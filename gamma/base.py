@@ -25,7 +25,9 @@ PY3 = version_info[0] == 3
 __all__ = ("DataFile", "SLC", "MLI", "gp", "imview", "gnuplot", "Temps",
            "Argp", "mkdir", "ln", "rm", "mv", "colors", "Files", "HGT",
            "make_colorbar", "Base", "IFG", "cat", "tmpdir", "string_t",
-           "ras_ext", "all_same", "gamma_progs", "ScanSAR", "montage")
+           "settings", "all_same", "gamma_progs", "ScanSAR", "montage",
+           "get_tmp")
+
 
 ScanSAR = True
 
@@ -35,27 +37,26 @@ else:
     string_t = basestring,
 
 
-libpath = os.getenv("LD_LIBRARY_PATH")
-
-os.environ["LD_LIBRARY_PATH"] = libpath + "/home/istvan/miniconda3/lib:"
+os.environ["LD_LIBRARY_PATH"] = \
+os.getenv("LD_LIBRARY_PATH") + "/home/istvan/miniconda3/lib:"
 
 tmpdir = _get_default_tempdir()
 
-ras_ext = "bmp"
+settings = {
+    "ras_ext": "bmp",
+    "path": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
+    "modules": ("DIFF", "DISP", "ISP", "LAT", "IPTA")
+}
 
 log = getLogger("gamma.base")
 
+gamma_cmaps = pth.join(settings["path"], "DISP", "cmaps")
 
-__gamma_path = "/home/istvan/progs/GAMMA_SOFTWARE-20181130"
-    
-__gamma_modules = ("DIFF", "DISP", "ISP", "LAT", "IPTA")
-
-gamma_cmaps = pth.join(__gamma_path, "DISP", "cmaps")
 
 gamma_commands = \
-tuple(binfile for module in __gamma_modules
+tuple(binfile for module in settings["modules"]
       for path in ("bin", "scripts")
-      for binfile in iglob(pth.join(__gamma_path, module, path, "*")))
+      for binfile in iglob(pth.join(settings["path"], module, path, "*")))
 
 
 
@@ -139,32 +140,33 @@ class Params(object):
 
 
 class Temps(object):
-    def __init__(self, ntmp=10, keep=False, **kwargs):
-        self.keep = keep
-        self.tmps = tuple(Files.get_tmp(**kwargs) for ii in range(ntmp))
+    def __init__(self, *args):
+        self.tmp_paths = list(*args)
+
+    
+    def add(self, *args):
+        self.tmp_paths.extend(args)
+
     
     def __del__(self):
-        if not self.keep:
-            for path in self.tmps:
-                rm(path)
-    
-    
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        for path in self.tmps:
+        for path in self.tmp_paths:
+            log.debug('Removed file: "%s"' % path)
             rm(path)
+
+
+tmp = Temps()
+
+
+def get_tmp(path=tmpdir):
+    global tmp
     
-    def __getitem__(self, idx):
-        return self.tmps[idx]
+    path = pth.join(path, next(_get_candidate_names()))
     
-    def __iter__(self):
-        for elem in self.tmps:
-            yield elem
+    tmp.add(path)
     
-    
-    
+    return path
+
+
 
 class Files(object):
     def __init__(self, **kwargs):
@@ -232,11 +234,6 @@ class Files(object):
     def empty(self, attrib):
         return Files.is_empty(getattr(self, attrib))
 
-    
-    @staticmethod
-    def get_tmp(path=tmpdir):
-        return pth.join(path, next(_get_candidate_names()))
-    
     
     @staticmethod
     def _mv(src, dst):
@@ -394,7 +391,7 @@ class DataFile(Files):
         parfile   = kwargs.get("parfile")
         
         if datfile is None:
-            datfile = Files.get_tmp(kwargs.get("tmpdir", tmpdir))
+            datfile = get_tmp(kwargs.get("tmpdir", tmpdir))
         
         if parfile is None:
             parfile = datfile + ".par"
@@ -542,10 +539,8 @@ class DataFile(Files):
         if img_fmt is None:
             img_fmt = gp_file.img_fmt()
         
-        if flip:
-            flip = -1
-        else:
-            flip = 1
+        
+        flipe = -1 if flip else 1
         
 
         if cmd is None:
