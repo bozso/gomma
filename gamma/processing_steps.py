@@ -5,11 +5,13 @@ import os
 from datetime import datetime
 from glob import iglob
 from pickle import dump, load
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from pprint import pprint
 from shutil import copy
 from sys import stdout
-from imp import load_source
+
+
+ProcStep = namedtuple("ProcStep", ["fun", "opt"])
 
 
 try:
@@ -56,7 +58,7 @@ class Pickler(object):
             dump(self, f)
     
     
-    def load(self, path)
+    def load(self, path):
         with open(path, "rb") as f:
             self = load(f)
 
@@ -66,41 +68,68 @@ class Pickler(object):
         self.update(kwargs)
         self.save(path)
     
+    
     @staticmethod
-    def file_load(path):
+    def load_file(path):
         with open(path, "rb") as f:
             return load(f)
 
 
-class MetaData(Pickler):
+class Config(dict):
+    def getint(self, key, default):
+        return int(self.get(key, default))
+    
+    def getfloat(self, key, default):
+        return float(self.get(key, default))
+
+            
+class Meta(Pickler):
     def __init__(self, **kwargs):
         self.meta = kwargs
+    
+    
+    def __getitem__(self, elem):
+        return self.meta[elem]
+
+    
+    def __setitem__(self, elem, arg):
+        self.meta[elem] = arg
+    
     
     @classmethod
     def from_file(cls, path):
         return cls(**Pickler.file_load(path))
-    
-    def 
-    
-    
-    
-def make_step(name, function, required=True):
-    return (name, (function, required))
 
 
 class ListIter(object):
+    converters = {
+        "S1SLC" : gm.S1SLC.from_tabfile,
+        "SLC" : gm.SLC.from_line,
+        "MLI" : gm.MLI.from_line
+    }
+    
+    ftypes = converters.keys()
+    
+    
     def __init__(self, path, converter):
         self.path = path
-        self.conv = converter
+
     
     def __enter__(self):
         self.fp = open(self.path, "r")
+        self.conv = self.get_conv()
         return self
     
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.fp.close()
-
+    
+    
+    def get_conv(self):
+        line = self.fp.readline()
+        
+        return ListIter.converters[line.split(":")[1].strip()]
+    
     def __iter__(self):
         for line in self.fp:
             yield self.conv(line)
@@ -108,12 +137,6 @@ class ListIter(object):
 
 class Processing(object):
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
-    converters = {
-        "S1SLC" : gm.S1SLC.from_tabfile,
-        "SLC" : gm.SLC.from_line,
-        "MLI" : gm.MLI.from_line
-    }
     
     
     def __init__(self, paramfile):
@@ -124,18 +147,16 @@ class Processing(object):
                  % (paramfile))
         
         self.params.read(paramfile)
-        self.params = params
         
-        self._steps = params.sections()
-        self._steps.remove("general")
+        self.steps = params.sections()
+        self.steps.remove("general")
         
-        metafile = self.params.get("general", "metafile")
+        self.metafile = self.params.get("general", "metafile")
 
-        
-        if pth.isfile(metafile):
-            self.meta = MetaData.fromfile(metafile)
+        if pth.isfile(self.metafile):
+            self.meta = Meta.fromfile(metafile)
         else:
-            self.meta = MetaData(dirs={}, lists={})
+            self.meta = Meta(dirs={}, lists={})
 
         
         #self.optional_steps = tuple(key for key, item in self._steps.items()
@@ -143,53 +164,16 @@ class Processing(object):
         #
         #self.required_steps = tuple(key for key, item in self._steps.items()
                                     #if item[1])
-        
 
-    def setup_log(self, logger_name, filename=None, formatter=None,
-                  loglevel="debug"):
-        
-        logger = logging.getLogger(logger_name)
-        
-        level = getattr(logging, loglevel.upper(), None)
-        
-        if not isinstance(level, int):
-            raise ValueError("Invalid log level: {}".format(loglevel))
-        
-        logger.setLevel(level)
-        
-        if formatter is None:
-            formatter = self._default_log_format
-        
-        form = logging.Formatter(formatter, datefmt="%Y.%m.%d %H:%M:%S")
-        
-        
-        if filename is not None:
-            fh = logging.FileHandler(filename)
-            fh.setFormatter(form)
-            logger.addHandler(fh)
-        
-        consoleHandler = logging.StreamHandler()
-        consoleHandler.setFormatter(form)
-        
-        logger.addHandler(consoleHandler)    
-    
-        return logger
 
-    
-    def steps(self):
-        return self._steps.keys()
-    
-    
     def parse_steps(self, args):
-        
         step = args.step
-        
-        _steps = tuple(self._steps.keys())
+        steps = self.steps
         
         if step is not None:
-            if step not in _steps:
-                raise ValueError("Single step \"%s\" is not a valid processing "
-                                 "step. Choose from: %s"
+            if step not in steps:
+                raise ValueError('Single step "%s" is not a valid processing '
+                                 'step. Choose from: %s'
                                  % (step, ", ".join(steps)))
             
             log.debug("Single step \"%s\" is executed." % step)
@@ -198,7 +182,7 @@ class Processing(object):
             start = args.start
             stop  = args.stop
             
-            if start not in _steps:
+            if start not in steps:
                 raise ValueError("Step \"%s\" is not a valid processing "
                                  "step. Choose from: %s"
                                  % (start, ", ".join(steps)))
@@ -208,11 +192,12 @@ class Processing(object):
                                  "step. Choose from: %s"
                                  % (stop, ", ".join(steps)))
     
-            log.debug("Steps from \"%s\" to \"%s\" will be executed."
+            log.debug('Steps from "%s" to "%s" will be executed.'
                        % (start, stop))
-            first = _steps.index(start)
-            last = _steps.index(stop)
-            return _steps[first:last + 1]
+            
+            first = steps.index(start)
+            last  = steps.index(stop)
+            return steps[first:last + 1]
 
 
     def show_steps(self):
@@ -221,9 +206,12 @@ class Processing(object):
                  ", ".join(step for step in self.optional_steps)))
     
     
-    def add_args(self, conf_file="gp_conf.py", log_file="gamma_proc.log"):
-        _steps = tuple(self.steps())
+    def add_args(self, log_file="gamma_proc.log"):
+        _steps = self.steps
         return (
+            narg("conf_file", kind="pos", help="File holding information "
+                 "about processing steps", alt="S", type=str, choices=_steps),
+
             narg("step", help="Single processing step to be executed",
                       alt="S", type=str, choices=_steps),
         
@@ -274,31 +262,34 @@ class Processing(object):
             return _path
 
 
-    def inlist(self, name, conv):
-        return ListIter(self.get_list(name), Processing.converters[conv])
+    def inlist(self, name):
+        return ListIter(self.get_list(name))
 
-    def outlist(self, name):
-        return open(self.get_list(name), "w")
+    
+    def outlist(self, name, ftype):
+        assert ftype in ListIter.ftypes
+        
+        f = open(self.get_list(name), "w")
+        
+        try:
+            f.write("type: %s" % ftype)
+        finally:
+            f.close()
+        
+        return f
 
 
     def parse_args(self, args):
         self.setup_log("gamma", filename=args.logfile, loglevel=args.loglevel)
         self.run_steps(args)
     
-
-    def load(self):
-        metafile = self.params.general["metafile"]
-
-        if pth.isfile(metafile):
-            self.meta = pk_load(metafile)
-        else:
-            self.meta = {"dirs": {}, "lists": {}}
     
-    
-    def save(self):
-        pk_save(self.meta, self.params.general["metafile"])
+    def get_fun(self, step):
+        opt = self.params.getboolean(step, "optional")
         
-    
+        return ProcStep(getattr(self, step), opt)
+        
+
     def run_steps(self, args):
         
         if args.show_steps:
@@ -308,9 +299,6 @@ class Processing(object):
         log.info("File containing processing parameters: %s" 
                  % (args.paramfile))
         
-        self.params = load_source("params", args.paramfile)
-        
-
         if args.info:
             pprint(self.params)
             pprint(self.meta)
@@ -323,157 +311,189 @@ class Processing(object):
         if not optional_steps:
             log.info("Skipping optional steps.")
         
-        self.load()
         
         for step in steps:
-            step_fun = self._steps[step]
+            step_fun = self.get_fun(step)
+            
             
             try:
-                if step_fun[1] or optional_steps:
-                    log.info("Running step: \"%s\"" % step)
-                    step_fun[0](self)
-            except Exception as e:
-                self.save()
-                raise e
-            
-            self.save()
+                if step_fun.opt or optional_steps:
+                    ustep = step.upper()
+                    
+                    delim("Starting step: %s" % ustep)
+                    
+                    log.info('Running step: "%s"' % step)
+                    step_fun.fun(self)
+                    
+                    delim("Finished step: %s" % ustep)
+            finally:
+                self.meta.save(self.metafile)
 
     
     def get_out_master(self):
-        general = self.params.general
-        
-        output_dir  = general.get("output_dir", ".")
+        output_dir  = self.params.get("general", "output_dir")
         master_date = self.meta.get("master_date")
         
         if master_date is None:
             raise ValueError("master_date is not defined.")
         
         return output_dir, master_date
+
+        
+    @staticmethod
+    def setup_log(self, logger_name, filename=None, formatter=None,
+                  loglevel="debug"):
+        
+        logger = logging.getLogger(logger_name)
+        
+        level = getattr(logging, loglevel.upper(), None)
+        
+        if not isinstance(level, int):
+            raise ValueError("Invalid log level: {}".format(loglevel))
+        
+        logger.setLevel(level)
+        
+        if formatter is None:
+            formatter = Processing._default_log_format
+        
+        form = logging.Formatter(formatter, datefmt="%Y.%m.%d %H:%M:%S")
+        
+        
+        if filename is not None:
+            fh = logging.FileHandler(filename)
+            fh.setFormatter(form)
+            logger.addHandler(fh)
+        
+        consoleHandler = logging.StreamHandler()
+        consoleHandler.setFormatter(form)
+        
+        logger.addHandler(consoleHandler)    
+    
+        return logger
+
+    
+    def section(name):
+        return Config(self.params.items(name))
+    
+    
+    def select_bursts(self):
+        general = self.section("general")
+        
+        slc_data = general.get("slc_data")
+
+        if slc_data is None:
+            raise ValueError('Parameter "slc_data" not defined.')
+
+
+        master_date, output_dir = general.get("master_date"), \
+                                  general.get("output_dir", ".")
+
+        date_start, date_stop = general.get("date_start"), general.get("date_stop")
+
+        check_zips = general.get("check_zips", False)
+        pol = general.get("pol")
+        
+        
+        IWs = tuple(general.get("iw%d" % (idx + 1)) for idx in range(3))
+        
+        IWs = tuple(
+            tuple(
+                int(elem)
+                for elem in IW.split(",")
+                 ) if IW is not None else None
+            for IW in IWs
+        )
         
 
-def select_bursts(self):
-
-    delim("Starting SELECT_BURSTS")
-
-    general = self.params.general
-    
-    slc_data = general.get("slc_data")
-
-    if slc_data is None:
-        raise ValueError('Parameter "slc_data" not defined.')
-
-
-    master_date, output_dir = general.get("master_date"), \
-                              general.get("output_dir", ".")
-
-    date_start, date_stop = general.get("date_start"), general.get("date_stop")
-
-    check_zips = general.get("check_zips", False)
-    pol = general.get("pol")
-    
-    
-    
-    IWs = tuple(general.get("iw%d" % (idx + 1)) for idx in range(3))
-    
-    IWs = tuple(
-        tuple(
-            int(elem)
-            for elem in IW.split(",")
-             ) if IW is not None else None
-        for IW in IWs
-    )
-    
-
-    if IWs[2] is not None and IWs[1] is None:
-        raise ValueError("Selected IWs must be contigous. You must have "
-                         "selected bursts in IW2 to have bursts in IW3")
-    
-    log.info("Creating SLC directories, checking dates and creating "
-             "zipfile list.")
-    
-    SLC = (gm.S1Zip(zipfile)
-           for zipfile in iglob(pth.join(slc_data, "S1*_IW_SLC*.zip")))
-    
-    if date_start is not None and date_stop is not None:
-        date_start = datetime.strptime(date_start, "%Y%m%d")
-        date_stop = datetime.strptime(date_stop, "%Y%m%d")
+        if IWs[2] is not None and IWs[1] is None:
+            raise ValueError("Selected IWs must be contigous. You must have "
+                             "selected bursts in IW2 to have bursts in IW3")
         
-        SLC = (slc for slc in SLC
-               if slc.date.start > date_start and slc.date.stop < date_stop)
-    
-    elif date_start is not None:
-        date_start = datetime.strptime(date_start, "%Y%m%d")
-
-        SLC = (slc for slc in SLC if slc.date.start > date_start)
-
-
-    elif date_stop is not None:
-        date_stop = datetime.strptime(date_stop, "%Y%m%d")
-        SLC = (slc for slc in SLC if slc.date.stop < date_stop)
-
-    
-    if check_zips:
-        SLC = (slc for slc in SLC if slc.test_zip())
-    
-    SLC = tuple(SLC)
-    dates = tuple(slc.date for slc in SLC)
-    self.meta["dates"] = dates
-    
-    if master_date is None:
-        log.info("No master_date defined, using first date.")
+        log.info("Creating SLC directories, checking dates and creating "
+                 "zipfile list.")
         
-        master_slc = sorted(SLC, key=lambda x: x.date.mean)[0]
-        master_date = master_slc.date.date2str()
+        SLC = (gm.S1Zip(zipfile)
+               for zipfile in iglob(pth.join(slc_data, "S1*_IW_SLC*.zip")))
         
-        self.meta["master_date"] = master_date
-    else:
-        master_date = general["master_date"]
-        master_slc = [slc for slc in SLC
-                      if slc.date.date2str() == master_date][0]
-
-
-    log.info("Selected master date is %s" % master_date)
-    
-    # if we have selected bursts
-    if any(IWs):
-        master_burst_nums = master_slc.get_burst_nums(pol)
+        if date_start is not None and date_stop is not None:
+            date_start = datetime.strptime(date_start, "%Y%m%d")
+            date_stop = datetime.strptime(date_stop, "%Y%m%d")
+            
+            SLC = (slc for slc in SLC
+                   if slc.date.start > date_start and slc.date.stop < date_stop)
         
-        master_burst_nums = \
-        tuple(None if IW is None
-              else tuple((master_burst[IW[0] - 1], master_burst[IW[-1] - 1]))
-              for IW, master_burst in zip(IWs, master_burst_nums))
+        elif date_start is not None:
+            date_start = datetime.strptime(date_start, "%Y%m%d")
+
+            SLC = (slc for slc in SLC if slc.date.start > date_start)
+
+
+        elif date_stop is not None:
+            date_stop = datetime.strptime(date_stop, "%Y%m%d")
+            SLC = (slc for slc in SLC if slc.date.stop < date_stop)
+
         
-        burst_nums = tuple(slc.select_bursts(pol, master_burst_nums)
-                           for slc in SLC)
-    # end select AOE
-    
-    
-    S1A_bursts = set(
-            " ".join(
-            "IW%d: %s" % (ii + 1, item)
-            for ii, item in enumerate(burst_num)
-            )
-        for slc, burst_num in zip(SLC, burst_nums) if slc.mission == "S1A"
-    )
+        if check_zips:
+            SLC = (slc for slc in SLC if slc.test_zip())
+        
+        SLC = tuple(SLC)
+        dates = tuple(slc.date for slc in SLC)
+        self.meta["dates"] = dates
+        
+        if master_date is None:
+            log.info("No master_date defined, using first date.")
+            
+            master_slc = sorted(SLC, key=lambda x: x.date.mean)[0]
+            master_date = master_slc.date.date2str()
+            
+            self.meta["master_date"] = master_date
+        else:
+            master_date = general["master_date"]
+            master_slc = [slc for slc in SLC
+                          if slc.date.date2str() == master_date][0]
 
-    S1B_bursts = set(
-            " ".join(
-            "IW%d: %s" % (ii + 1, item)
-            for ii, item in enumerate(burst_num)
-            )
-        for slc, burst_num in zip(SLC, burst_nums) if slc.mission == "S1B"
-    )
 
-    #log.debug("Master bursts:\n{}\n\n".format(S1A_bursts))
-    log.info("\nSentinel-1A slave bursts:\n%s" % S1A_bursts)
-    log.info("\nSentinel-1B slave bursts:\n%s" % S1B_bursts)
-    
-    self.meta["SLC_zip"] = SLC
-    self.meta["burst_nums"] = burst_nums
+        log.info("Selected master date is %s" % master_date)
+        
+        # if we have selected bursts
+        if any(IWs):
+            master_burst_nums = master_slc.get_burst_nums(pol)
+            
+            master_burst_nums = \
+            tuple(None if IW is None
+                  else tuple((master_burst[IW[0] - 1], master_burst[IW[-1] - 1]))
+                  for IW, master_burst in zip(IWs, master_burst_nums))
+            
+            burst_nums = tuple(slc.select_bursts(pol, master_burst_nums)
+                               for slc in SLC)
+        # end select AOE
+        
+        
+        S1A_bursts = set(
+                " ".join(
+                "IW%d: %s" % (ii + 1, item)
+                for ii, item in enumerate(burst_num)
+                )
+            for slc, burst_num in zip(SLC, burst_nums) if slc.mission == "S1A"
+        )
 
-    gm.rm("tmp_par", "tmp_TOPS_par")
-    
-    print(delim("Finished SELECT_BURSTS"))
+        
+        S1B_bursts = set(
+                " ".join(
+                "IW%d: %s" % (ii + 1, item)
+                for ii, item in enumerate(burst_num)
+                )
+            for slc, burst_num in zip(SLC, burst_nums) if slc.mission == "S1B"
+        )
+
+        #log.debug("Master bursts:\n{}\n\n".format(S1A_bursts))
+        log.info("\nSentinel-1A slave bursts:\n%s" % S1A_bursts)
+        log.info("\nSentinel-1B slave bursts:\n%s" % S1B_bursts)
+        
+        self.meta["SLC_zip"] = SLC
+        self.meta["burst_nums"] = burst_nums
+
+        gm.rm("tmp_par", "tmp_TOPS_par")
 
 
 def import_slc(self):
