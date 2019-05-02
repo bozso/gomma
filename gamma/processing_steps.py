@@ -25,7 +25,7 @@ gp, narg = gm.gamma_progs, gm.Argp.narg
 log = logging.getLogger("gamma.steps")
 
 
-__all__ = ("Processing", "make_step", "ListIter")
+__all__ = ("Processing", "ListIter")
 
 # *********************
 # * Utility functions *
@@ -48,29 +48,42 @@ def delim(msg, sym="*", width=80):
     
     print(tpl.format(syms, msg, syms))
 
+
+
+class Pickler(object):
+    def save(self, path):
+        with open(path, "wb") as f:
+            dump(self, f)
     
-def pk_save(obj, path):
-    with open(path, "wb") as f:
-        dump(obj, f)
-
-
-def pk_load(path):
-    with open(path, "rb") as f:
-        obj = load(f)
     
-    return obj
+    def load(self, path)
+        with open(path, "rb") as f:
+            self = load(f)
 
-
-def pk_update(path, _dict):
-    with open(path, "rb") as f:
-        obj = load(f)
     
-    obj.update(_dict)
+    def update(self, path, **kwargs):
+        self.load(path)
+        self.update(kwargs)
+        self.save(path)
     
-    with open(path, "wb") as f:
-        dump(obj, f)
+    @staticmethod
+    def file_load(path):
+        with open(path, "rb") as f:
+            return load(f)
 
 
+class MetaData(Pickler):
+    def __init__(self, **kwargs):
+        self.meta = kwargs
+    
+    @classmethod
+    def from_file(cls, path):
+        return cls(**Pickler.file_load(path))
+    
+    def 
+    
+    
+    
 def make_step(name, function, required=True):
     return (name, (function, required))
 
@@ -102,15 +115,34 @@ class Processing(object):
         "MLI" : gm.MLI.from_line
     }
     
+    
+    def __init__(self, paramfile):
+        
+        self.params = SafeConfigParser()
+        
+        log.info("File containing processing parameters: %s"
+                 % (paramfile))
+        
+        self.params.read(paramfile)
+        self.params = params
+        
+        self._steps = params.sections()
+        self._steps.remove("general")
+        
+        metafile = self.params.get("general", "metafile")
 
-    def __init__(self, *steps):
-        self._steps = OrderedDict(steps)
         
-        self.optional_steps = tuple(key for key, item in self._steps.items()
-                                    if not item[1])
+        if pth.isfile(metafile):
+            self.meta = MetaData.fromfile(metafile)
+        else:
+            self.meta = MetaData(dirs={}, lists={})
+
         
-        self.required_steps = tuple(key for key, item in self._steps.items()
-                                    if item[1])
+        #self.optional_steps = tuple(key for key, item in self._steps.items()
+                                    #if not item[1])
+        #
+        #self.required_steps = tuple(key for key, item in self._steps.items()
+                                    #if item[1])
         
 
     def setup_log(self, logger_name, filename=None, formatter=None,

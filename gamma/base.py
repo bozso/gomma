@@ -17,7 +17,7 @@ from tempfile import _get_default_tempdir, _get_candidate_names
 from pprint import pformat
 from subprocess import check_output, CalledProcessError, STDOUT
 from shlex import split
-
+from atexit import register
 
 
 PY3 = version_info[0] == 3
@@ -26,7 +26,7 @@ __all__ = ("DataFile", "SLC", "MLI", "gp", "imview", "gnuplot", "Temps",
            "Argp", "mkdir", "ln", "rm", "mv", "colors", "Files", "HGT",
            "make_colorbar", "Base", "IFG", "cat", "tmpdir", "string_t",
            "settings", "all_same", "gamma_progs", "ScanSAR", "montage",
-           "get_tmp")
+           "get_tmp", "settings")
 
 
 ScanSAR = True
@@ -42,11 +42,13 @@ os.getenv("LD_LIBRARY_PATH") + "/home/istvan/miniconda3/lib:"
 
 tmpdir = _get_default_tempdir()
 
+
 settings = {
     "ras_ext": "bmp",
     "path": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
     "modules": ("DIFF", "DISP", "ISP", "LAT", "IPTA")
 }
+
 
 log = getLogger("gamma.base")
 
@@ -139,22 +141,7 @@ class Params(object):
         return int(self[key].split()[idx])
 
 
-class Temps(object):
-    def __init__(self, *args):
-        self.tmp_paths = list(*args)
-
-    
-    def add(self, *args):
-        self.tmp_paths.extend(args)
-
-    
-    def __del__(self):
-        for path in self.tmp_paths:
-            log.debug('Removed file: "%s"' % path)
-            rm(path)
-
-
-tmp = Temps()
+tmp = []
 
 
 def get_tmp(path=tmpdir):
@@ -162,10 +149,20 @@ def get_tmp(path=tmpdir):
     
     path = pth.join(path, next(_get_candidate_names()))
     
-    tmp.add(path)
+    tmp.append(path)
     
     return path
 
+
+def cleanup_temps():
+    global tmp
+    
+    for path in tmp:
+        log.debug('Removed file: "%s"' % path)
+        rm(path)
+
+
+register(cleanup_temps)
 
 
 class Files(object):
@@ -422,7 +419,7 @@ class DataFile(Files):
     def __del__(self):
         keep = self.keep
         
-        if keep is not None and not self.keep:
+        if keep is not None and not keep:
             self.rm()
 
     
@@ -577,7 +574,7 @@ class DataFile(Files):
         avg_fact = kwargs.get("avg_fact", 750)
         
         if raster is None:
-            raster = "%s.%s" % (args["datfile"], ras_ext)
+            raster = "%s.%s" % (args["datfile"], settings["ras_ext"])
     
         if avg_fact == "noavg":
             avg_rng, avg_azi = None, None
@@ -627,8 +624,8 @@ class DataFile(Files):
 
 
 class SLC(DataFile):
-    def __init__(self, **kwargs):
-        DataFile.__init__(self, **kwargs)
+    #def __init__(self, **kwargs):
+        #DataFile.__init__(self, **kwargs)
     
     
     def multi_look(self, MLI, **kwargs):
@@ -650,8 +647,8 @@ class SLC(DataFile):
     
 
 class MLI(DataFile):
-    def __init__(self, **kwargs):
-        DataFile.__init__(self, **kwargs)
+    #def __init__(self, **kwargs):
+        #DataFile.__init__(self, **kwargs)
 
     def plot_cmd(self):
         return "pwr"
@@ -1437,7 +1434,6 @@ def cat(out, *args):
     for arg in args[1:]:
         with open(out, 'ab') as f_out, open(arg, 'rb') as f_in:
             copyfileobj(f_in, f_out)
-        
 
 
 colors = {
@@ -1460,12 +1456,14 @@ colors = {
     "navy"      : RGB(  0,    0,  128)
 }
 
+
 def _proc_arg(arg):
     if arg is not None:
         return str(arg)
     else:
         return "-"
 
+        
 plot_cmd_files = {
     "pwr": ("pix_sigma0", "pix_gamma0", "sbi_pwr", "cc", "rmli", "mli"),
     "SLC": ("slc", "rslc"),

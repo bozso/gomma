@@ -7,7 +7,7 @@ log = getLogger("gamma.interferometry")
 gp = gp.gamma_progs
 
 
-__all__ = ("coherence", "base_plot")
+__all__ = ["coherence", "base_plot"]
 
 
 cc_weights = {
