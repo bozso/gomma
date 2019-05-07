@@ -8,24 +8,9 @@ from gamma.processing_steps import pk_load
 from gamma.base import display, raster, Argp, display_parser, raster_parser
 
 
-TSProc = gs.Processing(
-    gs.make_step("select_bursts", gs.select_bursts),
-    gs.make_step("import",        gs.import_slc),
-    gs.make_step("merge",         gs.merge_slcs),
-    gs.make_step("quick_mli",     gs.quicklook_mli, False),
-    gs.make_step("mosaic",        gs.mosaic_tops, False),
-    gs.make_step("iono",          gs.check_ionoshpere, False),
-    gs.make_step("geocode",       gs.geocode_master),
-    gs.make_step("geo_check",     gs.check_geocode, False),
-    gs.make_step("coreg",         gs.coreg_slcs),
-)
-
-
-IPTA = gs.Processing(
-    gs.make_step("deramp", gs.deramp),
-    gs.make_step("base_plot", gs.base_plot),
-    gs.make_step("avg_mli", gs.avg_mli),
-)
+def proc(args):
+    proc = Processing(args.paramfile)
+    proc.run_steps(args)
 
 
 def execute(process, args):
@@ -50,9 +35,7 @@ def main():
     # * ts_prep *
     # ***********
     
-    ap.subcmd("tsprep", partial(execute, TSProc), *TSProc.add_args())
-    ap.subcmd("ipta", partial(execute, IPTA),
-              *IPTA.add_args("ipta_conf.py", "ipta_proc.log"))
+    ap.subcmd("proc", proc, *Processing.args)
 
     ap.subcmd("ras", _raster, parents=[raster_parser])
     ap.subcmd("dis", _display, parents=[display_parser])
