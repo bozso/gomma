@@ -284,19 +284,13 @@ class S1SLC(object):
                 sh.copy(iw1.TOPS_par, iw2.TOPS_par) 
         
     
-    def mosaic(self, datfile=None, parfile=None, rng_looks=1, azi_looks=1,
-               debug=False):
-
-        if datfile is None:
-            datfile = pth.join(pth.dirname(self.tab),
-                                           self.date.date2str() + ".slc")
-        
-        slc = SLC(datfile, parfile=parfile)
+    def mosaic(self, rng_looks=1, azi_looks=1, debug=False, **kwargs):
+        slc = SLC(**kwargs)
         
         gp.SLC_mosaic_S1_TOPS(self.tab, slc.datpar, rng_looks, azi_looks,
                               debug=debug)
         
-        self.slc = slc
+        return slc
         
 
     def multi_look(self, MLI, rng_looks=1, azi_looks=1, wflg=0):

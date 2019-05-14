@@ -2,14 +2,12 @@
 
 from functools import partial
 
-import gamma.processing_steps as gs
-from gamma.processing_steps import pk_load
-
-from gamma.base import display, raster, Argp, display_parser, raster_parser
+from gamma import (display, raster, Argp, display_parser, raster_parser,
+                   Processing)
 
 
 def proc(args):
-    proc = Processing(args.paramfile)
+    proc = Processing(args.conf_file)
     proc.run_steps(args)
 
 

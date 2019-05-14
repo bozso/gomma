@@ -1,3 +1,4 @@
+
 import logging
 import os.path as pth
 import os
@@ -5,7 +6,7 @@ import os
 from datetime import datetime
 from glob import iglob
 from pickle import dump, load
-from collections import OrderedDict, namedtuple
+from collections import namedtuple
 from pprint import pprint
 from shutil import copy
 from sys import stdout
@@ -27,7 +28,7 @@ gp, narg = gm.gamma_progs, gm.Argp.narg
 log = logging.getLogger("gamma.steps")
 
 
-__all__ = ("Processing", "ListIter")
+__all__ = ["Processing", "ListIter"]
 
 # *********************
 # * Utility functions *
@@ -141,22 +142,18 @@ class Processing(object):
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
     args = (
-            narg("conf_file", kind="pos", help="File holding information "
-                 "about processing steps", alt="S", type=str, choices=steps),
-
             narg("step", help="Single processing step to be executed",
-                      alt="S", type=str, choices=_steps),
+                 alt="S", type=str),
         
             narg("start", help="Starting processing step. Processing steps will "
                  "be executed until processing step defined by --stop is "
-                 "reached.", alt="s", type=str, default=steps[0],
-                 choices=steps),
+                 "reached.", alt="s", type=str),
         
             narg("stop", help="Last processing step to be executed.", alt="e",
-                 type=str, default=steps[-1], choices=steps),
-        
-            narg("paramfile", help="Text file that contains the GAMMA processing "
-                 "parameters.", alt="p", type=str, default=conf_file),
+                 type=str),
+
+            narg("conf_file", kind="pos", help="File holding information "
+                 "about processing steps", alt="c", type=str),
         
             narg("logfile", help="Log messages will be saved here.", alt="l",
                  type=str, default="gamma_proc.log"),
@@ -175,16 +172,16 @@ class Processing(object):
         )
     
     
-    def __init__(self, paramfile):
+    def __init__(self, conf_file):
         
         self.params = SafeConfigParser()
         
         log.info("File containing processing parameters: %s"
-                 % (paramfile))
+                 % (conf_file))
         
-        self.params.read(paramfile)
+        self.params.read(conf_file)
         
-        self.steps = params.sections()
+        self.steps = self.params.sections()
         self.steps.remove("general")
         
         self.metafile = self.params.get("general", "metafile")
@@ -193,14 +190,12 @@ class Processing(object):
             self.meta = Meta.fromfile(metafile)
         else:
             self.meta = Meta(dirs={}, lists={})
-
         
-        #self.optional_steps = tuple(key for key, item in self._steps.items()
-                                    #if not item[1])
-        #
-        #self.required_steps = tuple(key for key, item in self._steps.items()
-                                    #if item[1])
-
+            #self.optional_steps = tuple(key for key, item in self._steps.items()
+                                        #if not item[1])
+            #
+            #self.required_steps = tuple(key for key, item in self._steps.items()
+                                        #if item[1])
 
     def parse_steps(self, args):
         step = args.step
@@ -319,8 +314,9 @@ class Processing(object):
         
         try:
             f.write("type: %s" % ftype)
-        finally:
+        except Exception as e:
             f.close()
+            raise e
         
         return f
     
@@ -503,10 +499,10 @@ class Processing(object):
         else:
             copy_fun = getattr(gp, "SLC_copy_S1_TOPS")
 
-        print(delim("Starting IMPORT_SLCS"))
+        general = self.section("general")
         
         output_dir, master_date = self.get_out_master()
-        pol = self.params.general.get("pol")
+        pol = general.get("pol")
         
         dir_uncrop = self.get_dir("SLC_uncrop")
         dir_crop = self.get_dir("SLC_crop")
@@ -520,44 +516,42 @@ class Processing(object):
         tpl = pth.join(dir_uncrop, "{date}_iw{iw}.{pol}.slc")
         tpl_tab = pth.join(dir_uncrop, "{date}.{pol}.SLC_tab")
 
-
-        SLC_uncrop = \
-        tuple(
-            gm.S1SLC.from_template(pol, date, burst_num, tpl=tpl,
-                                   tpl_tab=tpl_tab)
-            for burst_num, date in zip(burst_nums, dates)
-        )
+        
+        with self.outlist("uncrop", "S1SLC") as f:
+            for burst_num, date, slc in zip(burst_nums, dates, SLC):
+                uncrop = gm.S1SLC.from_template(pol, date, burst_num, tpl=tpl,
+                                                tpl_tab=tpl_tab)
+                
+                for IW in uncrop.IWs:
+                    if IW is not None:
+                        slc.extract(pol, IW)
+                
+                f.write("%s\n" % s1slc)
 
 
         tpl = pth.join(dir_crop, "{date}_iw{iw}.{pol}.slc")
         tpl_tab = pth.join(dir_crop, "{date}.{pol}.SLC_tab")
         
-        
-        SLC_crop = \
-        tuple(
-            gm.S1SLC.from_template(pol, date, burst_num, tpl=tpl,
-                                   tpl_tab=tpl_tab)
-            for burst_num, date in zip(burst_nums, dates)
-        )
+        with self.outlist("crop", "S1SLC") as f:
+            for burst_num, date in zip(burst_nums, dates):
+                s1slc = gm.S1SLC.from_template(pol, date, burst_num, tpl=tpl,
+                                               tpl_tab=tpl_tab)
+                f.write("%s\n" % s1slc)
 
-        for slc, uncrop in zip(SLC, SLC_uncrop):
-            for IW in uncrop.IWs:
-                if IW is not None:
-                    slc.extract_IW(pol, IW)
         
-        for uncrop, crop, burst_num in zip(SLC_uncrop, SLC_crop, burst_nums):
-            with open("tmp_burst_tab", "w") as f:
-                f.write("\n".join("%d %d" % (burst[0], burst[1])
-                        for burst in burst_num if burst is not None) + "\n")
+        burst_tab = gm.get_tmp()
+        
+        with self.inlist("uncrop") as uc, self.inlist("crop") as c:
+            for uncrop, crop, burst_num in zip(uc, c, burst_nums):
+                with open(burst_tab, "w") as f:
+                    f.write("\n".join("%d %d" % (burst[0], burst[1])
+                            for burst in burst_num if burst is not None) + "\n")
+                
+                copy_fun(uncrop.tab, crop.tab, "tmp_burst_tab")
             
-            copy_fun(uncrop.tab, crop.tab, "tmp_burst_tab")
-
-        self.meta["SLC_uncrop"] = SLC_uncrop
-        self.meta["SLC_crop"] = SLC_crop
         
-        gm.rm("tmp_burst_tab")
-        
-        print(delim("Finished IMPORT_SLCS"))
+        # self.meta["SLC_uncrop"] = "uncrop"
+        # self.meta["SLC_crop"] = "crop"
 
 
     def merge_slcs(self):
@@ -583,7 +577,12 @@ class Processing(object):
         
         list_merged = self.get_list("merged")
         
-        with self.outlist("merged", "w") as f:
+        
+        with self.inlist("crop") as f:
+            SLC = tuple(slc for slc in f)
+        
+        
+        with self.outlist("merged", "S1SLC") as f:
             for SLC1 in SLC:
                 if SLC1 in used_SLC:
                     continue
@@ -621,7 +620,7 @@ class Processing(object):
         # close
         
         self.meta["dates"] = tuple(slc.date for slc in SLC_merged)
-        self.meta["merged"] = list_merged
+        # self.meta["merged"] = list_merged
 
         # CLEANUP
         #gm.rm("*.SAFE", "*.SLC_tab", "*iw*", "*.slc*")
@@ -629,21 +628,18 @@ class Processing(object):
 
     def quicklook_mli(self):
         
-        general = self.params.general
+        general = self.section("general")
         
         output_dir    = general.get("output_dir", ".")
-        range_looks   = general.get("range_looks", 1)
-        azimuth_looks = general.get("azimuth_looks", 4)
+        range_looks   = general.getint("range_looks", 1)
+        azimuth_looks = general.getint("azimuth_looks", 4)
         pol           = general.get("pol")
         
-        log.info("CREATING QUICKLOOK MLIs.")
         mli_dir = self.get_dir("MLI")
-        
-        list_merged = self.meta["merged"]
         
         tpl = pth.join(mli_dir, "%s.%s.mli")
         
-        with self.inlist("merged", "S1SLC") as SLC, self.outlist("mli", "w") as f:
+        with self.inlist("merged", "S1SLC") as SLC, self.outlist("mli", "MLI") as f:
             for mli, slc in zip(MLI, SLC):
                 # create MLI file paths
                 mli = gm.MLI(tpl % (slc.date2str(), pol))
@@ -660,17 +656,21 @@ class Processing(object):
 
     def mosaic_tops(self):
         
-        general = self.params.general
+        general = self.section("general")
         
         output_dir      = general.get("output_dir", ".")
-        range_looks     = general.get("range_looks", 1)
-        azimuth_looks   = general.get("azimuth_looks", 4)
+        range_looks     = general.getint("range_looks", 1)
+        azimuth_looks   = general.getint("azimuth_looks", 4)
         pol             = general.get("pol", "vv")
         
-        log.info("MOSAICING SENTINEL IWs.")
         
-        for S1slc in self.meta["SLC_merged"]:
-            S1slc.mosaic(rng_looks=rng_looks, azi_looks=azi_looks)
+        with self.inlist("merged") as m, \
+        self.outlist("slc_mosaic", "SLC") as f:
+            for s1slc in m:
+                dat = pth.join(s1slc.IW[0].dat.split(".")[-2], ".dat")
+                slc = s1slc.mosaic(rng_looks=rng_looks, azi_looks=azi_looks,
+                                   datfile=dat)
+                f.write("%s\n" % slc)
 
 
     def check_ionoshpere(self):

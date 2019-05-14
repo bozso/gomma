@@ -22,11 +22,12 @@ from atexit import register
 
 PY3 = version_info[0] == 3
 
-__all__ = ("DataFile", "SLC", "MLI", "gp", "imview", "gnuplot", "Temps",
+__all__ = ("DataFile", "SLC", "MLI", "gp", "imview", "gnuplot",
            "Argp", "mkdir", "ln", "rm", "mv", "colors", "Files", "HGT",
            "make_colorbar", "Base", "IFG", "cat", "tmpdir", "string_t",
            "settings", "all_same", "gamma_progs", "ScanSAR", "montage",
-           "get_tmp", "settings")
+           "get_tmp", "settings", "display", "raster",
+           "display_parser", "raster_parser")
 
 
 ScanSAR = True
@@ -37,8 +38,6 @@ else:
     string_t = basestring,
 
 
-os.environ["LD_LIBRARY_PATH"] = \
-os.getenv("LD_LIBRARY_PATH") + "/home/istvan/miniconda3/lib:"
 
 tmpdir = _get_default_tempdir()
 
@@ -46,8 +45,13 @@ tmpdir = _get_default_tempdir()
 settings = {
     "ras_ext": "bmp",
     "path": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
-    "modules": ("DIFF", "DISP", "ISP", "LAT", "IPTA")
+    "modules": ("DIFF", "DISP", "ISP", "LAT", "IPTA"),
+    "libpaths": "/home/istvan/miniconda3/lib:"
 }
+
+
+os.environ["LD_LIBRARY_PATH"] = \
+os.getenv("LD_LIBRARY_PATH") + settings["libpaths"]
 
 
 log = getLogger("gamma.base")
@@ -59,7 +63,6 @@ gamma_commands = \
 tuple(binfile for module in settings["modules"]
       for path in ("bin", "scripts")
       for binfile in iglob(pth.join(settings["path"], module, path, "*")))
-
 
 
 def make_cmd(command):
@@ -93,6 +96,9 @@ def make_cmd(command):
     return cmd
 
 
+
+gamma_commands = ("rashgt", "ScanSAR_burst_corners")
+    
 gamma_progs = type("Gamma", (object,),
                    dict((pth.basename(cmd), staticmethod(make_cmd(cmd)))
                    for cmd in gamma_commands))
@@ -104,7 +110,7 @@ gp = gamma_progs
 _convert = make_cmd("convert")
 _montage = make_cmd("montage")
 gnuplot = make_cmd("gnuplot")
-imview   = make_cmd("eog")
+imview = make_cmd("eog")
 
 
 def all_same(iterable):
@@ -145,8 +151,6 @@ tmp = []
 
 
 def get_tmp(path=tmpdir):
-    global tmp
-    
     path = pth.join(path, next(_get_candidate_names()))
     
     tmp.append(path)
