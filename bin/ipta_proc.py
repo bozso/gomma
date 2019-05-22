@@ -46,6 +46,7 @@ def date(path):
 
 
 def main():
+        
     root = "/mnt/storage_A/istvan/dszekcso"
     
     ipta_dir = mkdir(pth.join(root, "ipta"))
@@ -82,9 +83,20 @@ def main():
                     azi_off=off_ln[2], azi_num=off_ln[3])
         master_crop.raster()
     
+    if 0:
+        gm.ListIter.file_from_glob("/mnt/storage_A/Kulcs/"
+                                   "PS_ASC_INSAR_20170416_preproc/*.vv.rslc",
+                                   fpath="RSLC.list", type="SLC")
     
-    RSLC = tuple(gm.SLC(datfile=slc)
-                 for slc in iglob(pth.join("deramp", "*.slc.deramp")))
+    # RSLC = tuple(gm.SLC(datfile=slc)
+    #              for slc in iglob(pth.join("deramp", "*.slc.deramp")))
+    
+    
+    with gm.ListIter("RSLC.list") as l:
+        for rslc in l:
+            print(rslc)
+    
+    return
     
     rslc_tab = pth.join(ipta_dir, "rslc.tab")
     
@@ -718,7 +730,8 @@ def main():
         
         pwr.ras_pt(avg_ras, pwr.ras, size=10)
 
-
+    
+    
     if 0:
         from struct import pack
         

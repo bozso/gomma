@@ -41,7 +41,6 @@ def download(url, outfile, timeout=5, attempts=3):
             break
         except URLError as e:
             _attempts += 1
-            print(type(e))
 
 
 def parse_map(tecmap, exponent = -1):

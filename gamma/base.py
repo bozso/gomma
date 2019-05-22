@@ -97,7 +97,7 @@ def make_cmd(command):
 
 
 
-gamma_commands = ("rashgt", "ScanSAR_burst_corners")
+# gamma_commands = ("rashgt", "ScanSAR_burst_corners")
     
 gamma_progs = type("Gamma", (object,),
                    dict((pth.basename(cmd), staticmethod(make_cmd(cmd)))

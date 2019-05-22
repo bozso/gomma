@@ -72,9 +72,9 @@ class Masks(object):
     
     
     def __getitem__(self, key):
-        try:
+        if key in self.mlist:
             return self.mlist[key]
-        except KeyError:
+        else:
             _path = pth.join(self.root, key)
             self.mlist[key] = _path
             return _path

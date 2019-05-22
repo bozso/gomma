@@ -1,7 +1,6 @@
-
 import logging
-import os.path as pth
 import os
+pth = os.path
 
 from datetime import datetime
 from glob import iglob
@@ -102,6 +101,7 @@ class Meta(Pickler):
         return cls(**Pickler.load_file(path))
 
 
+
 class ListIter(object):
     converters = {
         "S1SLC" : gm.S1SLC.from_tabfile,
@@ -109,10 +109,18 @@ class ListIter(object):
         "MLI" : gm.MLI.from_line
     }
     
+    
+    constructors = {
+        "S1SLC" : gm.S1SLC,
+        "SLC" : gm.SLC,
+        "MLI" : gm.MLI
+    }
+    
+    
     ftypes = converters.keys()
     
     
-    def __init__(self, path, converter):
+    def __init__(self, path):
         self.path = path
 
     
@@ -137,7 +145,20 @@ class ListIter(object):
         for line in self.fp:
             yield self.conv(line)
 
-
+    
+    @staticmethod
+    def file_from_glob(*path, **kwargs):
+        fpath = kwargs.get("fpath")
+        _type = kwargs.get("type")
+        constr = ListIter.constructors[_type]
+        
+        with open(fpath, "w") as f:
+            f.write("type: %s\n" % _type)
+            
+            for path in iglob(pth.join(*path)):
+                f.write("%s\n" % constr(datfile=path))
+    
+    
 class Processing(object):
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
@@ -187,7 +208,7 @@ class Processing(object):
         self.metafile = self.params.get("general", "metafile")
 
         if pth.isfile(self.metafile):
-            self.meta = Meta.fromfile(metafile)
+            self.meta = Meta.from_file(self.metafile)
         else:
             self.meta = Meta(dirs={}, lists={})
         
@@ -285,9 +306,9 @@ class Processing(object):
 
     
     def get_dir(self, name):
-        try:
+        if name in self.meta["dirs"]:
             return self.meta["dirs"][name]
-        except KeyError:
+        else:
             _path = pth.join(self.params.general["output_dir"], name)
             os.mkdir(_path)
             self.meta["dirs"][name] = _path
@@ -295,9 +316,9 @@ class Processing(object):
 
 
     def get_list(self, name):
-        try:
+        if name in self.meta["lists"]:
             return self.meta["lists"][name]
-        except KeyError:
+        else:
             _path = pth.join(self.get_dir("list_dir"), "%s.file_list" % name)
             self.meta["lists"][name] = _path
             return _path
@@ -313,7 +334,7 @@ class Processing(object):
         f = open(self.get_list(name), "w")
         
         try:
-            f.write("type: %s" % ftype)
+            f.write("type: %s\n" % ftype)
         except Exception as e:
             f.close()
             raise e
