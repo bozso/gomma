@@ -22,7 +22,7 @@ except ImportError:
 
 import gamma as gm
 
-gp, narg = gm.gamma_progs, gm.Argp.narg
+gp = gm.gamma_progs
 
 log = logging.getLogger("gamma.steps")
 
@@ -162,45 +162,14 @@ class ListIter(object):
 class Processing(object):
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
-    args = (
-            narg("step", help="Single processing step to be executed",
-                 alt="S", type=str),
-        
-            narg("start", help="Starting processing step. Processing steps will "
-                 "be executed until processing step defined by --stop is "
-                 "reached.", alt="s", type=str),
-        
-            narg("stop", help="Last processing step to be executed.", alt="e",
-                 type=str),
-
-            narg("conf_file", kind="pos", help="File holding information "
-                 "about processing steps", alt="c", type=str),
-        
-            narg("logfile", help="Log messages will be saved here.", alt="l",
-                 type=str, default="gamma_proc.log"),
-        
-            narg("loglevel", help="Level of logging.", alt="g", type=str,
-                 default="info"),
-        
-            narg("skip_optional", help="If set the processing will skip optional "
-                 "steps.", kind="flag", alt="o"),
-    
-            narg("show_steps", help="If set, just print the processing steps.",
-                 kind="flag", alt="t"),
-    
-            narg("info", help="Dumps information about the processing to "
-                 "the terminal.", kind="flag", alt="i")
-        )
-    
-    
-    def __init__(self, conf_file):
-        
+    def __init__(self, args):
+        self.args = args
         self.params = SafeConfigParser()
         
         log.info("File containing processing parameters: %s"
-                 % (conf_file))
+                 % (args.conf_file))
         
-        self.params.read(conf_file)
+        self.params.read(args.conf_file)
         
         self.steps = self.params.sections()
         self.steps.remove("general")
@@ -218,7 +187,8 @@ class Processing(object):
             #self.required_steps = tuple(key for key, item in self._steps.items()
                                         #if item[1])
 
-    def parse_steps(self, args):
+    def parse_steps(self):
+        args = self.args
         step = args.step
         steps = self.steps
         
@@ -264,7 +234,8 @@ class Processing(object):
         return ProcStep(getattr(self, step), opt)
 
     
-    def run_steps(self, args):
+    def run_steps(self):
+        args = self.args
         Processing.setup_log("gamma", filename=args.logfile, loglevel=args.loglevel)
         
         if args.show_steps:

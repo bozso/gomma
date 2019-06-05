@@ -22,12 +22,12 @@ from atexit import register
 
 PY3 = version_info[0] == 3
 
-__all__ = ("DataFile", "SLC", "MLI", "gp", "imview", "gnuplot",
-           "Argp", "mkdir", "ln", "rm", "mv", "colors", "Files", "HGT",
+__all__ = ["DataFile", "SLC", "MLI", "gp", "imview", "gnuplot",
+           "mkdir", "ln", "rm", "mv", "colors", "Files", "HGT",
            "make_colorbar", "Base", "IFG", "cat", "tmpdir", "string_t",
            "settings", "all_same", "gamma_progs", "ScanSAR", "montage",
            "get_tmp", "settings", "display", "raster",
-           "display_parser", "raster_parser")
+           "CParse", "pos", "opt", "flag", "annot"]
 
 
 ScanSAR = True
@@ -1277,100 +1277,119 @@ def mv(*args, **kwargs):
             log.debug("File \"%s\" moved to \"%s\"." % (src, dst))    
 
 
-class Argp(ArgumentParser):
+def pos(action="store", help=None, type=str, choices=None,
+        nargs=None, metavar=None, dest=None, const=None):
+    return {
+        "action": action,
+        "nargs": nargs,
+        "type": type,
+        "choices": choices,
+        "help": help,
+        "metavar": metavar,
+        "kind": "pos"
+        # "dest": dest,
+    }
+
+
+def opt(short=None, action="store", help=None, type=str, choices=None,
+        nargs=None, metavar=None, dest=None, default=None, const=None):
+    
+    ret = {
+        "action": action,
+        "nargs": nargs,
+        "default": default,
+        "type": type,
+        "choices": choices,
+        "required": False,
+        "help": help,
+        "metavar": metavar,
+        "dest": dest,
+        "nargs": nargs,
+        "kind": "opt"
+    }
+    
+    
+    # if short is not None:
+    #     ret["flags"] = "-" + short
+    
+    return ret
+
+
+def flag(short=None, action="store_true", help=None, dest=None):
+
+    ret = {
+        "action": action,
+        "help": help,
+        "dest": dest,
+        "kind": "flag"
+    }
+    
+    
+    # if short is not None:
+    #     ret["flags"] = "-" + short
+    
+    return ret
+
+
+def annot(**kwargs):
+    parent = kwargs.pop("parent", None)
+    
+    def annotate(f):
+        f.__parent__ = parent
+        f.__annotations__ = kwargs
+        
+        return f
+        
+    return annotate
+
+
+class CParse(object):
     def __init__(self, **kwargs):
-        subcmd = bool(kwargs.pop("subcmd", False))
+        self.argp, self.args = ArgumentParser(**kwargs), None
         
-        ArgumentParser.__init__(self, **kwargs)
-        
-        if subcmd:
-            self.subparser = self.add_subparsers(**kwargs)
-        else:
-            self.subparser = None
-        
-    
-    def addargs(self, *args):
-        for arg in args:
-            Argp.ap_add_arg(self, arg)
-
-    
-    def subp(self, **kwargs):
-        if self.subparser is None:
-            self.subparser = self.add_subparsers(**kwargs)
-        else:
-            raise ValueError("One subparser is already initiated!")
-    
-    
-    def subcmd(self, name, fun, *args, **kwargs):
-        
-        subtmp = self.subparser.add_parser(name, **kwargs)
-        
-        for arg in args:
-            Argp.ap_add_arg(subtmp,  arg)
-        
-        subtmp.set_defaults(fun=fun)
-
-    
-    @staticmethod
-    def narg(name, help=None, kind="opt", alt=None, type=str, choices=None,
-             default=None, nargs=None):
-        return (name, help, default, kind, alt, type, choices, nargs)
-    
-    
-    @staticmethod
-    def ap_add_arg(obj, arg):
-        if arg[3] == "opt":
-            if arg[4] is not None:
-                obj.add_argument(
-                    "--{}".format(arg[0]), "-{}".format(arg[4]),
-                    help=arg[1],
-                    type=arg[5],
-                    default=arg[2],
-                    nargs=arg[7],
-                    choices=arg[6])
+        for key, value in self.__init__.__annotations__.items():
+            if value.pop("kind") == "pos":
+                self.argp.add_argument(key, **value)
             else:
-                obj.add_argument(
-                    "--{}".format(arg[0]),
-                    help=arg[1],
-                    type=arg[5],
-                    default=arg[2],
-                    nargs=arg[7],
-                    choices=arg[6])
-        elif arg[3] == "pos":
-            obj.add_argument(
-                arg[0],
-                help=arg[1],
-                type=arg[5],
-                choices=arg[6])
+                self.argp.add_argument("--" + key, **value)
+            
         
-        elif arg[3] == "flag":
-            obj.add_argument(
-                "--{}".format(arg[0]),
-                help=arg[1],
-                action="store_true")
-
-
-display_parser = Argp(add_help=False)
-
-display_parser.addargs(
-    Argp.narg("datfile", kind="pos", alt="d", help="Datafile."),
-    Argp.narg("mode", alt="m", help="Command to use."),
-    Argp.narg("flip", alt="f", kind="flag", help="Flip image left-right."),
-    Argp.narg("rng", alt="r", help="Range samples."),
-    Argp.narg("parfile", alt="p", help="Parameter file."),
-    Argp.narg("image_format", alt="i", help="Image format."),
-    Argp.narg("debug", alt="d", kind="flag", help="Debug mode.")
-)
-
-
-raster_parser = Argp(add_help=False, parents=[display_parser])
-
-raster_parser.addargs(
-    Argp.narg("raster", alt="R", help="Output raster file."),
-    Argp.narg("azi", alt="a", help="Azimuth lines."),
-    Argp.narg("avg_fact", alt="v", type=int, help="Pixel averaging factor",
-              default=750)
-)
+        self.subparser = self.argp.add_subparsers(**kwargs)
+        
+        try:
+            cmds = self.commands
+        except AttributeError:
+            return
+        
+        for cmd in cmds:
+            fun = getattr(self, cmd)
+            subp = self.subparser.add_parser(fun.__name__)
+            
+            try:
+                parent = fun.__parent__
+            except AttributeError:
+                parent = None
+            
+            if parent is not None:
+                fun.__annotations__.update(getattr(self, parent).__annotations__)
+            
+            
+            for key, value in fun.__annotations__.items():
+                if value.pop("kind") == "pos":
+                    subp.add_argument(key, **value)
+                else:
+                    subp.add_argument("--" + key, **value)
+            
+            subp.set_defaults(fun=fun)
+    
+    
+    def __getitem__(self, item):
+        return getattr(self.args, item)
+    
+    
+    def parse(self):
+        self.args = self.argp.parse_args()
+        return self
 
 
 # specialize function
