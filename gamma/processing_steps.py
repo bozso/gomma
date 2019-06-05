@@ -180,7 +180,7 @@ class ListIter(object):
 class Processing(object):
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
-    # steps = frozenset(("select_bursts", "import"))
+    steps = frozenset(("select_bursts", "import_slc"))
     
     def __init__(self, args):
         self.args = args
@@ -193,8 +193,12 @@ class Processing(object):
         
         steps = self.params.sections()
         steps.remove("general")
-        self.steps = set(steps)
-        # steps.update(*Processing.steps)
+        steps = set(steps)
+        steps.update(Processing.steps)
+        
+        
+        
+        self.steps = steps
         
         self.metafile = self.params.get("general", "metafile")
 
@@ -312,7 +316,7 @@ class Processing(object):
         if name in self.meta["dirs"]:
             return self.meta["dirs"][name]
         else:
-            _path = pth.join(self.params.general["output_dir"], name)
+            _path = pth.join(self.params.get("general", "output_dir"), name)
             os.mkdir(_path)
             self.meta["dirs"][name] = _path
             return _path
@@ -347,7 +351,7 @@ class Processing(object):
     
     def get_out_master(self):
         output_dir  = self.params.get("general", "output_dir")
-        master_date = self.meta.get("master_date")
+        master_date = self.meta["master_date"]
         
         if master_date is None:
             raise ValueError("master_date is not defined.")
@@ -411,7 +415,7 @@ class Processing(object):
 
         check_zips = select.getbool("check_zips", False)
         
-        pol = select.get("pol")
+        pol = general.get("pol")
         
         
         IWs = tuple(select.get("iw%d" % (idx + 1)) for idx in range(3))
@@ -523,7 +527,7 @@ class Processing(object):
 
     def import_slc(self):
 
-        if gp.ScanSAR:
+        if gm.ScanSAR:
             copy_fun = getattr(gp, "SLC_copy_ScanSAR")
         else:
             copy_fun = getattr(gp, "SLC_copy_S1_TOPS")
@@ -538,7 +542,7 @@ class Processing(object):
 
 
         meta = self.meta
-        SLC, burst_nums, dates = meta["SLC_zip"], meta["burst_nums"], meta["dates"]
+        SLC, burst_nums = meta["SLC_zip"], meta["burst_nums"]
         
         log.info("Importing SLCs.")
         
@@ -547,15 +551,16 @@ class Processing(object):
 
         
         with self.outlist("uncrop", "S1SLC") as f:
-            for burst_num, date, slc in zip(burst_nums, dates, SLC):
-                uncrop = gm.S1SLC.from_template(pol, date, burst_num, tpl=tpl,
-                                                tpl_tab=tpl_tab)
+            for burst_num, slc in zip(burst_nums, SLC):
+                uncrop = \
+                gm.S1SLC.from_template(pol, slc.date, burst_num, tpl=tpl,
+                                       tpl_tab=tpl_tab)
                 
                 for IW in uncrop.IWs:
                     if IW is not None:
-                        slc.extract(pol, IW)
+                        slc.extract_IW(pol, IW)
                 
-                f.write("%s\n" % s1slc)
+                f.write("%s\n" % uncrop)
 
 
         tpl = pth.join(dir_crop, "{date}_iw{iw}.{pol}.slc")
@@ -576,7 +581,7 @@ class Processing(object):
                     f.write("\n".join("%d %d" % (burst[0], burst[1])
                             for burst in burst_num if burst is not None) + "\n")
                 
-                copy_fun(uncrop.tab, crop.tab, "tmp_burst_tab")
+                copy_fun(uncrop.tab, crop.tab, burst_tab)
             
         
         # self.meta["SLC_uncrop"] = "uncrop"

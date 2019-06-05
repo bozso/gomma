@@ -955,14 +955,6 @@ def search_pair(slc1, SLCs, used_SLCs):
 
     return None
 
-
-def check_paths(path):
-    if len(path) != 1:
-        raise Exception("More than one or none file(s) found in the zip that "
-                        "corresponds to the regexp. Paths: {}".format(path))
-    else:
-        return path[0]
-
     
 def interfero(date1, date2, master_date, output_dir=".", range_looks=4,
               azimuth_looks=1):

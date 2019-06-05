@@ -2,7 +2,9 @@ from os import path as pth
 from datetime import datetime
 from zipfile import ZipFile
 
+
 import gamma as gm
+from gamma.private import extract_file, burst_selection_helper
 
 from logging import getLogger
 
@@ -12,6 +14,14 @@ gp = gm.gamma_progs
 
 
 __all__ = ("S1Zip", "S1IW", "S1SLC", "deramp_master", "deramp_slave", "coreg")
+
+
+def check_paths(path):
+    if len(path) != 1:
+        raise Exception("More than one or none file(s) found in the zip that "
+                        "corresponds to the regexp. Paths: {}".format(path))
+    else:
+        return path[0]
 
 
 class S1Zip(object):
@@ -63,7 +73,7 @@ class S1Zip(object):
         regx = self.r_annot_tpl.format(iw=iw, pol=pol)
         
         with ZipFile(self.zipfile, "r") as slc_zip:
-            ret = pr.extract_file(slc_zip, regx, out_path)
+            ret = extract_file(slc_zip, regx, out_path)
     
         return ret
     
@@ -77,13 +87,13 @@ class S1Zip(object):
         r_noise = self.r_noise_tpl.format(iw=iw_num, pol=pol)
     
         with ZipFile(self.zipfile, "r") as slc_zip:
-            tiff  = pr.extract_file(slc_zip, r_tiff, ".")
-            calib = pr.extract_file(slc_zip, r_calib, ".")
-            noise = pr.extract_file(slc_zip, r_noise, ".")
+            tiff  = extract_file(slc_zip, r_tiff, ".")
+            calib = extract_file(slc_zip, r_calib, ".")
+            noise = extract_file(slc_zip, r_noise, ".")
     
             if annot is None:
                 r_annot = self.r_annot_tpl.format(iw=iw_num, pol=pol)
-                annot = pr.extract_file(slc_zip, r_annot, ".")
+                annot = extract_file(slc_zip, r_annot, ".")
         
         tiff, annot, calib, noise = check_paths(tiff), check_paths(annot), \
                                     check_paths(calib), check_paths(noise)
@@ -141,7 +151,7 @@ class S1Zip(object):
         log.info("Selecting bursts of %s." % self.zipfile)
         
         return \
-        tuple(pr.burst_selection_helper(ref, slc) for ref, slc in
+        tuple(burst_selection_helper(ref, slc) for ref, slc in
               zip(ref_burst_nums, self.get_burst_nums(pol)))
 
 
@@ -150,7 +160,7 @@ class S1IW(gm.DataFile):
     
     def __init__(self, num, TOPS_parfile=None, **kwargs):
         
-        DataFile.__init__(self, **kwargs)
+        gm.DataFile.__init__(self, **kwargs)
 
 
         if TOPS_parfile is None:
@@ -272,7 +282,7 @@ class S1SLC(object):
         fmt = kwargs.pop("fmt", "%Y%m%dT%H%M%S")
         
         IWs = tuple(
-                S1IW.from_template(pol, date.mean, ii + 1, fmt=fmt, **kwargs)
+                S1IW.from_template(pol, date.center, ii + 1, fmt=fmt, **kwargs)
                 if iw is not None else None
                 for ii, iw in enumerate(burst_num)
         )
