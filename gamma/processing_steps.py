@@ -75,14 +75,32 @@ class Pickler(object):
             return load(f)
 
 
+trues = frozenset(("true", "on", "1"))
+falses = frozenset(("false", "off", "0"))
+
 class Config(dict):
     def getint(self, key, default):
         return int(self.get(key, default))
     
     def getfloat(self, key, default):
         return float(self.get(key, default))
-
+   
+    def getbool(self, key, default):
+        val = self.get(key, default)
+        
+        if isinstance(val, str):
+            val = val.lower()
             
+            if val in trues:
+                return True
+            elif val in falses:
+                return False
+            else:
+                raise ValueError("Unrecognized option!")
+        elif val is None:
+            return False
+
+
 class Meta(Pickler):
     def __init__(self, **kwargs):
         self.meta = kwargs
@@ -96,9 +114,9 @@ class Meta(Pickler):
         self.meta[elem] = arg
     
     
-    @classmethod
-    def from_file(cls, path):
-        return cls(**Pickler.load_file(path))
+    @staticmethod
+    def from_file(path):
+        return Pickler.load_file(path)
 
 
 
@@ -162,6 +180,8 @@ class ListIter(object):
 class Processing(object):
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
+    # steps = frozenset(("select_bursts", "import"))
+    
     def __init__(self, args):
         self.args = args
         self.params = SafeConfigParser()
@@ -171,8 +191,10 @@ class Processing(object):
         
         self.params.read(args.conf_file)
         
-        self.steps = self.params.sections()
-        self.steps.remove("general")
+        steps = self.params.sections()
+        steps.remove("general")
+        self.steps = set(steps)
+        # steps.update(*Processing.steps)
         
         self.metafile = self.params.get("general", "metafile")
 
@@ -180,13 +202,21 @@ class Processing(object):
             self.meta = Meta.from_file(self.metafile)
         else:
             self.meta = Meta(dirs={}, lists={})
+            
         
-            #self.optional_steps = tuple(key for key, item in self._steps.items()
-                                        #if not item[1])
-            #
-            #self.required_steps = tuple(key for key, item in self._steps.items()
-                                        #if item[1])
+        self.optional_steps = set(
+            step for step in self.steps
+            if self.params.has_option(step, "optional")
+            and self.params.getboolean(step, "optional")
+        )
+        
+        
+        self.required_steps = set(
+            step for step in self.steps
+            if step not in self.optional_steps
+        )
 
+    
     def parse_steps(self):
         args = self.args
         step = args.step
@@ -229,7 +259,8 @@ class Processing(object):
     
     
     def get_fun(self, step):
-        opt = self.params.getboolean(step, "optional")
+        opt = self.params.has_option(step, "optional") and \
+              self.params.getboolean(step, "optional")
         
         return ProcStep(getattr(self, step), opt)
 
@@ -243,14 +274,14 @@ class Processing(object):
             return
         
         log.info("File containing processing parameters: %s" 
-                 % (args.paramfile))
+                 % (args.conf_file))
         
         if args.info:
             pprint(self.params)
             pprint(self.meta)
             return
         
-        steps = self.parse_steps(args)
+        steps = self.parse_steps()
         
         optional_steps = not args.skip_optional
         
@@ -269,7 +300,8 @@ class Processing(object):
                     delim("Starting step: %s" % ustep)
                     
                     log.info('Running step: "%s"' % step)
-                    step_fun.fun(self)
+                    # step_fun.fun(self)
+                    step_fun.fun()
                     
                     delim("Finished step: %s" % ustep)
             finally:
@@ -324,7 +356,7 @@ class Processing(object):
 
         
     @staticmethod
-    def setup_log(self, logger_name, filename=None, formatter=None,
+    def setup_log(logger_name, filename=None, formatter=None,
                   loglevel="debug"):
         
         logger = logging.getLogger(logger_name)
@@ -355,7 +387,7 @@ class Processing(object):
         return logger
 
     
-    def section(name):
+    def section(self, name):
         return Config(self.params.items(name))
     
     
@@ -365,34 +397,34 @@ class Processing(object):
     
     
     def select_bursts(self):
-        general = self.section("general")
+        general, select = self.section("general"), self.section("select_bursts")
         
         slc_data = general.get("slc_data")
-
+        
         if slc_data is None:
             raise ValueError('Parameter "slc_data" not defined.')
-
 
         master_date, output_dir = general.get("master_date"), \
                                   general.get("output_dir", ".")
 
-        date_start, date_stop = general.get("date_start"), general.get("date_stop")
+        date_start, date_stop = select.get("date_start"), select.get("date_stop")
 
-        check_zips = general.get("check_zips", False)
-        pol = general.get("pol")
+        check_zips = select.getbool("check_zips", False)
+        
+        pol = select.get("pol")
         
         
-        IWs = tuple(general.get("iw%d" % (idx + 1)) for idx in range(3))
+        IWs = tuple(select.get("iw%d" % (idx + 1)) for idx in range(3))
         
         IWs = tuple(
             tuple(
                 int(elem)
                 for elem in IW.split(",")
-                 ) if IW is not None else None
+            ) 
+            if IW is not None else None
             for IW in IWs
         )
         
-
         if IWs[2] is not None and IWs[1] is None:
             raise ValueError("Selected IWs must be contigous. You must have "
                              "selected bursts in IW2 to have bursts in IW3")
@@ -422,23 +454,28 @@ class Processing(object):
 
         
         if check_zips:
+            log("Checking integrity of zipfiles.")
             SLC = (slc for slc in SLC if slc.test_zip())
         
+        
         SLC = tuple(SLC)
-        dates = tuple(slc.date for slc in SLC)
-        self.meta["dates"] = dates
         
         if master_date is None:
             log.info("No master_date defined, using first date.")
             
-            master_slc = sorted(SLC, key=lambda x: x.date.mean)[0]
+            master_slc = sorted(SLC, key=lambda x: x.date.center)[0]
             master_date = master_slc.date.date2str()
             
             self.meta["master_date"] = master_date
         else:
             master_date = general["master_date"]
+            
+            print(master_date)
+            
+            log.info("Master date already defined: %s", master_date)
+            
             master_slc = [slc for slc in SLC
-                          if slc.date.date2str() == master_date][0]
+                          if slc.datestr() == master_date][0]
 
 
         log.info("Selected master date is %s" % master_date)

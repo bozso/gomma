@@ -55,7 +55,7 @@ class GammaCmd(CParse):
         logfile=opt(type=str, help="Log messages will be saved here."),
         
         loglevel=opt(type=str, help="Level of logging.",
-                     choices=["info", "debug", "error"]),
+                     choices=["info", "debug", "error"], default="info"),
         
         skip_optional=flag(help="If set the processing will skip optional steps."),
         

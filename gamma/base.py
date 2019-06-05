@@ -22,7 +22,7 @@ from atexit import register
 
 PY3 = version_info[0] == 3
 
-__all__ = ["DataFile", "SLC", "MLI", "gp", "imview", "gnuplot",
+__all__ = ["Date", "DataFile", "SLC", "MLI", "gp", "imview", "gnuplot",
            "mkdir", "ln", "rm", "mv", "colors", "Files", "HGT",
            "make_colorbar", "Base", "IFG", "cat", "tmpdir", "string_t",
            "settings", "all_same", "gamma_progs", "ScanSAR", "montage",
@@ -151,6 +151,7 @@ tmp = []
 
 
 def get_tmp(path=tmpdir):
+    global tmp
     path = pth.join(path, next(_get_candidate_names()))
     
     tmp.append(path)
@@ -354,7 +355,7 @@ class Date(object):
         
         if center is None:
             center = (start_date - stop_date) / 2.0
-            center = stop_date + mean
+            center = stop_date + center
         
         self.center = center
     

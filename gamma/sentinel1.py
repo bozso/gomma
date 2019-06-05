@@ -1,3 +1,7 @@
+from os import path as pth
+from datetime import datetime
+from zipfile import ZipFile
+
 import gamma as gm
 
 from logging import getLogger
@@ -34,8 +38,8 @@ class S1Zip(object):
         
         self.zipfile = zipfile
         self.mission = zip_base[:3]
-        self.date = Date(datetime.strptime(zip_base[17:32], "%Y%m%dT%H%M%S"),
-                         datetime.strptime(zip_base[33:48], "%Y%m%dT%H%M%S"))
+        self.date = gm.Date(datetime.strptime(zip_base[17:32], "%Y%m%dT%H%M%S"),
+                            datetime.strptime(zip_base[33:48], "%Y%m%dT%H%M%S"))
         self.burst_nums = None
         
         if extra_info:
@@ -48,8 +52,13 @@ class S1Zip(object):
             self.abs_orb = int(zip_base[49:55])
             self.DTID = zip_base[56:62]
             self.UID = zip_base[63:67]
+    
+    
+    
+    def datestr(self, fmt="%Y%m%d"):
+        return self.date.center.strftime(fmt)
 
-
+    
     def extract_annot(self, iw, pol, out_path="."):
         regx = self.r_annot_tpl.format(iw=iw, pol=pol)
         
