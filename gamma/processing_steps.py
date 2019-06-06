@@ -114,6 +114,10 @@ class Meta(Pickler):
         self.meta[elem] = arg
     
     
+    def __contains__(self, item):
+        return item in self.meta
+    
+    
     @staticmethod
     def from_file(path):
         return Pickler.load_file(path)
@@ -161,7 +165,7 @@ class ListIter(object):
     
     def __iter__(self):
         for line in self.fp:
-            yield self.conv(line)
+            yield self.conv(line.strip())
 
     
     @staticmethod
@@ -180,7 +184,9 @@ class ListIter(object):
 class Processing(object):
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
-    steps = frozenset(("select_bursts", "import_slc"))
+    steps = frozenset(("select_bursts", "import_slcs", "merge_slcs", 
+                       "make_mli", "make_rmli"))
+    
     
     def __init__(self, args):
         self.args = args
@@ -329,8 +335,12 @@ class Processing(object):
             _path = pth.join(self.get_dir("list_dir"), "%s.file_list" % name)
             self.meta["lists"][name] = _path
             return _path
-
-
+    
+    
+    def is_list(self, name):
+        return name in self.meta["lists"]
+    
+    
     def inlist(self, name):
         return ListIter(self.get_list(name))
 
@@ -525,7 +535,7 @@ class Processing(object):
         gm.rm("tmp_par", "tmp_TOPS_par")
 
 
-    def import_slc(self):
+    def import_slcs(self):
 
         if gm.ScanSAR:
             copy_fun = getattr(gp, "SLC_copy_ScanSAR")
@@ -550,27 +560,30 @@ class Processing(object):
         tpl_tab = pth.join(dir_uncrop, "{date}.{pol}.SLC_tab")
 
         
-        with self.outlist("uncrop", "S1SLC") as f:
-            for burst_num, slc in zip(burst_nums, SLC):
-                uncrop = \
-                gm.S1SLC.from_template(pol, slc.date, burst_num, tpl=tpl,
-                                       tpl_tab=tpl_tab)
-                
-                for IW in uncrop.IWs:
-                    if IW is not None:
-                        slc.extract_IW(pol, IW)
-                
-                f.write("%s\n" % uncrop)
+        
+        if 1:
+            with self.outlist("uncrop", "S1SLC") as f:
+                for burst_num, slc in zip(burst_nums, SLC):
+                    uncrop = \
+                    gm.S1SLC.from_template(pol, slc.date, burst_num, tpl=tpl,
+                                           tpl_tab=tpl_tab)
+                    
+                    for IW in uncrop.IWs:
+                        if IW is not None:
+                            slc.extract_IW(pol, IW)
+                    
+                    f.write("%s\n" % uncrop.tab)
 
 
         tpl = pth.join(dir_crop, "{date}_iw{iw}.{pol}.slc")
         tpl_tab = pth.join(dir_crop, "{date}.{pol}.SLC_tab")
         
         with self.outlist("crop", "S1SLC") as f:
-            for burst_num, date in zip(burst_nums, dates):
-                s1slc = gm.S1SLC.from_template(pol, date, burst_num, tpl=tpl,
-                                               tpl_tab=tpl_tab)
-                f.write("%s\n" % s1slc)
+            for burst_num, slc in zip(burst_nums, SLC):
+                crop = \
+                gm.S1SLC.from_template(pol, slc.date, burst_num, tpl=tpl,
+                                       tpl_tab=tpl_tab)
+                f.write("%s\n" % crop.tab)
 
         
         burst_tab = gm.get_tmp()
@@ -582,28 +595,24 @@ class Processing(object):
                             for burst in burst_num if burst is not None) + "\n")
                 
                 copy_fun(uncrop.tab, crop.tab, burst_tab)
-            
+    
         
-        # self.meta["SLC_uncrop"] = "uncrop"
-        # self.meta["SLC_crop"] = "crop"
-
 
     def merge_slcs(self):
 
-        if gp.ScanSAR:
+        if gm.ScanSAR:
             merge_fun = getattr(gp, "SLC_cat_ScanSAR")
         else:
             merge_fun = getattr(gp, "SLC_cat_S1_TOPS")
 
         
-        general = self.params.general
+        general = self.section("general")
+        
         
         output_dir = general.get("output_dir", ".")
         pol        = general.get("pol", "vv")
         slc_dir    = self.get_dir("SLC_merged")
 
-        
-        SLC, dates = self.meta["SLC_crop"], self.meta["dates"]
         SLC_merged, used_SLC = [], []
         
         tpl_iw = pth.join(slc_dir, "{}_iw{}.{}.slc")
@@ -621,23 +630,28 @@ class Processing(object):
                 if SLC1 in used_SLC:
                     continue
                 
-                date1str = SLC1.date.date2str()
+                date1 = SLC1.date(start_stop=True)
+                
+                date1str = date1.date2str()
+                
                 log.info("Processing date %s." % date1str)
-                SLC2 = gm.search_pair(SLC1, SLC, used_SLC)
-        
+                SLC2 = search_pair(SLC1, SLC, used_SLC)
+                
+                
                 SLC3 = gm.S1SLC(
                 tuple(
-                        gm.S1IW(tpl_iw.format(date1str, ii + 1, pol), num=ii + 1)
+                        gm.S1IW(ii + 1, datfile=tpl_iw.format(date1str, ii + 1, pol))
                         if IW is not None else None
                         for ii, IW in enumerate(SLC1.IWs)
-                    ), tpl_tab.format(date1str, pol), date=SLC1.date
+                    ), tpl_tab.format(date1str, pol)
                 )
                 
                 
                 if SLC2 is not None:
                     log.info("Merging %s with %s." % (SLC1.tab, SLC2.tab))
+                    date2 = SLC2.date(start_stop=True)
                     
-                    if SLC1.date.mean > SLC2.date.mean:
+                    if date1.center > date2.center:
                         gp.SLC_cat_S1_TOPS(SLC2.tab, SLC1.tab, SLC3.tab)
                         merge_fun(SLC2.tab, SLC1.tab, SLC3.tab)
                     else:
@@ -649,18 +663,15 @@ class Processing(object):
                     SLC1.cp(SLC3)
         
                 # endif
-                f.write("%s\n", SLC3.tab)
+                f.write("%s\n" % SLC3.tab)
             # endfor
         # close
         
-        self.meta["dates"] = tuple(slc.date for slc in SLC_merged)
-        # self.meta["merged"] = list_merged
-
         # CLEANUP
         #gm.rm("*.SAFE", "*.SLC_tab", "*iw*", "*.slc*")
 
 
-    def quicklook_mli(self):
+    def make_mli(self):
         
         general = self.section("general")
         
@@ -673,16 +684,15 @@ class Processing(object):
         
         tpl = pth.join(mli_dir, "%s.%s.mli")
         
-        with self.inlist("merged", "S1SLC") as SLC, self.outlist("mli", "MLI") as f:
-            for mli, slc in zip(MLI, SLC):
+        with self.inlist("merged") as SLC, self.outlist("mli", "MLI") as f:
+            for slc in SLC:
                 # create MLI file paths
-                mli = gm.MLI(tpl % (slc.date2str(), pol))
+                mli = gm.MLI(datfile=tpl % (slc.datestr(), pol))
                 
                 # multi looking
                 slc.multi_look(mli, range_looks, azimuth_looks)
                 
-                # quicklook gm.ras_extter
-                gm.gm.ras_extter(mli.dat, parfile=mli.par, avg_fact=750)
+                mli.raster()
                 
                 # write to file
                 f.write("%s\n" % mli)
@@ -709,29 +719,28 @@ class Processing(object):
 
     def check_ionoshpere(self):
         
-        output_dir = self.params.general.get("output_dir", ".")
-        
-        try:
-            SLC = self.meta["SLC_mosaic"]
-        except KeyError:
-            mosaic_tops(self)
-            SLC = self.meta["SLC_mosaic"]
+        output_dir = self.params.get("general", "output_dir")
         
         
-        check_iono = self.params.check_ionosphere
+        if not self.is_list("merged"):
+            self.mosaic_tops()
         
-        rng_win = check_iono.get("rng_win", 256)
-        azi_win = check_iono.get("azi_win", 256)
-        thresh  = check_iono.get("iono_thresh", 0.1)
+        check_iono = self.params.section("check_ionoshpere")
         
-        rng_step = check_iono.get("rng_step")
-        azi_step = check_iono.get("azi_step")
+        rng_win = check_iono.getint("rng_win", 256)
+        azi_win = check_iono.getint("azi_win", 256)
+        thresh  = check_iono.getfloat("iono_thresh", 0.1)
         
-        SLC[0].check_ionoshpere(rng_win=rng_win, azi_win=azi_win, thresh=thresh,
-                                rng_step=rng_step, azi_step=azi_step)
+        rng_step = check_iono.getint("rng_step")
+        azi_step = check_iono.getint("azi_step")
+        
+        raise NotImplementedError("This processing step needs to be reworked.")
+        
+        # SLC[0].check_ionoshpere(rng_win=rng_win, azi_win=azi_win, thresh=thresh,
+        #                         rng_step=rng_step, azi_step=azi_step)
         
 
-    def quicklook_rmli(self):
+    def make_rmli(self):
         
         general = self.params.general
         
@@ -765,36 +774,35 @@ class Processing(object):
         log.info("Starting GEOCODE_MASTER.")
         
         output_dir, master_date = self.get_out_master()
-        general = self.params.general
+        general = self.section("general")
         
-        rng_looks = general.get("range_looks", 1)
-        azi_looks = general.get("azimuth_looks", 4)
+        rng_looks = general.getint("range_looks", 1)
+        azi_looks = general.getint("azimuth_looks", 4)
         
         
-        geoc = self.params.geocoding
+        geoc = self.section("geocode_master")
         
         vrt_path = geoc.get("dem_path")
 
         if vrt_path is None:
             raise ValueError("dem_path is not defined!")
         
-        dem_lat_ovs = geoc.get("dem_lat_ovs", 1.0)
-        dem_lon_ovs = geoc.get("dem_lon_ovs", 1.0)
+        dem_lat_ovs = geoc.getfloat("dem_lat_ovs", 1.0)
+        dem_lon_ovs = geoc.getfloat("dem_lon_ovs", 1.0)
 
-        n_rng_off = geoc.get("n_rng_off", 64)
-        n_azi_off = geoc.get("n_azi_off", 32)
+        n_rng_off = geoc.getint("n_rng_off", 64)
+        n_azi_off = geoc.getint("n_azi_off", 32)
 
-        rng_ovr = geoc.get("rng_overlap", 100)
-        azi_ovr = geoc.get("azi_overlap", 100)
+        rng_ovr = geoc.getint("rng_overlap", 100)
+        azi_ovr = geoc.getint("azi_overlap", 100)
 
-        npoly = geoc.get("npoly", 4)
+        npoly = geoc.getint("npoly", 4)
 
-        itr = geoc.get("iter", 0)
+        itr = geoc.getint("iter", 0)
         
-        demdir = gm.mkdir(pth.join(output_dir, "dem"))
-        geodir = gm.mkdir(pth.join(output_dir, "geo"))
+        demdir = self.get_dir("dem")
+        geodir = self.get_dir("geo")
         
-        merged = self.meta["SLC_merged"]
 
         if "master" in self.meta:
             master = self.meta["master"]
@@ -805,20 +813,23 @@ class Processing(object):
         if "S1SLC" in master:
             master_S1slc = master["S1SLC"]
         else:
-            master_S1slc = tuple(slc for slc in merged
-                                 if slc.date.date2str() == master_date)[0]
+            with self.inlist("merged") as merged:
+                master_S1slc = tuple(slc for slc in merged
+                                     if slc.datestr() == master_date)[0]
             master["S1SLC"] = master_S1slc
         
         
         if master_S1slc.slc is None:
-            master_S1slc.mosaic(rng_looks=rng_looks, azi_looks=azi_looks)
+            master_S1slc.mosaic(rng_looks=rng_looks, azi_looks=azi_looks,
+                                datfile=pth.join(outpu_dir,
+                                "%s.slc" % master_S1slc.datestr())
 
             
         if "MLI" in master:
             mmli = master["MLI"]
         else:
-            mlidir = gm.mkdir(pth.join(output_dir, "MLI"))
-            mmli = gm.MLI(pth.join(mlidir, "%s.mli" % master_date))
+            mlidir = gm.get_dir("MLI")
+            mmli = gm.MLI(datfile=pth.join(mlidir, "%s.mli" % master_date))
             
             master_S1slc.slc.multi_look(mmli, rng_looks=rng_looks,
                                         azi_looks=azi_looks)
@@ -829,7 +840,7 @@ class Processing(object):
         self.meta["master"].update(master)
         
         
-        dem_orig = gm.MLI(pth.join(demdir, "srtm.dem"),
+        dem_orig = gm.MLI(datfile=pth.join(demdir, "srtm.dem"),
                           parfile=pth.join(demdir, "srtm.dem_par"))
         
         
@@ -841,7 +852,7 @@ class Processing(object):
             log.info("DEM already imported.")
 
 
-        geo_path = gm.mkdir(pth.join(geodir))
+        geo_path = geodir
 
         mli_rng, mli_azi = int(mmli.rng()), int(mmli.azi())
         
@@ -1201,3 +1212,16 @@ _dtypes = {
     "TIFF": 6
 }
 
+
+
+def search_pair(slc1, SLCs, used_SLCs):
+    
+    date1 = slc1.date(start_stop=True)
+    
+    for slc2 in SLCs:
+        date2 = slc2.date(start_stop=True)
+        if date1.date2str() == date2.date2str() \
+        and date1.center != date2.center and slc2 not in used_SLCs:
+            return slc2
+
+    return None

@@ -22,12 +22,42 @@ from atexit import register
 
 PY3 = version_info[0] == 3
 
-__all__ = ["Date", "DataFile", "SLC", "MLI", "gp", "imview", "gnuplot",
-           "mkdir", "ln", "rm", "mv", "colors", "Files", "HGT",
-           "make_colorbar", "Base", "IFG", "cat", "tmpdir", "string_t",
-           "settings", "all_same", "gamma_progs", "ScanSAR", "montage",
-           "get_tmp", "settings", "display", "raster",
-           "CParse", "pos", "opt", "flag", "annot"]
+__all__ = [
+    "Date",
+    "DataFile",
+    "SLC",
+    "MLI",
+    "gp",
+    "imview",
+    "gnuplot",
+    "mkdir",
+    "ln",
+    "rm",
+    "mv",
+    "colors",
+    "Files",
+    "HGT",
+    "make_colorbar",
+    "Base",
+    "IFG",
+    "cat",
+    "tmpdir",
+    "string_t",
+    "settings",
+    "all_same",
+    "gamma_progs",
+    "ScanSAR",
+    "montage",
+    "get_tmp",
+    "settings",
+    "display",
+    "raster",
+    "CParse",
+    "pos",
+    "opt",
+    "flag",
+    "annot"
+]
 
 
 ScanSAR = True
@@ -356,7 +386,7 @@ class Date(object):
         if center is None:
             center = (start_date - stop_date) / 2.0
             center = stop_date + center
-        
+    
         self.center = center
     
     
@@ -374,7 +404,7 @@ class Date(object):
         return "<Date start: %s stop: %s mean: %s>"\
                 % (self.start, self.stop, self.mean)
 
-
+                
 class DataFile(Files):
     __slots__ = ("dat", "par", "datpar", "tab", "keep")
 
@@ -462,7 +492,8 @@ class DataFile(Files):
 
     
     def date(self, start_stop=False):
-        date = datetime.strptime(self["date"], "%Y %m %d")
+        date = \
+        datetime.strptime(" ".join(self["date"].split()[:3]), "%Y %m %d")
         
         if start_stop:
             start = timedelta(seconds=self.getfloat("par", "start_time"))
@@ -542,7 +573,7 @@ class DataFile(Files):
             img_fmt = gp_file.img_fmt()
         
         
-        flipe = -1 if flip else 1
+        flip = -1 if flip else 1
         
 
         if cmd is None:
@@ -629,10 +660,6 @@ class DataFile(Files):
 
 
 class SLC(DataFile):
-    #def __init__(self, **kwargs):
-        #DataFile.__init__(self, **kwargs)
-    
-    
     def multi_look(self, MLI, **kwargs):
         args = parse_ml_args(**kwargs)
         gp.multi_look(self.datpar, MLI.datpar, args["rng_looks"],
@@ -652,9 +679,6 @@ class SLC(DataFile):
     
 
 class MLI(DataFile):
-    #def __init__(self, **kwargs):
-        #DataFile.__init__(self, **kwargs)
-
     def plot_cmd(self):
         return "pwr"
     
@@ -946,15 +970,6 @@ class IFG(DataFile):
 # * Auxilliary functions *
 # ************************
 
-def search_pair(slc1, SLCs, used_SLCs):
-
-    for slc2 in SLCs:
-        if  slc1.date.mean.date() == slc2.date.mean.date() \
-        and slc1.date.mean != slc2.date.mean and slc2 not in used_SLCs:
-            return slc2
-
-    return None
-
     
 def interfero(date1, date2, master_date, output_dir=".", range_looks=4,
               azimuth_looks=1):
@@ -1040,7 +1055,7 @@ def parse_dis_args(datfile, **kwargs):
     parts = pth.basename(datfile).split(".")
     
     try:
-        ext = [ext for ext in parts if ext in pr.extensions][0]
+        ext = [ext for ext in parts if ext in extensions][0]
     except IndexError:
         raise ValueError("Unrecognized extension of file %s. Available "
                          "extensions: %s" % (datfile, pr.extensions))
@@ -1102,7 +1117,7 @@ def parse_dis_args(datfile, **kwargs):
     
     
     if cmd is None:
-        cmd = [cmd for cmd, exts in pr.plot_cmd_files.items()
+        cmd = [cmd for cmd, exts in plot_cmd_files.items()
                if ext in exts][0]
     
     
@@ -1111,7 +1126,7 @@ def parse_dis_args(datfile, **kwargs):
         "parfile"  : parfile,
         "rng"      : rng,
         "azi"      : azi,
-        "img_fmt"  : pr.data_types[img_fmt],
+        "img_fmt"  : data_types[img_fmt],
         "start"    : kwargs.get("start", None),
         "nlines"   : kwargs.get("nlines", None),
         "scale"    : kwargs.get("scale", None),

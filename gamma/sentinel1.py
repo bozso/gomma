@@ -1,6 +1,7 @@
 from os import path as pth
-from datetime import datetime
+from datetime import datetime, timedelta
 from zipfile import ZipFile
+import shutil as sh
 
 
 import gamma as gm
@@ -204,6 +205,20 @@ class S1IW(gm.DataFile):
             return ret
     
     
+    def date(self, start_stop=False):
+        date = \
+        datetime.strptime(" ".join(self["date"].split()[:3]), "%Y %m %d")
+        
+        if start_stop:
+            start = timedelta(seconds=self.getfloat("start_time"))
+            cent  = timedelta(seconds=self.getfloat("center_time"))
+            stop  = timedelta(seconds=self.getfloat("end_time"))
+            
+            return gm.Date(date + start, date + stop, date + cent)
+        else:
+            return date
+    
+
     def getfloat(self, key, idx=0):
         return float(self[key].split()[idx])
 
@@ -239,14 +254,22 @@ class S1IW(gm.DataFile):
 
 
 class S1SLC(object):
-    __slots__ = ("IWs", "tab", "date", "slc")
+    __slots__ = ("IWs", "tab", "slc")
     
-    def __init__(self, IWs, tabfile, date=None):
-        self.IWs, self.tab, self.date, self.slc = IWs, tabfile, date, None
+    def __init__(self, IWs, tabfile):
+        self.IWs, self.tab, self.slc = IWs, tabfile, None
         
         with open(tabfile, "w") as f:
             f.write("%s\n" % str(self))
-
+    
+    
+    def date(self, *args, **kwargs):
+        return self.IWs[0].date(*args, **kwargs)
+    
+    
+    def datestr(self, *args, **kwargs):
+        return self.IWs[0].datestr(*args, **kwargs)
+    
 
     def rm(self):
         for IW in self.IWs:
@@ -264,16 +287,16 @@ class S1SLC(object):
                 for ii, iw in enumerate(other.IWs)
         )
         
-        return cls(IWs, tabfile, other.date)
+        return cls(IWs, tabfile)
     
     
     @classmethod
-    def from_tabfile(cls, tabfile, date=None):
+    def from_tabfile(cls, tabfile):
         
         with open(tabfile, "r") as f:
             IWs = tuple(S1IW.from_tabline(line) for line in f)
         
-        return cls(IWs, tabfile, date)    
+        return cls(IWs, tabfile)    
     
     
     @classmethod
@@ -287,8 +310,7 @@ class S1SLC(object):
                 for ii, iw in enumerate(burst_num)
         )
         
-        return cls(IWs, tpl_tab.format(date=date.date2str(fmt), pol=pol),
-                   date=date)
+        return cls(IWs, tpl_tab.format(date=date.date2str(fmt), pol=pol))
 
 
     def num_IWs(self):
@@ -304,7 +326,7 @@ class S1SLC(object):
         
     
     def mosaic(self, rng_looks=1, azi_looks=1, debug=False, **kwargs):
-        slc = SLC(**kwargs)
+        self.slc = gm.SLC(**kwargs)
         
         gp.SLC_mosaic_S1_TOPS(self.tab, slc.datpar, rng_looks, azi_looks,
                               debug=debug)
