@@ -356,8 +356,8 @@ def coreg(master, SLC, RSLC, hgt=0.1, rng_looks=10, azi_looks=2,
     cleaning = 1 if clean else 0
     flag1 = 1 if use_inter else 0
     
-    SLC1_tab, SLC1_ID = mslc.tab, mslc.date.date2str()
-    SLC2_tab, SLC2_ID = SLC.tab, SLC.date.date2str()
+    SLC1_tab, SLC1_ID = mslc.tab, mslc.datestr()
+    SLC2_tab, SLC2_ID = SLC.tab, SLC.datestr()
     
     if 1:
         if RSLC3 is None:
@@ -379,8 +379,8 @@ def coreg(master, SLC, RSLC, hgt=0.1, rng_looks=10, azi_looks=2,
     
     ID = "%s_%s" % (SLC1_ID, SLC2_ID)
     
-    ifg = IFG(ID + ".diff", ID + ".off", ID + ".diff_par",
-              ID + ".coreg_quality")
+    ifg = gm.IFG(ID + ".diff", parfile=ID + ".off", diff_par=ID + ".diff_par",
+                 quality=ID + ".coreg_quality")
     
     with open("coreg.output", "wb") as f:
         f.write(out)

@@ -186,7 +186,7 @@ class ListIter(object):
 class Processing(object):
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
-    steps = frozenset(("select_bursts", "import_slcs", "merge_slcs", 
+    steps = frozenset(("select", "load", "merge", 
                        "make_mli", "make_rmli", "check_geocode"))
     
     
@@ -423,7 +423,7 @@ class Processing(object):
     #                            ********************
     
     
-    def select_bursts(self):
+    def select(self):
         general, select = self.section("general"), self.section("select_bursts")
         
         slc_data = general.get("slc_data")
@@ -548,7 +548,7 @@ class Processing(object):
         gm.rm("tmp_par", "tmp_TOPS_par")
 
 
-    def import_slcs(self):
+    def load(self):
 
         if gm.ScanSAR:
             copy_fun = getattr(gp, "SLC_copy_ScanSAR")
@@ -611,7 +611,7 @@ class Processing(object):
     
         
 
-    def merge_slcs(self):
+    def merge(self):
 
         if gm.ScanSAR:
             merge_fun = getattr(gp, "SLC_cat_ScanSAR")
@@ -782,7 +782,7 @@ class Processing(object):
         self.meta["RMLI"] = RMLI
 
 
-    def geocode_master(self):
+    def geocode(self):
 
         log.info("Starting GEOCODE_MASTER.")
         
@@ -961,42 +961,41 @@ class Processing(object):
         # gp.dis2pwr(hgt.mli.dat, geo.gamma0, mrng, mrng)
 
 
-    def coreg_slcs(self):
+    def coreg(self):
         log.info("Starting COREG_SLCS")
         
-        master, SLC, dates = self.meta["master"], self.meta["SLC_merged"], \
-                             self.meta["dates"]
-        
-        mdate = master["S1SLC"].date
-        
         output_dir, master_date = self.get_out_master()
-        general = self.params.general
+        general = self.section("general")
         
         pol       = general.get("pol", "vv")
-        rng_looks = general.get("range_looks", 1)
-        azi_looks = general.get("azimuth_looks", 4)
+        rng_looks = general.getint("range_looks", 1)
+        azi_looks = general.getint("azimuth_looks", 4)
 
-        coregp = self.params.coreg
+        coregp = self.section("coreg")
         
-        cc_thresh   = float(coregp.get("cc_thresh", 0.8))
-        frac_thresh = float(coregp.get("fraction_thresh", 0.01))
-        ph_std_thresh  = float(coregp.get("ph_stdev_thresh", 0.8))
-        itmax       = float(coregp.get("itmax", 5))
+        cc_thresh   = coregp.getfloat("cc_thresh", 0.8)
+        frac_thresh = coregp.getfloat("fraction_thresh", 0.01)
+        ph_std_thresh  = coregp.getfloat("ph_stdev_thresh", 0.8)
+        itmax       = coregp.getint("itmax", 5)
         
         cleaning, flag1, poly1, poly2 = True, True, None, None
         
         hgt = self.meta["hgt"].dat
         
-        coreg_dir = gm.mkdir(pth.join(output_dir, "coreg_out"))
-        rmli_dir = gm.mkdir(pth.join(output_dir, "RMLI"))
-        diff_dir = gm.mkdir(pth.join(output_dir, "IFG"))
+        coreg_dir = self.get_dir("coreg_out")
+        rmli_dir  = self.get_dir("RMLI")
+        diff_dir  = self.get_dir("IFG")
         
         tpl_iw = pth.join(coreg_dir, "{date}_iw{iw}.{pol}.rslc")
         tpl_tab = pth.join(coreg_dir, "{date}.{pol}.RSLC_tab")
         fmt = "%Y%m%d"
         
-        SLC_sort = sorted(SLC, key=lambda x: x.date.mean)
-        midx = tuple(ii for ii, slc in enumerate(SLC_sort) if slc.date == mdate)[0]
+        with self.inlist("merged") as f:
+            SLC = tuple(slc for slc in f)
+        
+        SLC_sort = sorted(SLC, key=lambda x: x.date(start_stop=True).center)
+        midx = tuple(ii for ii, slc in enumerate(SLC_sort)
+                     if slc.datestr() == master_date)[0]
         
         # number of slave images
         n_sar = len(SLC) - 1
@@ -1019,46 +1018,50 @@ class Processing(object):
             range(master_idx + 1, n_sar)
             # from master date to the start
             range(master_idx - 1, -1, -1)
-            
         
-        log.info("Master: %s." % master["S1SLC"].tab)
         
-        for ii, slc in enumerate(itr):
-            if ii == midx:
-                continue
-            
-            # log_coreg(ii, n_sar, master_par, parfile, prev)
-
-            SLC_coreg = \
-            gm.S1SLC.from_template(pol, slc.date, slc.IWs, tpl_tab=tpl_tab,
-                                   fmt=fmt, tpl=tpl_iw)
-
-            gm.coreg(master, slc, SLC_coreg, hgt, rng_looks, azi_looks, poly1,
-                     poly2, cc_thresh, frac_thresh, ph_std_thresh, cleaning,
-                     flag1, prev, diff_dir)
-            
-            rslc = pth.join(coreg_dir, slc.date.date2str()) + ".rslc"
-            rmli = gm.MLI(pth.join(rmli_dir, slc.date.date2str()) + ".rmli")
-            
-            SLC_coreg.mosaic(datfile=rslc, rng_looks=rng_looks,
-                             azi_looks=azi_looks)
-            
-            SLC_coreg.slc.multi_look(rmli, rng_looks=rng_looks,
-                                     azi_looks=azi_looks)
-            
-            RSLC.append(SLC_coreg)
-            RMLI.append(rmli)
-            
-            rmli.gm.ras_extter()
-            
-                #gs.S1_coreg(mslc, slc, SLC_coreg, hgt, range_looks, azimuth_looks,
-                        #poly1, poly2, cc_thresh, frac_thresh, std_thresh,
-                        #cleaning, flag1, prev)
-
-            prev = SLC_coreg
+        master = {
+            "S1SLC": self.select_date("merged", master_date),
+            "SLC": self.select_date("slc", master_date),
+            "MLI": self.select_date("mli", master_date)
+        }
         
-        self.meta.update({"RSLC": tuple(RSLC), "RMLI": tuple(RMLI)})
+        with self.outlist("RSLC", "S1SLC") as f:
+            for ii, slc in enumerate(itr):
+                if ii == midx:
+                    continue
+                
+                # log_coreg(ii, n_sar, master_par, parfile, prev)
 
+                SLC_coreg = \
+                gm.S1SLC.from_template(pol, slc.date(start_stop=True), slc.IWs, tpl_tab=tpl_tab,
+                                       fmt=fmt, tpl=tpl_iw)
+
+                gm.coreg(master, slc, SLC_coreg, hgt, rng_looks, azi_looks, poly1,
+                         poly2, cc_thresh, frac_thresh, ph_std_thresh, cleaning,
+                         flag1, prev, diff_dir)
+                
+                rslc = pth.join(coreg_dir, slc.date.date2str()) + ".rslc"
+                rmli = gm.MLI(pth.join(rmli_dir, slc.date.date2str()) + ".rmli")
+                
+                # SLC_coreg.mosaic(datfile=rslc, rng_looks=rng_looks,
+                #                  azi_looks=azi_looks)
+                
+                # SLC_coreg.slc.multi_look(rmli, rng_looks=rng_looks,
+                #                          azi_looks=azi_looks)
+                
+                # RSLC.append(SLC_coreg)
+                # RMLI.append(rmli)
+                # 
+                # rmli.gm.ras_extter()
+                
+                    #gs.S1_coreg(mslc, slc, SLC_coreg, hgt, range_looks, azimuth_looks,
+                            #poly1, poly2, cc_thresh, frac_thresh, std_thresh,
+                            #cleaning, flag1, prev)
+
+                prev = SLC_coreg
+                f.write("%s\n" % SLC_coreg.tab)
+        
 
 
     def deramp(self):
