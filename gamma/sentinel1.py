@@ -65,6 +65,10 @@ class S1Zip(object):
             self.UID = zip_base[63:67]
     
     
+    @classmethod
+    def from_line(cls, line):
+        return cls(line)
+    
     
     def datestr(self, fmt="%Y%m%d"):
         return self.date.center.strftime(fmt)
@@ -159,6 +163,8 @@ class S1Zip(object):
 class S1IW(gm.DataFile):
     __slots__ = ("TOPS_par", "num")
     
+    tpl = gm.settings["templates"]["IW"]
+    
     def __init__(self, num, TOPS_parfile=None, **kwargs):
         
         gm.DataFile.__init__(self, **kwargs)
@@ -235,13 +241,12 @@ class S1IW(gm.DataFile):
     
     
     @classmethod
-    def from_template(cls, pol, date, num, **kwargs):
-        tpl = kwargs.get("tpl", "{date}_iw{iw}.{pol}.slc")
-        fmt = kwargs.get("fmt", "%Y%m%dT%H%M%S")
+    def from_template(cls, pol, date, num, tpl=None, **kwargs):
+        if tpl is None:
+            tpl = self.tpl
         
-        return cls(num,
-                   datfile=tpl.format(date=date.strftime(fmt), iw=num, pol=pol),
-                   keep=True)
+        return cls(num, datfile=tpl.format(date=date, iw=num, pol=pol),
+                   keep=True, **kwargs)
 
 
     def lines_offset(self):
@@ -255,6 +260,8 @@ class S1IW(gm.DataFile):
 
 class S1SLC(object):
     __slots__ = ("IWs", "tab", "slc")
+    
+    tab_tpl = gm.settings["templates"]["tab"]
     
     def __init__(self, IWs, tabfile):
         self.IWs, self.tab, self.slc = IWs, tabfile, None
@@ -299,18 +306,31 @@ class S1SLC(object):
         return cls(IWs, tabfile)    
     
     
+    
+    def make_other(self, dirpath, fmt="short", **kwargs):
+        tpl = pth.join(dirpath, S1IW.tpl)
+        
+        date = self.date(start_stop=True)
+        burst_num = self.IWs
+        pol = self.pol()
+        
+        return S1SLC.from_template(date, burst_num, pol, fmt=fmt, tpl=tpl)
+        
+    
     @classmethod
-    def from_template(cls, pol, date, burst_num, **kwargs):
-        tpl_tab = kwargs.get("tpl_tab", "{date}.{pol}.SLC_tab")
-        fmt = kwargs.pop("fmt", "%Y%m%dT%H%M%S")
+    def from_template(cls, date, burst_num, pol, fmt="short", dirpath="."
+                      **kwargs):
+        tpl_tab = pth.join(dirpath, self.tpl_tab)
+        
+        date = date.date2str(gm.settings["templates"]["date"][fmt])
         
         IWs = tuple(
-                S1IW.from_template(pol, date.center, ii + 1, fmt=fmt, **kwargs)
+                S1IW.from_template(pol, date, ii + 1, **kwargs)
                 if iw is not None else None
                 for ii, iw in enumerate(burst_num)
         )
         
-        return cls(IWs, tpl_tab.format(date=date.date2str(fmt), pol=pol))
+        return cls(IWs, tpl_tab.format(date=date, pol=pol))
 
 
     def num_IWs(self):

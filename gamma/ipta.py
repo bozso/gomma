@@ -344,9 +344,11 @@ class PointData(gm.Files):
     
     
     def ras_pt(self, inras, outras, rng_looks=1, azi_looks=1,
-               rgb=gm.colors["red"], size=1, zero=False, mask=None,
+               rgb="red", size=1, zero=False, mask=None,
                mask_flag=0, rec=None):
         """Plot point coordinates on raster file."""
+        
+        rgb = gm.colors[rgb]
         
         zero = 1 if zero else 0
         

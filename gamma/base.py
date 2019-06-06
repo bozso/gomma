@@ -22,17 +22,14 @@ __all__ = [
     "SLC",
     "MLI",
     "imview",
-    "gnuplot",
-    "colors",
-    "make_colorbar",
     "string_t",
     "settings",
     "gamma_progs",
     "ScanSAR",
-    "montage",
     "settings",
     "display",
     "raster",
+    "make_cmd"
 ]
 
 
@@ -44,11 +41,24 @@ else:
     string_t = basestring,
 
 
+versions = {
+    "20181130": "/home/istvan/progs/GAMMA_SOFTWARE-20181130"
+}
+
+
 settings = {
     "ras_ext": "bmp",
     "path": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
     "modules": ("DIFF", "DISP", "ISP", "LAT", "IPTA"),
-    "libpaths": "/home/istvan/miniconda3/lib:"
+    "libpaths": "/home/istvan/miniconda3/lib:",
+    "templates": {
+        "IW": "{date}_iw{iw}.{pol}.slc",
+        "date": {
+            "short": "%Y%m%d",
+            "long": "%Y%m%dT%H%M%S"
+        },
+        "tab": "{date}.{pol}.SLC_tab"
+    }
 }
 
 
@@ -108,13 +118,50 @@ gamma_progs = type("Gamma", (object,),
 
 gp = gamma_progs
 
-
-_convert = make_cmd("convert")
-_montage = make_cmd("montage")
-gnuplot = make_cmd("gnuplot")
 imview = make_cmd("eog")
 
-     
+
+class Parfile(object):
+    __slots__ = ("path",)
+    
+    def __init__(self, path):
+        self.path = path
+    
+    def __getitem__(self, item):
+        return gm.get_par(item, self.path)
+    
+    def __contains__(self, item):
+        return self[item] is not None
+    
+    def getfloat(key, idx=0):
+        return float(self[key].split()[idx])
+    
+    def getint(key, idx=0):
+        return int(self[key].split()[idx])
+    
+    
+    def set_par(key, new):
+        if gm.Files.is_empty(self.path) or key not in self:
+            with open(self.path, "a") as f:
+                f.write("%s: %s\n" % (key, new))
+        
+        elif key in self:
+            with open(self.path, "r+") as f:
+                lines = (line for line in f)
+        
+                lines = (
+                            "%s: %s" % (key, new)
+                            if key in line
+                            else line
+                            for line in lines
+                        )
+            
+                f.seek(0)
+                f.truncate()
+            
+                f.write("%s\n" % "\n".join(lines))
+            
+
 class DataFile(gm.Files):
     __slots__ = ("dat", "par", "datpar", "tab", "keep")
 
@@ -188,7 +235,10 @@ class DataFile(gm.Files):
     
     def img_fmt(self):
         return self["image_format"]
-
+    
+    def pol(self):
+        return self["pol"]
+    
 
     def stat(self, **kwargs):
         return Files.stat(self, "dat", self.rng(), **kwargs)
@@ -630,36 +680,6 @@ def raster(datfile, **kwargs):
              debug=args["debug"])
             
 
-def palette_line(line):
-    return " ".join(str(float(elem) / 255.0) for elem in line.split())
-
-
-def make_palette(cmap):
-    ret = "defined (%s)"
-    
-    with open(cmap) as f:
-        return ret % ",".join("%d %s" % (ii, palette_line(line))
-                              for ii, line in enumerate(f))
-
-
-def make_colorbar(inras, outras, cmap, title="", ratio=1, start=0.0,
-                  stop=255.0):
-    
-    tmp = Files.get_tmp()
-    cbar, script = tmp + ".png", tmp + ".prt"
-    cmap = pth.join(gamma_cmaps, "%s" % cmap)
-    
-    palette = "set palette %s" % make_palette(cmap)
-    
-    
-    with open(script, "w") as f:
-        f.write(cbar_tpl.format(out=cbar, xmin=start, xmax=stop,
-                                ratio=ratio, title=title, palette=palette))
-    
-    _gnuplot(script)
-    _convert(inras, cbar, "+append", outras)
-    
-    rm(cbar, script)
     
 
 
@@ -683,65 +703,6 @@ def add(args):
     print(results)
 
 
-def parse_opt(key, value):
-    if value is True:
-        return "-%s" % (key)
-    else:
-        return "-%s %s" % (key, value)
-
-
-def montage(out, *args, **kwargs):
-    size = kwargs.pop("size")
-    debug = bool(kwargs.get("debug", False))
-    
-    
-    if size is not None:
-        kwargs["resize"] = "x".join(str(pixel) if pixel is not None else ""
-                                    for pixel in size)
-    
-    options = " ".join(parse_opt(key, value)
-                       for key, value in kwargs.items())
-    
-    
-    
-    files = " ".join(str(arg) for arg in args)
-    
-    _montage(files, files, options, out, debug=debug)
-    
-
-    
-class RGB(object):
-    def __init__(self, r=0, g=0, b=0):
-        self.rgb = (r, g, b)
-    
-    def __str__(self):
-        return "%d, %d, %d" % (self.rgb[0], self.rgb[1], self.rgb[2])
-
-
-
-
-
-colors = {
-    "black"     : RGB(  0,    0,    0),
-    "white"     : RGB(255,  255,  255),
-    "red"       : RGB(255,    0,    0),
-    "lime"      : RGB(  0,  255,    0),
-    "blue"      : RGB(  0,    0,  255),
-    "yellow"    : RGB(255,  255,    0),
-    "aqua"      : RGB(  0,  255,  255),
-    "magenta"   : RGB(255,    0,  255),
-    "silver"    : RGB(192,  192,  192),
-    "gray"      : RGB(128,  128,  128),
-    "maroon"    : RGB(128,    0,    0),
-    "olive"     : RGB(128,  128,    0),
-    "olive"     : RGB(128,  128,    0),
-    "green"     : RGB(  0,  128,    0),
-    "purple"    : RGB(128,    0,  128),
-    "teal"      : RGB(  0,  128,  128),
-    "navy"      : RGB(  0,    0,  128)
-}
-
-
 def _proc_arg(arg):
     if arg is not None:
         return str(arg)
@@ -758,25 +719,3 @@ plot_cmd_files = {
 
 
 extensions = " ".join(" ".join(items) for items in plot_cmd_files.values())
-
-
-cbar_tpl = \
-"""\
-set terminal pngcairo size 200,800
-set output "{out}"
-set pm3d map
-
-g(x,y) = y
-
-set yrange [{xmin}:{xmax}]
-# set ytics 0.2
-set ytics scale 1.5 nomirror
-# set mytics 2
-set size ratio 1e{ratio}
-
-{palette}
-
-unset colorbox; unset key; set tics out; unset xtics
-set title "{title}"
-splot g(x,y)
-"""

@@ -12,6 +12,7 @@ __all__ = [
     "make_object",
     "Params",
     "get_tmp",
+    "get_par",
     "cat",
     "Files",
     "Multi",
@@ -185,39 +186,6 @@ class Files(object):
         return pth.getsize(path) == 0
     
     
-    @staticmethod
-    def get_par(key, data):
-        value = None
-
-        if pth.isfile(data):
-            with open(data, "r") as f:
-                for line in f:
-                    if key in line:
-                        value = line
-                        break
-
-        elif isinstance(data, bytes):
-            for line in data.decode().split("\n"):
-                if key in line:
-                    value = line
-                    break
-
-        elif isinstance(data, str):
-            for line in data.split("\n"):
-                if key in line:
-                    value = line
-                    break
-                
-        else:
-            for line in data:
-                if key in line:
-                    value = line
-                    break
-        
-        if value is not None:
-            return " ".join(value.split(":")[1:]).strip() 
-        else:
-            return None
 
         
     @staticmethod
@@ -252,6 +220,22 @@ class Files(object):
             f.truncate()
             
             f.write("%s\n" % "\n".join(lines))
+
+
+def get_par(key, data, sep=":"):
+    if pth.isfile(data):
+        with open(data, "r") as f:
+            lines = f.readlines()
+    elif isinstance(data, bytes):
+        lines = data.decode().split("\n")
+    elif isinstance(data, string_t):
+        lines = data.split("\n")
+    else:
+        lines = data
+            
+    for line in lines:
+        if key in line:
+            return " ".join(value.split(sep)[1:]).strip() 
 
     
 def Multi(**kwargs):

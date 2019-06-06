@@ -9,7 +9,7 @@ from collections import namedtuple
 from pprint import pprint
 from shutil import copy
 from sys import stdout
-
+from json import load as jload, dump as jdump
 
 ProcStep = namedtuple("ProcStep", ["fun", "opt"])
 
@@ -101,36 +101,43 @@ class Config(dict):
             return False
 
 
-class Meta(Pickler):
-    def __init__(self, **kwargs):
-        self.meta = kwargs
+class Meta(dict):
+    # def __init__(self, **kwargs):
+    #     self.meta = kwargs
+    # 
+    # def __getitem__(self, elem):
+    #     return self.meta[elem]
+    # 
+    # def __setitem__(self, elem, arg):
+    #     self.meta[elem] = arg
+    # 
+    # def __contains__(self, item):
+    #     return item in self.meta
+    # 
+    # def update(self, *args, **kwargs):
+    #     self.meta.update(*args, **kwargs)
     
+    @classmethod
+    def from_file(cls, path):
+        with open(path, "r") as f:
+            # ret = cls()
+            # ret.meta = jload(f)
+            # return ret
+            return cls(jload(f))
     
-    def __getitem__(self, elem):
-        return self.meta[elem]
-
-    
-    def __setitem__(self, elem, arg):
-        self.meta[elem] = arg
-    
-    
-    def __contains__(self, item):
-        return item in self.meta
-    
-    def update(self, *args, **kwargs):
-        self.meta.update(*args, **kwargs)
-    
-    @staticmethod
-    def from_file(path):
-        return Pickler.load_file(path)
-
+    def save(self, path):
+        with open(path, "w") as f:
+            # jdump(self.meta, f, indent=4,
+            #       separators=(",", ": "))
+            jdump(self, f, indent=4, separators=(",", ": "))
 
 
 class ListIter(object):
     converters = {
         "S1SLC" : gm.S1SLC.from_tabfile,
         "SLC" : gm.SLC.from_line,
-        "MLI" : gm.MLI.from_line
+        "MLI" : gm.MLI.from_line,
+        "S1Zip": gm.S1Zip.from_line
     }
     
     
@@ -138,6 +145,7 @@ class ListIter(object):
         "S1SLC" : gm.S1SLC,
         "SLC" : gm.SLC,
         "MLI" : gm.MLI
+        "S1Zip": gm.S1Zip
     }
     
     
@@ -204,8 +212,6 @@ class Processing(object):
         steps = set(steps)
         steps.update(Processing.steps)
         
-        
-        
         self.steps = steps
         
         self.metafile = self.params.get("general", "metafile")
@@ -218,8 +224,9 @@ class Processing(object):
         
         self.optional_steps = set(
             step for step in self.steps
-            if self.params.has_option(step, "optional")
-            and self.params.getboolean(step, "optional")
+            if self.is_optional(step)
+            # if self.params.has_option(step, "optional")
+            # and self.params.getboolean(step, "optional")
         )
         
         
@@ -270,11 +277,15 @@ class Processing(object):
                  ", ".join(step for step in self.optional_steps)))
     
     
+    def is_optional(self, step)
+        return self.params.has_option(step, "optional") and \
+               self.params.getboolean(step, "optional")
+    
     def get_fun(self, step):
-        opt = self.params.has_option(step, "optional") and \
-              self.params.getboolean(step, "optional")
+        # opt = self.params.has_option(step, "optional") and \
+        #       self.params.getboolean(step, "optional")
         
-        return ProcStep(getattr(self, step), opt)
+        return ProcStep(getattr(self, step), self.is_optional(step))
 
     
     def run_steps(self):
@@ -303,7 +314,6 @@ class Processing(object):
         
         for step in steps:
             step_fun = self.get_fun(step)
-            
             
             try:
                 if step_fun.opt or optional_steps:
@@ -345,7 +355,12 @@ class Processing(object):
     
     def inlist(self, name):
         return ListIter(self.get_list(name))
-
+    
+    
+    def from_list(self, name):
+        with self.inlist(name) as f:
+            return tuple(elem for elem in f)
+    
     
     def select_date(self, name, date):
         if not self.is_list(name):
@@ -487,6 +502,9 @@ class Processing(object):
         
         SLC = tuple(SLC)
         
+        with self.outfile("s1zip", "S1Zip") as f:
+            f.write("%s\n" % "\n".join(slc.zipfile for slc in SLC))
+        
         if master_date is None:
             log.info("No master_date defined, using first date.")
             
@@ -560,8 +578,8 @@ class Processing(object):
         output_dir, master_date = self.get_out_master()
         pol = general.get("pol")
         
-        dir_uncrop = self.get_dir("SLC_uncrop")
-        dir_crop = self.get_dir("SLC_crop")
+        dir_uncrop = self.get_dir("uncrop")
+        dir_crop   = self.get_dir("crop")
 
 
         meta = self.meta
@@ -569,17 +587,14 @@ class Processing(object):
         
         log.info("Importing SLCs.")
         
-        tpl = pth.join(dir_uncrop, "{date}_iw{iw}.{pol}.slc")
-        tpl_tab = pth.join(dir_uncrop, "{date}.{pol}.SLC_tab")
-
-        
+        SLC = self.from_list("s1zip")
         
         if 1:
             with self.outlist("uncrop", "S1SLC") as f:
                 for burst_num, slc in zip(burst_nums, SLC):
                     uncrop = \
-                    gm.S1SLC.from_template(pol, slc.date, burst_num, tpl=tpl,
-                                           tpl_tab=tpl_tab)
+                    gm.S1SLC.from_template(pol, slc.date, burst_num,
+                                           fmt="long", dirpath=dir_uncrop)
                     
                     for IW in uncrop.IWs:
                         if IW is not None:
@@ -588,24 +603,17 @@ class Processing(object):
                     f.write("%s\n" % uncrop.tab)
 
 
-        tpl = pth.join(dir_crop, "{date}_iw{iw}.{pol}.slc")
-        tpl_tab = pth.join(dir_crop, "{date}.{pol}.SLC_tab")
-        
-        with self.outlist("crop", "S1SLC") as f:
-            for burst_num, slc in zip(burst_nums, SLC):
-                crop = \
-                gm.S1SLC.from_template(pol, slc.date, burst_num, tpl=tpl,
-                                       tpl_tab=tpl_tab)
-                f.write("%s\n" % crop.tab)
-
-        
         burst_tab = gm.get_tmp()
         
-        with self.inlist("uncrop") as uc, self.inlist("crop") as c:
-            for uncrop, crop, burst_num in zip(uc, c, burst_nums):
+        with self.inlist("uncrop") as uc, self.outlist("crop", "S1SLC") as f:
+            for uncrop, crop, burst_num in zip(uc,  burst_nums):
                 with open(burst_tab, "w") as f:
                     f.write("\n".join("%d %d" % (burst[0], burst[1])
                             for burst in burst_num if burst is not None) + "\n")
+                
+                crop = uncrop.make_other(dirpath=dir_crop)
+                
+                f.write("%s\n" % crop.tab)
                 
                 copy_fun(uncrop.tab, crop.tab, burst_tab)
     
@@ -627,9 +635,6 @@ class Processing(object):
         slc_dir    = self.get_dir("SLC_merged")
 
         SLC_merged, used_SLC = [], []
-        
-        tpl_iw = pth.join(slc_dir, "{}_iw{}.{}.slc")
-        tpl_tab = pth.join(slc_dir, "{}.{}.SLC_tab")
         
         list_merged = self.get_list("merged")
         
