@@ -328,10 +328,10 @@ class S1SLC(object):
     def mosaic(self, rng_looks=1, azi_looks=1, debug=False, **kwargs):
         self.slc = gm.SLC(**kwargs)
         
-        gp.SLC_mosaic_S1_TOPS(self.tab, slc.datpar, rng_looks, azi_looks,
+        gp.SLC_mosaic_S1_TOPS(self.tab, self.slc.datpar, rng_looks, azi_looks,
                               debug=debug)
         
-        return slc
+        return self.slc
         
 
     def multi_look(self, MLI, rng_looks=1, azi_looks=1, wflg=0):

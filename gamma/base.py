@@ -36,6 +36,8 @@ __all__ = [
     "mv",
     "colors",
     "Files",
+    "DEM",
+    "Geocode",
     "HGT",
     "make_colorbar",
     "Base",
@@ -703,13 +705,15 @@ class DEM(DataFile):
     }
     
 
-    def __init__(self, datfile, parfile=None, lookup=None, lookup_old=None):
-        self.dat = datfile
+    def __init__(self, datfile, parfile=None, lookup=None, lookup_old=None,
+                 keep=True):
+        self.dat, self.keep = datfile, None
         
         if parfile is None:
             parfile = pth.splitext(datfile) + ".dem_par"
         
         self.par, self.lookup, self.lookup_old = parfile, lookup, lookup_old
+        self.keep = keep
     
     
     def geo2rdc(self, infile, outfile, width, nlines=0, interp="dist",
@@ -744,23 +748,23 @@ class DEM(DataFile):
             kwargs.setdefault("image_format", "FCOMPLEX")
             kwargs.setdefault("datfile", getattr(self, obj))
             kwargs.setdefault("mode", "mph")
-            super(DEM, self).raster(**kwargs)
+            DataFile.raster(self, **kwargs)
 
 
 class Geocode(Files):
     _items = ("sim_sar", "zenith", "orient", "inc", "pix", "psi", "ls_map",
               "diff_par", "offs", "offsets", "ccp", "coffs", "coffsets")
 
-    def __init__(self, path, mli, sigpa0=None, gamma0=None, **kwargs):
+    def __init__(self, path, mli, sigma0=None, gamma0=None, **kwargs):
         self.par = mli.par
         
-        if sigpa0 is None:
-            sigpa0 = pth.join(path, "sigpa0")
+        if sigma0 is None:
+            sigma0 = pth.join(path, "sigma0")
 
         if gamma0 is None:
             gamma0 = pth.join(path, "gamma0")
         
-        self.sigma0, self.gamma0 = sigpa0, gamma0
+        self.sigma0, self.gamma0 = sigma0, gamma0
         
         
         elems = (
@@ -781,21 +785,20 @@ class Geocode(Files):
 
     
     def raster(self, obj, **kwargs):
-        kwargs.setdefault("mode", "pwr")
-
-        raster(getattr(self, obj), **kwargs)
+        raster(getattr(self, obj), rng=self.rng(), azi=self.azi(),
+               image_format="FLOAT", mode="pwr", **kwargs)
 
 
 class HGT(DataFile):
     rashgt = getattr(gp, "rashgt")
     
-    def __init__(self, hgt, mli):
+    def __init__(self, hgt, mli, keep=True):
         self.keep = None
         self.dat = hgt
         self.mli = mli
         self.par = mli.par
         
-        self.keep = True
+        self.keep = keep
     
     
     def __str__(self):
@@ -1126,7 +1129,7 @@ def parse_dis_args(datfile, **kwargs):
         "parfile"  : parfile,
         "rng"      : rng,
         "azi"      : azi,
-        "img_fmt"  : data_types[img_fmt],
+        "img_fmt"  : DataFile.data_types[img_fmt],
         "start"    : kwargs.get("start", None),
         "nlines"   : kwargs.get("nlines", None),
         "scale"    : kwargs.get("scale", None),
@@ -1145,12 +1148,12 @@ def parse_ras_args(datfile, **kwargs):
     parfile = args["parfile"]
     
     if raster is None:
-        raster = "%s.%s" % (datfile, _default_image_fmt)
+        raster = "%s.%s" % (datfile, settings["ras_ext"])
 
     if avg_fact == "noavg":
         avg_rng, avg_azi = None, None
     else:
-        avg_rng, avg_azi = pr.avg_factor(args["rng"], args["azi"], avg_fact)
+        avg_rng, avg_azi = DataFile.avg_factor(args["rng"], args["azi"], avg_fact)
 
     
     args.update({

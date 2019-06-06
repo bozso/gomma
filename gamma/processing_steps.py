@@ -117,6 +117,8 @@ class Meta(Pickler):
     def __contains__(self, item):
         return item in self.meta
     
+    def update(self, *args, **kwargs):
+        self.meta.update(*args, **kwargs)
     
     @staticmethod
     def from_file(path):
@@ -185,7 +187,7 @@ class Processing(object):
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
     steps = frozenset(("select_bursts", "import_slcs", "merge_slcs", 
-                       "make_mli", "make_rmli"))
+                       "make_mli", "make_rmli", "check_geocode"))
     
     
     def __init__(self, args):
@@ -345,8 +347,19 @@ class Processing(object):
         return ListIter(self.get_list(name))
 
     
+    def select_date(self, name, date):
+        if not self.is_list(name):
+            return None
+        
+        with self.inlist(name) as f:
+            for elem in f:
+                if elem.datestr() == date:
+                    return elem
+    
+    
+    
     def outlist(self, name, ftype):
-        assert ftype in ListIter.ftypes
+        assert ftype in ListIter.ftypes, "Unrecognized filetype %s!" % ftype
         
         f = open(self.get_list(name), "w")
         
@@ -800,44 +813,37 @@ class Processing(object):
 
         itr = geoc.getint("iter", 0)
         
-        demdir = self.get_dir("dem")
-        geodir = self.get_dir("geo")
-        
-
-        if "master" in self.meta:
-            master = self.meta["master"]
-        else:
-            master = {}
-            self.meta["master"] = {}
-        
-        if "S1SLC" in master:
-            master_S1slc = master["S1SLC"]
-        else:
-            with self.inlist("merged") as merged:
-                master_S1slc = tuple(slc for slc in merged
-                                     if slc.datestr() == master_date)[0]
-            master["S1SLC"] = master_S1slc
+        demdir = self.get_dir("DEM")
+        geodir = self.get_dir("GEO")
         
         
-        if master_S1slc.slc is None:
-            master_S1slc.mosaic(rng_looks=rng_looks, azi_looks=azi_looks,
-                                datfile=pth.join(outpu_dir,
-                                "%s.slc" % master_S1slc.datestr())
-
+        m_s1slc = self.select_date("merged", master_date)
+        
+        assert m_s1slc is not None, "Master date S1SLC not found!"
+        
+        
+        m_slc = self.select_date("slc", master_date)
+        
+        
+        if m_slc is None:
+            m_slc = m_s1slc.mosaic(rng_looks=rng_looks, azi_looks=azi_looks,
+                                   datfile=\
+                                   pth.join(output_dir, self.get_dir("SLC"),
+                                   "%s.slc" % m_s1slc.datestr()))
             
-        if "MLI" in master:
-            mmli = master["MLI"]
-        else:
-            mlidir = gm.get_dir("MLI")
-            mmli = gm.MLI(datfile=pth.join(mlidir, "%s.mli" % master_date))
+            with self.outlist("slc", "SLC") as f:
+                f.write("%s\n" % m_slc)
             
-            master_S1slc.slc.multi_look(mmli, rng_looks=rng_looks,
-                                        azi_looks=azi_looks)
-            
-            master["MLI"] = mmli
         
+        m_mli = self.select_date("mli", master_date)
         
-        self.meta["master"].update(master)
+        if m_mli is None:
+            mlidir = self.get_dir("MLI")
+            m_mli = gm.MLI(datfile=pth.join(mlidir, "%s.mli" % master_date))
+            m_slc.multi_look(m_mli, rng_looks=rng_looks, azi_looks=azi_looks)
+        
+            with self.outlist("mli", "MLI") as f:
+                f.write("%s\n" % m_mli)
         
         
         dem_orig = gm.MLI(datfile=pth.join(demdir, "srtm.dem"),
@@ -854,7 +860,7 @@ class Processing(object):
 
         geo_path = geodir
 
-        mli_rng, mli_azi = int(mmli.rng()), int(mmli.azi())
+        mli_rng, mli_azi = int(m_mli.rng()), int(m_mli.azi())
         
         rng_patch, azi_patch = int(mli_rng / n_rng_off + rng_ovr / 2), \
                                int(mli_azi / n_azi_off + azi_ovr / 2)
@@ -870,7 +876,7 @@ class Processing(object):
                      lookup_old=pth.join(geo_path, "lookup_old"))
         
         
-        geo = gm.Geocode(geo_path, mmli, sim_sar="sim_sar", zenith="zenith",
+        geo = gm.Geocode(geo_path, m_mli, sim_sar="sim_sar", zenith="zenith",
                          orient="orient", inc="inc", pix="pix", psi="psi",
                          ls_map="ls_map", diff_par="diff_par", offs="offs",
                          offsets="offsets", ccp="ccp", coffs="coffs",
@@ -889,10 +895,10 @@ class Processing(object):
         dem_segpent_width = dem["width"]
         dem_segpent_lines = dem["lines"]
 
-        gp.pixel_area(mmli.par, dem.par, dem.dat, dem.lookup, geo.ls_map,
-                      geo.inc, geo.sigpa0, geo.gamma0, 20)
+        gp.pixel_area(m_mli.par, dem.par, dem.dat, dem.lookup, geo.ls_map,
+                      geo.inc, geo.sigma0, geo.gamma0, 20)
         
-        gp.create_diff_par(mmli.par, None, geo.diff_par, 1, 0)
+        gp.create_diff_par(m_mli.par, None, geo.diff_par, 1, 0)
         
         log.info("Refining lookup table.")
 
@@ -907,9 +913,9 @@ class Processing(object):
                 # copy previous lookup table
                 dem.cp("lookup", dem.lookup_old)
 
-                gp.create_diff_par(mmli.par, None, geo.diff_par, 1, 0)
+                gp.create_diff_par(m_mli.par, None, geo.diff_par, 1, 0)
 
-                gp.offset_pwrm(geo.sigpa0, mmli.dat, geo.diff_par, geo.offs,
+                gp.offset_pwrm(geo.sigma0, m_mli.dat, geo.diff_par, geo.offs,
                                geo.ccp, rng_patch, azi_patch, geo.offsets, 2,
                                n_rng_off, n_azi_off, 0.1, 5, 0.8)
 
@@ -921,19 +927,17 @@ class Processing(object):
                                dem.lookup, 1)
 
                 # create new simulated ampliutides with the new lookup table
-                gp.pixel_area(mmli.par, dem.par, dem.dat, dem.lookup, geo.ls_map,
-                              geo.inc, geo.sigpa0, geo.gamma0, 20)
+                gp.pixel_area(m_mli.par, dem.par, dem.dat, dem.lookup, geo.ls_map,
+                              geo.inc, geo.sigma0, geo.gamma0, 20)
 
             # end for
             log.info("ITERATION DONE.")
         # end if
         
-        hgt = gm.HGT(pth.join(geo_path, "dem.rdc"), mmli)
+        hgt = gm.HGT(pth.join(geo_path, "dem.rdc"), m_mli)
         
         self.meta.update({"geo": geo, "dem_orig": dem_orig, "dem": dem,
                           "hgt": hgt})
-
-        self.meta["SLC_merged_nomaster"] = merged
 
 
     def check_geocode(self):
@@ -943,17 +947,18 @@ class Processing(object):
         mrng = hgt.mli.rng()
         
         log.info("Geocoding DEM heights into image coordinates.")
-        dem.geo2rdc(dem.dat, hgt.dat, mrng, nlines=hgt.mli.azi(), interp="sqr_dist")
+        dem.geo2rdc(dem.dat, hgt.dat, mrng, nlines=hgt.mli.azi(),
+                    interp="sqr_dist")
         
-        dem.gm.ras_extter("lookup")
+        dem.raster("lookup")
         
         # TODO: make gm.ras_extter2
         log.info("Creating quicklook hgt.bmp file.")
-        hgt.gm.ras_extter(m_per_cycle=500.0)
+        hgt.raster(m_per_cycle=500.0)
         
-        geo.gm.ras_extter("gamma0")
+        # geo.raster("gamma0")
 
-        gp.dis2pwr(hgt.mli.dat, geo.gamma0, mrng, mrng)
+        # gp.dis2pwr(hgt.mli.dat, geo.gamma0, mrng, mrng)
 
 
     def coreg_slcs(self):
