@@ -9,7 +9,7 @@ from collections import namedtuple
 from pprint import pprint
 from shutil import copy
 from sys import stdout
-from json import load as jload, dump as jdump
+from json import load as jload, dump as jdump, JSONEncoder
 
 ProcStep = namedtuple("ProcStep", ["fun", "opt"])
 
@@ -27,7 +27,7 @@ gp = gm.gamma_progs
 log = logging.getLogger("gamma.steps")
 
 
-__all__ = ["Processing", "ListIter"]
+__all__ = ["Processing"]
 
 # *********************
 # * Utility functions *
@@ -52,31 +52,9 @@ def delim(msg, sym="*", width=80):
 
 
 
-class Pickler(object):
-    def save(self, path):
-        with open(path, "wb") as f:
-            dump(self, f)
-    
-    
-    def load(self, path):
-        with open(path, "rb") as f:
-            self = load(f)
-
-    
-    def update(self, path, **kwargs):
-        self.load(path)
-        self.update(kwargs)
-        self.save(path)
-    
-    
-    @staticmethod
-    def load_file(path):
-        with open(path, "rb") as f:
-            return load(f)
-
-
 trues = frozenset(("true", "on", "1"))
 falses = frozenset(("false", "off", "0"))
+
 
 class Config(dict):
     def getint(self, key, default):
@@ -101,7 +79,38 @@ class Config(dict):
             return False
 
 
-class Meta(dict):
+class FileEncoder(JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj, "to_json"):
+            return JSONEncoder.default(self, obj.to_json())
+        elif hasattr(obj, "__save__"):
+            return {
+                key: getattr(obj, key)
+                for key in getattr(obj, "__save__")
+            }
+        return JSONEncoder.default(self, obj)
+
+
+class Save(object):
+    @staticmethod
+    def load_file(path):
+        with open(path, "r") as f:
+            return jload(f)
+    
+    @classmethod
+    def from_file(cls, path):
+        return cls(Save.load_file(path))
+    
+    
+    def save(self, path):
+        with open(path, "w") as f:
+            jdump(self, f, indent=4, separators=(",", ": "),
+                  cls=FileEncoder)
+
+
+
+class Meta(dict, Save):
+    pass
     # def __init__(self, **kwargs):
     #     self.meta = kwargs
     # 
@@ -116,79 +125,28 @@ class Meta(dict):
     # 
     # def update(self, *args, **kwargs):
     #     self.meta.update(*args, **kwargs)
-    
-    @classmethod
-    def from_file(cls, path):
-        with open(path, "r") as f:
-            # ret = cls()
-            # ret.meta = jload(f)
-            # return ret
-            return cls(jload(f))
-    
-    def save(self, path):
-        with open(path, "w") as f:
-            # jdump(self.meta, f, indent=4,
-            #       separators=(",", ": "))
-            jdump(self, f, indent=4, separators=(",", ": "))
 
 
-class ListIter(object):
-    converters = {
-        "S1SLC" : gm.S1SLC.from_tabfile,
-        "SLC" : gm.SLC.from_line,
-        "MLI" : gm.MLI.from_line,
-        "S1Zip": gm.S1Zip.from_line
-    }
-    
-    
-    constructors = {
+class FileList(Save):
+    ftypes = {
         "S1SLC" : gm.S1SLC,
         "SLC" : gm.SLC,
-        "MLI" : gm.MLI
+        "MLI" : gm.MLI,
         "S1Zip": gm.S1Zip
     }
     
+    ftype_names = frozenset(ftypes.keys())
     
-    ftypes = converters.keys()
-    
-    
-    def __init__(self, path):
-        self.path = path
-
-    
-    def __enter__(self):
-        self.fp = open(self.path, "r")
-        self.conv = self.get_conv()
-        return self
+    __save__ = ("ftype", "files")
     
     
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.fp.close()
-    
-    
-    def get_conv(self):
-        self.fp.seek(0, 0)
-        line = self.fp.readline()
+    def __init__(self, files):
+        assert len(files) > 0, "Need a non-empty list!"
+        ftype = type(files[0]).__name__
+        assert ftype in FileList.ftype_names
         
-        return ListIter.converters[line.split(":")[1].strip()]
+        self.ftype, self.files = ftype, files
     
-    
-    def __iter__(self):
-        for line in self.fp:
-            yield self.conv(line.strip())
-
-    
-    @staticmethod
-    def file_from_glob(*path, **kwargs):
-        fpath = kwargs.get("fpath")
-        _type = kwargs.get("type")
-        constr = ListIter.constructors[_type]
-        
-        with open(fpath, "w") as f:
-            f.write("type: %s\n" % _type)
-            
-            for path in iglob(pth.join(*path)):
-                f.write("%s\n" % constr(datfile=path))
     
     
 class Processing(object):
@@ -277,7 +235,7 @@ class Processing(object):
                  ", ".join(step for step in self.optional_steps)))
     
     
-    def is_optional(self, step)
+    def is_optional(self, step):
         return self.params.has_option(step, "optional") and \
                self.params.getboolean(step, "optional")
     
@@ -352,14 +310,19 @@ class Processing(object):
     def is_list(self, name):
         return name in self.meta["lists"]
     
-    
+    def outlist(self, name, files):
+        FileList(files).save(self.get_list(name))
+        
     def inlist(self, name):
-        return ListIter(self.get_list(name))
+        flist = Save.load_file(self.get_list(name))
+        conv = FileList.ftypes[flist["ftype"]]
+        
+        return tuple(conv.from_json(line) for line in flist["files"])
     
     
-    def from_list(self, name):
-        with self.inlist(name) as f:
-            return tuple(elem for elem in f)
+    # def from_list(self, name):
+    #     with self.inlist(name) as f:
+    #         return tuple(elem for elem in f)
     
     
     def select_date(self, name, date):
@@ -370,21 +333,6 @@ class Processing(object):
             for elem in f:
                 if elem.datestr() == date:
                     return elem
-    
-    
-    
-    def outlist(self, name, ftype):
-        assert ftype in ListIter.ftypes, "Unrecognized filetype %s!" % ftype
-        
-        f = open(self.get_list(name), "w")
-        
-        try:
-            f.write("type: %s\n" % ftype)
-        except Exception as e:
-            f.close()
-            raise e
-        
-        return f
     
     
     def get_out_master(self):
@@ -439,7 +387,7 @@ class Processing(object):
     
     
     def select(self):
-        general, select = self.section("general"), self.section("select_bursts")
+        general, select = self.section("general"), self.section("select")
         
         slc_data = general.get("slc_data")
         
@@ -499,11 +447,7 @@ class Processing(object):
             log("Checking integrity of zipfiles.")
             SLC = (slc for slc in SLC if slc.test_zip())
         
-        
         SLC = tuple(SLC)
-        
-        with self.outfile("s1zip", "S1Zip") as f:
-            f.write("%s\n" % "\n".join(slc.zipfile for slc in SLC))
         
         if master_date is None:
             log.info("No master_date defined, using first date.")
@@ -514,8 +458,6 @@ class Processing(object):
             self.meta["master_date"] = master_date
         else:
             master_date = general["master_date"]
-            
-            print(master_date)
             
             log.info("Master date already defined: %s", master_date)
             
@@ -556,13 +498,11 @@ class Processing(object):
             for slc, burst_num in zip(SLC, burst_nums) if slc.mission == "S1B"
         )
 
-        #log.debug("Master bursts:\n{}\n\n".format(S1A_bursts))
+        # log.debug("Master bursts:\n{}\n\n".format(S1A_bursts))
         log.info("\nSentinel-1A slave bursts:\n%s" % S1A_bursts)
         log.info("\nSentinel-1B slave bursts:\n%s" % S1B_bursts)
         
-        self.meta["SLC_zip"] = SLC
-        self.meta["burst_nums"] = burst_nums
-
+        self.outlist("s1zip", SLC)
         gm.rm("tmp_par", "tmp_TOPS_par")
 
 

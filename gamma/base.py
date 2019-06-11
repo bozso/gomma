@@ -12,6 +12,7 @@ from collections import namedtuple
 from pprint import pformat
 from subprocess import check_output, CalledProcessError, STDOUT
 from shlex import split
+from json import JSONEncoder
 
 import gamma as gm
 
@@ -163,6 +164,7 @@ class Parfile(object):
             
 
 class DataFile(gm.Files):
+    __save__ = ("dat", "par", "tab")
     __slots__ = ("dat", "par", "datpar", "tab", "keep")
 
     data_types = {

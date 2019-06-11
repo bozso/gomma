@@ -44,6 +44,8 @@ class S1Zip(object):
                  "prod_type", "resolution", "level", "prod_class", "pol",
                  "abs_orb", "DTID", "UID")
     
+    __save__ = ("zipfile", "burst_nums")
+    
     def __init__(self, zipfile, extra_info=False):
         zip_base = pth.basename(zipfile)
         
@@ -51,7 +53,9 @@ class S1Zip(object):
         self.mission = zip_base[:3]
         self.date = gm.Date(datetime.strptime(zip_base[17:32], "%Y%m%dT%H%M%S"),
                             datetime.strptime(zip_base[33:48], "%Y%m%dT%H%M%S"))
+        
         self.burst_nums = None
+        
         
         if extra_info:
             self.mode = zip_base[4:6]
@@ -66,8 +70,18 @@ class S1Zip(object):
     
     
     @classmethod
-    def from_line(cls, line):
-        return cls(line)
+    def from_json(cls, line):
+        ret = cls(line["zipfile"])
+        ret.burst_nums = line["burst_nums"]
+        
+        return ret
+    
+    
+    def __str__(self):
+        line = "%s;" % self.zipfile
+        
+        if self.burst_nums is not None:
+            line += ",".join(str(elem) for elem in self.burst_nums)
     
     
     def datestr(self, fmt="%Y%m%d"):
@@ -260,6 +274,7 @@ class S1IW(gm.DataFile):
 
 class S1SLC(object):
     __slots__ = ("IWs", "tab", "slc")
+    __save__ = ("tab")
     
     tab_tpl = gm.settings["templates"]["tab"]
     
@@ -318,7 +333,7 @@ class S1SLC(object):
         
     
     @classmethod
-    def from_template(cls, date, burst_num, pol, fmt="short", dirpath="."
+    def from_template(cls, date, burst_num, pol, fmt="short", dirpath=".",
                       **kwargs):
         tpl_tab = pth.join(dirpath, self.tpl_tab)
         
