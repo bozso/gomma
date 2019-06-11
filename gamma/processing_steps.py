@@ -507,7 +507,6 @@ class Processing(object):
 
 
     def load(self):
-
         if gm.ScanSAR:
             copy_fun = getattr(gp, "SLC_copy_ScanSAR")
         else:
@@ -522,43 +521,45 @@ class Processing(object):
         dir_crop   = self.get_dir("crop")
 
 
-        meta = self.meta
-        SLC, burst_nums = meta["SLC_zip"], meta["burst_nums"]
-        
         log.info("Importing SLCs.")
         
-        SLC = self.from_list("s1zip")
+        SLC = self.inlist("s1zip")
         
-        if 1:
-            with self.outlist("uncrop", "S1SLC") as f:
-                for burst_num, slc in zip(burst_nums, SLC):
-                    uncrop = \
-                    gm.S1SLC.from_template(pol, slc.date, burst_num,
-                                           fmt="long", dirpath=dir_uncrop)
-                    
-                    for IW in uncrop.IWs:
-                        if IW is not None:
-                            slc.extract_IW(pol, IW)
-                    
-                    f.write("%s\n" % uncrop.tab)
-
-
+        uncrop = []
+        
+        if 0:
+            for slc in SLC:
+                _uncrop = \
+                gm.S1SLC.from_template(slc.date, slc.burst_nums, pol,
+                                       fmt=None, dirpath=dir_uncrop)
+                
+                for IW in _uncrop.IWs:
+                    if IW is not None:
+                        slc.extract_IW(pol, IW)
+                
+                uncrop.append(_uncrop)
+            self.outlist("uncrop", uncrop)
+        
+        uncrop = self.inlist("uncrop")
+        
         burst_tab = gm.get_tmp()
         
-        with self.inlist("uncrop") as uc, self.outlist("crop", "S1SLC") as f:
-            for uncrop, crop, burst_num in zip(uc,  burst_nums):
-                with open(burst_tab, "w") as f:
-                    f.write("\n".join("%d %d" % (burst[0], burst[1])
-                            for burst in burst_num if burst is not None) + "\n")
-                
-                crop = uncrop.make_other(dirpath=dir_crop)
-                
-                f.write("%s\n" % crop.tab)
-                
-                copy_fun(uncrop.tab, crop.tab, burst_tab)
-    
+        crop = []
         
+        for uc, slc in zip(uncrop,  SLC):
+            with open(burst_tab, "w") as f:
+                f.write("\n".join("%d %d" % (burst[0], burst[1])
+                        for burst in slc.burst_nums if burst is not None) + "\n")
+            
+            _crop = uc.make_other(dirpath=dir_crop)
+            
+            copy_fun(uc.tab, _crop.tab, burst_tab)
+            crop.append(_crop)
+    
+    
+        self.outlist("crop", crop)
 
+    
     def merge(self):
 
         if gm.ScanSAR:
@@ -575,55 +576,50 @@ class Processing(object):
         slc_dir    = self.get_dir("SLC_merged")
 
         SLC_merged, used_SLC = [], []
-        
-        list_merged = self.get_list("merged")
-        
-        
-        with self.inlist("crop") as f:
-            SLC = tuple(slc for slc in f)
+        SLC = self.inlist("crop")
         
         
-        with self.outlist("merged", "S1SLC") as f:
-            for SLC1 in SLC:
-                if SLC1 in used_SLC:
-                    continue
+        for SLC1 in SLC:
+            if SLC1 in used_SLC:
+                continue
+            
+            date1 = SLC1.date(start_stop=True)
+            
+            date1str = date1.date2str()
+            
+            log.info("Processing date %s." % date1str)
+            SLC2 = search_pair(SLC1, SLC, used_SLC)
+            
+            
+            SLC3 = gm.S1SLC(
+            tuple(
+                    gm.S1IW(ii + 1, datfile=tpl_iw.format(date1str, ii + 1, pol))
+                    if IW is not None else None
+                    for ii, IW in enumerate(SLC1.IWs)
+                ), tpl_tab.format(date1str, pol)
+            )
+            
+            
+            if SLC2 is not None:
+                log.info("Merging %s with %s." % (SLC1.tab, SLC2.tab))
+                date2 = SLC2.date(start_stop=True)
                 
-                date1 = SLC1.date(start_stop=True)
-                
-                date1str = date1.date2str()
-                
-                log.info("Processing date %s." % date1str)
-                SLC2 = search_pair(SLC1, SLC, used_SLC)
-                
-                
-                SLC3 = gm.S1SLC(
-                tuple(
-                        gm.S1IW(ii + 1, datfile=tpl_iw.format(date1str, ii + 1, pol))
-                        if IW is not None else None
-                        for ii, IW in enumerate(SLC1.IWs)
-                    ), tpl_tab.format(date1str, pol)
-                )
-                
-                
-                if SLC2 is not None:
-                    log.info("Merging %s with %s." % (SLC1.tab, SLC2.tab))
-                    date2 = SLC2.date(start_stop=True)
-                    
-                    if date1.center > date2.center:
-                        gp.SLC_cat_S1_TOPS(SLC2.tab, SLC1.tab, SLC3.tab)
-                        merge_fun(SLC2.tab, SLC1.tab, SLC3.tab)
-                    else:
-                        merge_fun(SLC1.tab, SLC2.tab, SLC3.tab)
-        
-                    used_SLC.append(SLC2)
+                if date1.center > date2.center:
+                    gp.SLC_cat_S1_TOPS(SLC2.tab, SLC1.tab, SLC3.tab)
+                    merge_fun(SLC2.tab, SLC1.tab, SLC3.tab)
                 else:
-                    log.info("No need for merge. Copying %s." % SLC1.tab)
-                    SLC1.cp(SLC3)
+                    merge_fun(SLC1.tab, SLC2.tab, SLC3.tab)
+    
+                used_SLC.append(SLC2)
+            else:
+                log.info("No need for merge. Copying %s." % SLC1.tab)
+                SLC1.cp(SLC3)
+    
+            # endif
+            merged.append(SLC3)
+        # endfor
         
-                # endif
-                f.write("%s\n" % SLC3.tab)
-            # endfor
-        # close
+        self.outlist("merged", merged)
         
         # CLEANUP
         #gm.rm("*.SAFE", "*.SLC_tab", "*iw*", "*.slc*")
@@ -642,20 +638,25 @@ class Processing(object):
         
         tpl = pth.join(mli_dir, "%s.%s.mli")
         
-        with self.inlist("merged") as SLC, self.outlist("mli", "MLI") as f:
-            for slc in SLC:
-                # create MLI file paths
-                mli = gm.MLI(datfile=tpl % (slc.datestr(), pol))
-                
-                # multi looking
-                slc.multi_look(mli, range_looks, azimuth_looks)
-                
-                mli.raster()
-                
-                # write to file
-                f.write("%s\n" % mli)
+        MLI = []
         
+        
+        for slc in self.inlist("merged"):
+            # create MLI file paths
+            mli = gm.MLI(datfile=tpl % (slc.datestr(), pol))
+            
+            # multi looking
+            slc.multi_look(mli, range_looks, azimuth_looks)
+            
+            mli.raster()
+            
+            # write to file
+            MLI.append(mli)
+        
+        
+        self.outlist("mli", mli)
 
+    
     def mosaic_tops(self):
         
         general = self.section("general")
@@ -666,15 +667,18 @@ class Processing(object):
         pol             = general.get("pol", "vv")
         
         
-        with self.inlist("merged") as m, \
-        self.outlist("slc_mosaic", "SLC") as f:
-            for s1slc in m:
-                dat = pth.join(s1slc.IW[0].dat.split(".")[-2], ".dat")
-                slc = s1slc.mosaic(rng_looks=rng_looks, azi_looks=azi_looks,
-                                   datfile=dat)
-                f.write("%s\n" % slc)
+        SLC = []
+        
+        for s1slc in self.inlist("merged"):
+            dat = pth.join(s1slc.IW[0].dat.split(".")[-2], ".dat")
+            slc = s1slc.mosaic(rng_looks=rng_looks, azi_looks=azi_looks,
+                               datfile=dat)
+            
+            SLC.append(slc)
+        
+        self.outlist("slc_mosaic", slc)
 
-
+    
     def check_ionoshpere(self):
         
         output_dir = self.params.get("general", "output_dir")
@@ -700,14 +704,13 @@ class Processing(object):
 
     def make_rmli(self):
         
-        general = self.params.general
+        general = self.section("general")
         
         output_dir    = general.get("output_dir", ".")
-        range_looks   = general.get("range_looks", 1)
-        azimuth_looks = general.get("azimuth_looks", 4)
+        range_looks   = general.getint("range_looks", 1)
+        azimuth_looks = general.getint("azimuth_looks", 4)
         pol           = general.get("pol")
         
-        log.info("CREATING QUICKLOOK RMLIs.")
         mli_dir = gm.mkdir(pth.join(output_dir, "RMLI"))
         
         RSLC = self.meta["SLC_coreg"]

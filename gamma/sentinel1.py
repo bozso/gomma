@@ -169,15 +169,18 @@ class S1Zip(object):
     def select_bursts(self, pol, ref_burst_nums):
         log.info("Selecting bursts of %s." % self.zipfile)
         
-        return \
+        self.burst_nums = \
         tuple(burst_selection_helper(ref, slc) for ref, slc in
               zip(ref_burst_nums, self.get_burst_nums(pol)))
+        
+        return self.burst_nums
 
 
 class S1IW(gm.DataFile):
     __slots__ = ("TOPS_par", "num")
     
     tpl = gm.settings["templates"]["IW"]
+    
     
     def __init__(self, num, TOPS_parfile=None, **kwargs):
         
@@ -187,7 +190,7 @@ class S1IW(gm.DataFile):
         if TOPS_parfile is None:
             TOPS_parfile = self.dat + ".TOPS_par"
         
-        self.TOPS_par, self.num = TOPS_parfile, num
+        self.TOPS_par, self.num = gm.Parfile(parfile=TOPS_parfile), num
 
     
     def save(self, datfile, parfile=None, TOPS_parfile=None):
@@ -195,26 +198,26 @@ class S1IW(gm.DataFile):
         
         self.mv("TOPS_par", TOPS_parfile)
         
-        self.TOPS_par = TOPS_parfile
+        self.TOPS_par = gm.Parfile(TOPS_parfile)
     
-        
+    
     def rm(self):
         Files.rm(self, "dat", "par", "TOPS_par")
     
 
     def __bool__(self):
-        return self.exist("dat", "par", "TOPS_par")
+        return Files.exist(self, "dat", "par", "TOPS_par")
 
 
     def __str__(self):
-        return "%s %s %s" % (self.dat, self.par, self.TOPS_par)
+        return "%s %s %s" % (self.dat, self.par, self.TOPS_par.par)
 
 
     def __getitem__(self, key):
-        ret = self.get("par", key)
+        ret = gm.Parfile.__getitem__(self, key)
         
         if ret is None:
-            ret = self.get("TOPS_par", key)
+            ret = self.TOPS_par[key]
             
             if ret is None:
                 raise ValueError('Keyword "%s" not found in parameter files.'
@@ -225,27 +228,20 @@ class S1IW(gm.DataFile):
             return ret
     
     
-    def date(self, start_stop=False):
-        date = \
-        datetime.strptime(" ".join(self["date"].split()[:3]), "%Y %m %d")
-        
-        if start_stop:
-            start = timedelta(seconds=self.getfloat("start_time"))
-            cent  = timedelta(seconds=self.getfloat("center_time"))
-            stop  = timedelta(seconds=self.getfloat("end_time"))
-            
-            return gm.Date(date + start, date + stop, date + cent)
-        else:
-            return date
+    # def date(self, start_stop=False):
+    #     date = \
+    #     datetime.strptime(" ".join(self["date"].split()[:3]), "%Y %m %d")
+    #     
+    #     if start_stop:
+    #         start = timedelta(seconds=self.getfloat("start_time"))
+    #         cent  = timedelta(seconds=self.getfloat("center_time"))
+    #         stop  = timedelta(seconds=self.getfloat("end_time"))
+    #         
+    #         return gm.Date(date + start, date + stop, date + cent)
+    #     else:
+    #         return date
     
 
-    def getfloat(self, key, idx=0):
-        return float(self[key].split()[idx])
-
-    def getint(self, key, idx=0):
-        return int(self[key].split()[idx])
-
-    
     @classmethod
     def from_tabline(cls, line):
         split = [elem.strip() for elem in line.split()]
@@ -257,7 +253,7 @@ class S1IW(gm.DataFile):
     @classmethod
     def from_template(cls, pol, date, num, tpl=None, **kwargs):
         if tpl is None:
-            tpl = self.tpl
+            tpl = cls.tpl
         
         return cls(num, datfile=tpl.format(date=date, iw=num, pol=pol),
                    keep=True, **kwargs)
@@ -274,9 +270,10 @@ class S1IW(gm.DataFile):
 
 class S1SLC(object):
     __slots__ = ("IWs", "tab", "slc")
-    __save__ = ("tab")
+    __save__ = ("tab",)
     
     tab_tpl = gm.settings["templates"]["tab"]
+    
     
     def __init__(self, IWs, tabfile):
         self.IWs, self.tab, self.slc = IWs, tabfile, None
@@ -285,17 +282,16 @@ class S1SLC(object):
             f.write("%s\n" % str(self))
     
     
-    def date(self, *args, **kwargs):
-        return self.IWs[0].date(*args, **kwargs)
-    
-    
-    def datestr(self, *args, **kwargs):
-        return self.IWs[0].datestr(*args, **kwargs)
-    
+    def __bool__(self):
+        return all(bool(IW) for IW in self.IWs if IW is not None)
 
-    def rm(self):
-        for IW in self.IWs:
-            IW.rm()
+    
+    def __str__(self):
+        return "\n".join(str(IW) for IW in self.IWs if IW is not None)
+    
+    @classmethod
+    def from_json(cls, line):
+        return cls.from_tabfile(line["tab"])
     
     
     @classmethod
@@ -310,7 +306,7 @@ class S1SLC(object):
         )
         
         return cls(IWs, tabfile)
-    
+
     
     @classmethod
     def from_tabfile(cls, tabfile):
@@ -321,33 +317,51 @@ class S1SLC(object):
         return cls(IWs, tabfile)    
     
     
-    
-    def make_other(self, dirpath, fmt="short", **kwargs):
-        tpl = pth.join(dirpath, S1IW.tpl)
-        
-        date = self.date(start_stop=True)
-        burst_num = self.IWs
-        pol = self.pol()
-        
-        return S1SLC.from_template(date, burst_num, pol, fmt=fmt, tpl=tpl)
-        
-    
     @classmethod
     def from_template(cls, date, burst_num, pol, fmt="short", dirpath=".",
                       **kwargs):
-        tpl_tab = pth.join(dirpath, self.tpl_tab)
+        tpl_tab = pth.join(dirpath, cls.tab_tpl)
         
-        date = date.date2str(gm.settings["templates"]["date"][fmt])
+        if fmt is not None:
+            date = date.date2str(gm.settings["templates"]["date"][fmt])
+        
+        
+        tpl = pth.join(dirpath, S1IW.tpl)
         
         IWs = tuple(
-                S1IW.from_template(pol, date, ii + 1, **kwargs)
+                S1IW.from_template(pol, date, ii + 1, tpl=tpl, **kwargs)
                 if iw is not None else None
                 for ii, iw in enumerate(burst_num)
         )
         
         return cls(IWs, tpl_tab.format(date=date, pol=pol))
-
-
+    
+    
+    def date(self, *args, **kwargs):
+        return self.IWs[0].date(*args, **kwargs)
+    
+    
+    def datestr(self, *args, **kwargs):
+        return self.IWs[0].datestr(*args, **kwargs)
+    
+    
+    def pol(self):
+        return self.IWs[0].pol()
+    
+    
+    def rm(self):
+        for IW in self.IWs:
+            IW.rm()
+    
+    
+    def make_other(self, fmt="short", **kwargs):
+        date = self.date(start_stop=True)
+        burst_num = self.IWs
+        pol = self.pol()
+        
+        return S1SLC.from_template(date, burst_num, pol, fmt=fmt, **kwargs)
+        
+    
     def num_IWs(self):
         return sum(1 for iw in self.IWs if iw is not None)
     
@@ -371,14 +385,6 @@ class S1SLC(object):
 
     def multi_look(self, MLI, rng_looks=1, azi_looks=1, wflg=0):
         gp.multi_S1_TOPS(self.tab, MLI.datpar, rng_looks, azi_looks, wflg)
-
-    
-    def __bool__(self):
-        return all(bool(IW) for IW in self.IWs if IW is not None)
-
-    
-    def __str__(self):
-        return "\n".join(str(IW) for IW in self.IWs if IW is not None)
 
 
 def coreg(master, SLC, RSLC, hgt=0.1, rng_looks=10, azi_looks=2,

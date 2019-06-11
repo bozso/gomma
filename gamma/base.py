@@ -19,6 +19,7 @@ import gamma as gm
 PY3 = version_info[0] == 3
 
 __all__ = [
+    "Parfile",
     "DataFile",
     "SLC",
     "MLI",
@@ -123,31 +124,36 @@ imview = make_cmd("eog")
 
 
 class Parfile(object):
-    __slots__ = ("path",)
+    __slots__ = ("par",)
+    __save__ = __slots__
     
-    def __init__(self, path):
-        self.path = path
+    
+    def __init__(self, **kwargs):
+        self.par = kwargs.get("parfile")
+    
+    def __str__(self):
+        return self.par
     
     def __getitem__(self, item):
-        return gm.get_par(item, self.path)
+        return gm.get_par(item, self.par)
     
     def __contains__(self, item):
         return self[item] is not None
     
-    def getfloat(key, idx=0):
+    def getfloat(self, key, idx=0):
         return float(self[key].split()[idx])
     
-    def getint(key, idx=0):
+    def getint(self, key, idx=0):
         return int(self[key].split()[idx])
     
     
     def set_par(key, new):
-        if gm.Files.is_empty(self.path) or key not in self:
+        if gm.Files.is_empty(self.par) or key not in self:
             with open(self.path, "a") as f:
                 f.write("%s: %s\n" % (key, new))
         
         elif key in self:
-            with open(self.path, "r+") as f:
+            with open(self.par, "r+") as f:
                 lines = (line for line in f)
         
                 lines = (
@@ -163,9 +169,9 @@ class Parfile(object):
                 f.write("%s\n" % "\n".join(lines))
             
 
-class DataFile(gm.Files):
-    __save__ = ("dat", "par", "tab")
-    __slots__ = ("dat", "par", "datpar", "tab", "keep")
+class DataFile(gm.Files, Parfile):
+    __save__ = ("dat", "tab")
+    __slots__ = ("dat", "datpar", "tab", "keep")
 
     data_types = {
         "FCOMPLEX": 0,
@@ -174,6 +180,8 @@ class DataFile(gm.Files):
         "SHORT_INT": 1,
         "DOUBLE": 2
     }
+    
+    pols = frozenset(("vv", "hh", "hv", "vh"))
 
     
     def __init__(self, **kwargs):
@@ -193,6 +201,12 @@ class DataFile(gm.Files):
         datfile, parfile, kwargs.get("tabfile", None), \
         bool(kwargs.get("keep", True))
 
+    
+    @classmethod
+    def from_json(cls, line):
+        return cls(datfile=line["dat"], parfile=line["par"],
+                   tabfile=line["tab"])
+    
     
     def rm(self):
         Files.rm(self, "dat", "par")
@@ -222,11 +236,7 @@ class DataFile(gm.Files):
 
 
     def __bool__(self):
-        return self.exist("dat") and self.exist("par")
-
-
-    def __getitem__(self, key):
-        return self.get("par", key)
+        return Files.exist(self, "dat", "par")
 
 
     def rng(self):
@@ -238,8 +248,12 @@ class DataFile(gm.Files):
     def img_fmt(self):
         return self["image_format"]
     
+    
     def pol(self):
-        return self["pol"]
+        dat = self.dat
+        for pol in self.pols:
+            if pol in dat or pol.upper() in dat:
+                return pol
     
 
     def stat(self, **kwargs):
@@ -258,11 +272,11 @@ class DataFile(gm.Files):
         datetime.strptime(" ".join(self["date"].split()[:3]), "%Y %m %d")
         
         if start_stop:
-            start = timedelta(seconds=self.getfloat("par", "start_time"))
-            cent  = timedelta(seconds=self.getfloat("par", "center_time"))
-            stop  = timedelta(seconds=self.getfloat("par", "end_time"))
+            start = timedelta(seconds=self.getfloat("start_time"))
+            cent  = timedelta(seconds=self.getfloat("center_time"))
+            stop  = timedelta(seconds=self.getfloat("end_time"))
             
-            return Date(date + start, date + stop, date + cent)
+            return gm.Date(date + start, date + stop, date + cent)
         else:
             return date
     
@@ -283,16 +297,6 @@ class DataFile(gm.Files):
         split = line.split()
         return cls(datfile=split[0].strip(), parfile=split[1].strip(),
                    keep=True)
-    
-    
-    @staticmethod
-    def parse_split(split):
-        s = split.strip()
-        
-        if s == "None":
-            return None
-        else:
-            return s
     
     
     def avg_fact(self, fact=750):

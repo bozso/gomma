@@ -14,8 +14,12 @@ __all__ = [
 
 
 class IFG(gm.DataFile):
+    
     __slots__ = ("diff_par", "qual", "filt", "cc", "dt", "slc1", "slc2",
                  "sim_unw")
+    
+    __save__ = __slots__
+    
     
     _cc_weights = {
         "constant": 0,
@@ -49,6 +53,12 @@ class IFG(gm.DataFile):
         None, None, None, None, sim_unw
 
 
+    @classmethod
+    def from_json(cls, line):
+        return cls(line["dat"], line["par"], line["sim_unw"], 
+                   line["diff_par"], line["qual"])
+
+    
     def rm(self):
         Files.rm(self, "dat", "par", "sim_unw")
     

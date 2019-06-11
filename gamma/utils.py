@@ -1,8 +1,15 @@
+import os
+from os import path as pth
 from itertools import tee
 from atexit import register
 from tempfile import _get_default_tempdir, _get_candidate_names
 from shutil import copyfileobj
 from argparse import ArgumentParser
+from glob import iglob
+from logging import getLogger
+
+
+log = getLogger("gamma.sentinel1")
 
 import gamma as gm
 
@@ -151,14 +158,14 @@ class Files(object):
     def cp(self, attrib, other):
         sh.copy(getattr(self, attrib), other)
     
-    def get(self, attrib, key):
-        return Files.get_par(key, getattr(self, attrib))
-    
-    def getfloat(self, attrib, key, idx=0):
-        return Files._getfloat(key, getattr(self, attrib), idx)
-
-    def getint(self, attrib, key, idx=0):
-        return Files._getint(key, getattr(self, attrib), idx)
+    # def get(self, attrib, key):
+    #     return Files.get_par(key, getattr(self, attrib))
+    # 
+    # def getfloat(self, attrib, key, idx=0):
+    #     return Files._getfloat(key, getattr(self, attrib), idx)
+    # 
+    # def getint(self, attrib, key, idx=0):
+    #     return Files._getint(key, getattr(self, attrib), idx)
     
     def set(self, attrib, key, **kwargs):
         return Files.set_par(key, getattr(self, attrib), **kwargs)
@@ -235,7 +242,7 @@ def get_par(key, data, sep=":"):
             
     for line in lines:
         if key in line:
-            return " ".join(value.split(sep)[1:]).strip() 
+            return " ".join(line.split(sep)[1:]).strip() 
 
     
 def Multi(**kwargs):
