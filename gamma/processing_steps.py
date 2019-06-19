@@ -183,8 +183,6 @@ class Processing(object):
         self.optional_steps = set(
             step for step in self.steps
             if self.is_optional(step)
-            # if self.params.has_option(step, "optional")
-            # and self.params.getboolean(step, "optional")
         )
         
         
@@ -205,20 +203,20 @@ class Processing(object):
                                  'step. Choose from: %s'
                                  % (step, ", ".join(steps)))
             
-            log.debug("Single step \"%s\" is executed." % step)
+            log.debug('Single step "%s" is executed.' % step)
             return [step]
         else:
             start = args.start
             stop  = args.stop
             
             if start not in steps:
-                raise ValueError("Step \"%s\" is not a valid processing "
-                                 "step. Choose from: %s"
+                raise ValueError('Step "%s" is not a valid processing '
+                                 'step. Choose from: %s'
                                  % (start, ", ".join(steps)))
     
             if stop not in _steps:
-                raise ValueError("Step \"%s\" is not a valid processing "
-                                 "step. Choose from: %s"
+                raise ValueError('Step "%s" is not a valid processing '
+                                 'step. Choose from: %s'
                                  % (stop, ", ".join(steps)))
     
             log.debug('Steps from "%s" to "%s" will be executed.'
@@ -239,28 +237,27 @@ class Processing(object):
         return self.params.has_option(step, "optional") and \
                self.params.getboolean(step, "optional")
     
+    
     def get_fun(self, step):
-        # opt = self.params.has_option(step, "optional") and \
-        #       self.params.getboolean(step, "optional")
-        
         return ProcStep(getattr(self, step), self.is_optional(step))
 
     
     def run_steps(self):
         args = self.args
-        Processing.setup_log("gamma", filename=args.logfile, loglevel=args.loglevel)
+        Processing.setup_log("gamma", filename=args.logfile,
+                             loglevel=args.loglevel)
         
         if args.show_steps:
             self.show_steps()
-            return
+            return 0
         
-        log.info("File containing processing parameters: %s" 
+        log.info('File containing processing parameters: "%s"'
                  % (args.conf_file))
         
         if args.info:
             pprint(self.params)
             pprint(self.meta)
-            return
+            return 0
         
         steps = self.parse_steps()
         
@@ -278,11 +275,7 @@ class Processing(object):
                     ustep = step.upper()
                     
                     delim("Starting step: %s" % ustep)
-                    
-                    log.info('Running step: "%s"' % step)
-                    # step_fun.fun(self)
                     step_fun.fun()
-                    
                     delim("Finished step: %s" % ustep)
             finally:
                 self.meta.save(self.metafile)
@@ -310,9 +303,11 @@ class Processing(object):
     def is_list(self, name):
         return name in self.meta["lists"]
     
+    
     def outlist(self, name, files):
         FileList(files).save(self.get_list(name))
-        
+    
+    
     def inlist(self, name):
         flist = Save.load_file(self.get_list(name))
         conv = FileList.ftypes[flist["ftype"]]
@@ -320,31 +315,24 @@ class Processing(object):
         return tuple(conv.from_json(line) for line in flist["files"])
     
     
-    # def from_list(self, name):
-    #     with self.inlist(name) as f:
-    #         return tuple(elem for elem in f)
-    
-    
     def select_date(self, name, date):
         if not self.is_list(name):
             return None
         
-        with self.inlist(name) as f:
-            for elem in f:
-                if elem.datestr() == date:
-                    return elem
+        return tuple(elem if elem.datestr() == date
+                     for elem in self.inlist(name))[0]
     
     
     def get_out_master(self):
         output_dir  = self.params.get("general", "output_dir")
-        master_date = self.meta["master_date"]
+        master_date = self.meta.get("master_date")
         
         if master_date is None:
             raise ValueError("master_date is not defined.")
         
         return output_dir, master_date
 
-        
+    
     @staticmethod
     def setup_log(logger_name, filename=None, formatter=None,
                   loglevel="debug"):
@@ -394,14 +382,14 @@ class Processing(object):
         if slc_data is None:
             raise ValueError('Parameter "slc_data" not defined.')
 
-        master_date, output_dir = general.get("master_date"), \
-                                  general.get("output_dir", ".")
-
-        date_start, date_stop = select.get("date_start"), select.get("date_stop")
-
-        check_zips = select.getbool("check_zips", False)
         
-        pol = general.get("pol")
+        master_date, output_dir, pol = \
+        general.get("master_date"), general.get("output_dir", "."), \
+        general.get("pol")
+
+        date_start, date_stop, check_zips = \
+        select.get("date_start"), select.get("date_stop"), \
+        select.getbool("check_zips", False)
         
         
         IWs = tuple(select.get("iw%d" % (idx + 1)) for idx in range(3))
