@@ -11,6 +11,8 @@ gp = gm.gamma_progs
 
 class DEM(gm.DataFile):
     __slots__ = ("lookup", "lookup_old")
+    __save__ = gm.save(gm.DataFile) | {"lookup"}
+    
     
     _geo2rdc = {
         "dist": 0,
@@ -73,9 +75,12 @@ class DEM(gm.DataFile):
 
 
 class Geocode(gm.Files):
-    _items = ("sim_sar", "zenith", "orient", "inc", "pix", "psi", "ls_map",
-              "diff_par", "offs", "offsets", "ccp", "coffs", "coffsets")
-
+    _items = {"sim_sar", "zenith", "orient", "inc", "pix", "psi", "ls_map",
+              "diff_par", "offs", "offsets", "ccp", "coffs", "coffsets"}
+    __save__ = {"par"} | _items
+    
+    
+    
     def __init__(self, path, mli, sigma0=None, gamma0=None, **kwargs):
         self.par = mli.par
         
@@ -106,6 +111,8 @@ class Geocode(gm.Files):
 
 
 class HGT(gm.DataFile):
+    __save__ = {"dat", "par", "mli"}
+    
     rashgt = getattr(gp, "rashgt")
     
     def __init__(self, hgt, mli, keep=True):

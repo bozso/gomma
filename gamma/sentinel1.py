@@ -40,11 +40,12 @@ class S1Zip(object):
     r_noise_tpl = ".*.SAFE/annotation/calibration/noise-s1.*-"\
                   "iw{iw}-slc-{pol}.*.xml"
     
-    __slots__ = ("zipfile", "mission", "date", "burst_nums", "mode",
+    __slots__ = {"zipfile", "mission", "date", "burst_nums", "mode",
                  "prod_type", "resolution", "level", "prod_class", "pol",
-                 "abs_orb", "DTID", "UID")
+                 "abs_orb", "DTID", "UID"}
     
-    __save__ = ("zipfile", "burst_nums")
+    __save__ = {"zipfile", "burst_nums", "date", "mission"}
+    
     
     def __init__(self, zipfile, extra_info=False):
         zip_base = pth.basename(zipfile)
@@ -177,7 +178,7 @@ class S1Zip(object):
 
 
 class S1IW(gm.DataFile):
-    __slots__ = ("TOPS_par", "num")
+    __slots__ = {"TOPS_par", "num"}
     
     tpl = gm.settings["templates"]["IW"]
     
@@ -269,8 +270,8 @@ class S1IW(gm.DataFile):
 
 
 class S1SLC(object):
-    __slots__ = ("IWs", "tab", "slc")
-    __save__ = ("tab",)
+    __slots__ = {"IWs", "tab", "slc"}
+    __save__ = {"tab",}
     
     tab_tpl = gm.settings["templates"]["tab"]
     

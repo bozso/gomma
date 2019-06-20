@@ -15,8 +15,8 @@ __all__ = [
 
 class IFG(gm.DataFile):
     
-    __slots__ = ("diff_par", "qual", "filt", "cc", "dt", "slc1", "slc2",
-                 "sim_unw")
+    __slots__ = {"diff_par", "qual", "filt", "cc", "dt", "slc1", "slc2",
+                 "sim_unw"}
     
     __save__ = __slots__
     

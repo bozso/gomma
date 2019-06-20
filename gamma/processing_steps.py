@@ -614,7 +614,7 @@ class Processing(object):
         azimuth_looks = general.getint("azimuth_looks", 4)
         pol           = general.get("pol")
         
-        mli_dir = self.get_dir("MLI")
+        mli_dir = self.get_dir("mli")
         
         tpl = pth.join(mli_dir, "%s.%s.mli")
         
@@ -711,8 +711,6 @@ class Processing(object):
 
 
     def geocode(self):
-
-        log.info("Starting GEOCODE_MASTER.")
         
         output_dir, master_date = self.get_out_master()
         general = self.section("general")
@@ -721,7 +719,7 @@ class Processing(object):
         azi_looks = general.getint("azimuth_looks", 4)
         
         
-        geoc = self.section("geocode_master")
+        geoc = self.section("geocode")
         
         vrt_path = geoc.get("dem_path")
 
@@ -741,8 +739,8 @@ class Processing(object):
 
         itr = geoc.getint("iter", 0)
         
-        demdir = self.get_dir("DEM")
-        geodir = self.get_dir("GEO")
+        demdir = self.get_dir("geo")
+        geodir = self.get_dir("dem")
         
         
         m_s1slc = self.select_date("merged", master_date)

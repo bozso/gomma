@@ -19,6 +19,7 @@ import gamma as gm
 PY3 = version_info[0] == 3
 
 __all__ = [
+    "save",
     "Parfile",
     "DataFile",
     "SLC",
@@ -123,6 +124,10 @@ gp = gamma_progs
 imview = make_cmd("eog")
 
 
+def save(obj):
+    return obj.__save__
+
+
 class Parfile(object):
     __slots__ = ("par",)
     __save__ = __slots__
@@ -173,8 +178,8 @@ class Parfile(object):
             
 
 class DataFile(gm.Files, Parfile):
-    __save__ = ("dat", "tab")
-    __slots__ = ("dat", "datpar", "tab", "keep")
+    __save__ = {"dat", "par", "tab"}
+    __slots__ = {"dat", "datpar", "tab", "keep"}
 
     data_types = {
         "FCOMPLEX": 0,
@@ -193,7 +198,7 @@ class DataFile(gm.Files, Parfile):
         parfile   = kwargs.get("parfile")
         
         if datfile is None:
-            datfile = get_tmp(kwargs.get("tmpdir", tmpdir))
+            datfile = gm.get_tmp(**kwargs)
         
         if parfile is None:
             parfile = datfile + ".par"

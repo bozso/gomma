@@ -103,6 +103,9 @@ class PointData(gm.Files):
     }
     
     
+    __save__ = {"root", "data_dir", "slc", "mli", "data", "mask"}
+    
+    
     def __init__(self, slc, mli, root="."):
         self.root, self.data_dir = root, pth.join(root, "data")
         
@@ -111,6 +114,7 @@ class PointData(gm.Files):
         
         self.plist, self.slc, self.data, self.mask, self.mli = \
         pth.join(root, "plist"), slc, {}, Masks(pth.join(root, "mask")), mli
+    
     
     def __setitem__(self, key, dtype):
         assert dtype.upper() in PointData.dtypes.keys(), \
