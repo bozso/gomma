@@ -243,10 +243,10 @@ class DataFile(gm.Files, Parfile):
 
 
     def rng(self):
-        return self.getint("par", "range_samples")
+        return self.getint("range_samples")
 
     def azi(self):
-        return self.getint("par", "azimuth_lines")
+        return self.getint("azimuth_lines")
     
     def img_fmt(self):
         return self["image_format"]

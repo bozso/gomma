@@ -239,7 +239,7 @@ def get_par(key, data, sep=":"):
         lines = data.split("\n")
     else:
         lines = data
-            
+    
     for line in lines:
         if key in line:
             return " ".join(line.split(sep)[1:]).strip() 

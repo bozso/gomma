@@ -634,7 +634,7 @@ class Processing(object):
             MLI.append(mli)
         
         
-        self.outlist("mli", mli)
+        self.outlist("mli", MLI)
 
     
     def mosaic_tops(self):
