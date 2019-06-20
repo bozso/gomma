@@ -140,6 +140,9 @@ class Parfile(object):
     def __contains__(self, item):
         return self[item] is not None
     
+    def __str__(self):
+        return self.par
+    
     def getfloat(self, key, idx=0):
         return float(self[key].split()[idx])
     

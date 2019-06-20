@@ -371,7 +371,7 @@ class S1SLC(object):
             if iw1 is not None and iw2 is not None:
                 sh.copy(iw1.dat, iw2.dat) 
                 sh.copy(iw1.par, iw2.par) 
-                sh.copy(iw1.TOPS_par, iw2.TOPS_par) 
+                sh.copy(str(iw1.TOPS_par), str(iw2.TOPS_par)) 
         
     
     def mosaic(self, rng_looks=1, azi_looks=1, debug=False, **kwargs):

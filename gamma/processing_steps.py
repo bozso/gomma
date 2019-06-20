@@ -319,8 +319,8 @@ class Processing(object):
         if not self.is_list(name):
             return None
         
-        return tuple(elem if elem.datestr() == date
-                     for elem in self.inlist(name))[0]
+        return tuple(elem for elem in self.inlist(name)
+                     if elem.datestr() == date)[0]
     
     
     def get_out_master(self):
@@ -561,9 +561,9 @@ class Processing(object):
         
         output_dir = general.get("output_dir", ".")
         pol        = general.get("pol", "vv")
-        slc_dir    = self.get_dir("SLC_merged")
+        slc_dir    = self.get_dir("merged")
 
-        SLC_merged, used_SLC = [], []
+        merged, used_SLC = [], []
         SLC = self.inlist("crop")
         
         
@@ -576,17 +576,9 @@ class Processing(object):
             date1str = date1.date2str()
             
             log.info("Processing date %s." % date1str)
+            
             SLC2 = search_pair(SLC1, SLC, used_SLC)
-            
-            
-            SLC3 = gm.S1SLC(
-            tuple(
-                    gm.S1IW(ii + 1, datfile=tpl_iw.format(date1str, ii + 1, pol))
-                    if IW is not None else None
-                    for ii, IW in enumerate(SLC1.IWs)
-                ), tpl_tab.format(date1str, pol)
-            )
-            
+            SLC3 = SLC1.make_other(dirpath=slc_dir)
             
             if SLC2 is not None:
                 log.info("Merging %s with %s." % (SLC1.tab, SLC2.tab))
