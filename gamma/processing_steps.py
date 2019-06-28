@@ -13,6 +13,14 @@ from json import load as jload, dump as jdump, JSONEncoder
 
 ProcStep = namedtuple("ProcStep", ["fun", "opt"])
 
+def typedval(obj):
+    return {
+        "ftype": getattr(type(obj), "__name__"),
+        "value": obj
+    }
+
+
+
 
 try:
     from configparser import SafeConfigParser
@@ -52,19 +60,22 @@ def delim(msg, sym="*", width=80):
 
 
 
-trues = frozenset(("true", "on", "1"))
-falses = frozenset(("false", "off", "0"))
+trues  = frozenset({"true", "on", "1"})
+falses = frozenset({"false", "off", "0"})
 
 
 class Config(dict):
-    def getint(self, key, default):
+    def int(self, key, default):
         return int(self.get(key, default))
     
-    def getfloat(self, key, default):
+    def float(self, key, default):
         return float(self.get(key, default))
    
-    def getbool(self, key, default):
+    def bool(self, key, default):
         val = self.get(key, default)
+        
+        if val is None:
+            return False
         
         if isinstance(val, str):
             val = val.lower()
@@ -73,10 +84,8 @@ class Config(dict):
                 return True
             elif val in falses:
                 return False
-            else:
-                raise ValueError("Unrecognized option!")
-        elif val is None:
-            return False
+
+            raise ValueError('Could not convert "%s" to boolean!' % val)
 
 
 class FileEncoder(JSONEncoder):
@@ -91,6 +100,12 @@ class FileEncoder(JSONEncoder):
         return JSONEncoder.default(self, obj)
 
 
+def save(obj, path):
+    with open(path, "w") as f:
+        jdump(obj, f, indent=4, separators=(",", ": "),
+              cls=FileEncoder)
+    
+
 class Save(object):
     @staticmethod
     def load_file(path):
@@ -103,57 +118,23 @@ class Save(object):
     
     
     def save(self, path):
-        with open(path, "w") as f:
-            jdump(self, f, indent=4, separators=(",", ": "),
-                  cls=FileEncoder)
-
+        save(self, path)
 
 
 class Meta(dict, Save):
     pass
-    # def __init__(self, **kwargs):
-    #     self.meta = kwargs
-    # 
-    # def __getitem__(self, elem):
-    #     return self.meta[elem]
-    # 
-    # def __setitem__(self, elem, arg):
-    #     self.meta[elem] = arg
-    # 
-    # def __contains__(self, item):
-    #     return item in self.meta
-    # 
-    # def update(self, *args, **kwargs):
-    #     self.meta.update(*args, **kwargs)
-
-
-class FileList(Save):
-    ftypes = {
-        "S1SLC" : gm.S1SLC,
-        "SLC" : gm.SLC,
-        "MLI" : gm.MLI,
-        "S1Zip": gm.S1Zip
-    }
-    
-    ftype_names = frozenset(ftypes.keys())
-    
-    __save__ = ("ftype", "files")
-    
-    
-    def __init__(self, files):
-        assert len(files) > 0, "Need a non-empty list!"
-        ftype = type(files[0]).__name__
-        assert ftype in FileList.ftype_names
-        
-        self.ftype, self.files = ftype, files
-    
     
     
 class Processing(object):
+    ftypes = {
+        name: getattr(gm, name).from_json
+        for name in {"S1SLC", "SLC", "MLI", "S1Zip", "DEM", "Geocode"}
+    }
+    
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
-    steps = frozenset(("select", "load", "merge", 
-                       "make_mli", "make_rmli", "check_geocode"))
+    steps = frozenset({"select", "load", "merge",  "make_mli", "make_rmli",
+                       "check_geocode"})
     
     
     def __init__(self, args):
@@ -238,7 +219,7 @@ class Processing(object):
                self.params.getboolean(step, "optional")
     
     
-    def get_fun(self, step):
+    def step_fun(self, step):
         return ProcStep(getattr(self, step), self.is_optional(step))
 
     
@@ -268,7 +249,7 @@ class Processing(object):
         
         
         for step in steps:
-            step_fun = self.get_fun(step)
+            step_fun = self.step_fun(step)
             
             try:
                 if step_fun.opt or optional_steps:
@@ -281,7 +262,7 @@ class Processing(object):
                 self.meta.save(self.metafile)
 
     
-    def get_dir(self, name):
+    def dir(self, name):
         if name in self.meta["dirs"]:
             return self.meta["dirs"][name]
         else:
@@ -291,7 +272,7 @@ class Processing(object):
             return _path
 
 
-    def get_list(self, name):
+    def list(self, name):
         if name in self.meta["lists"]:
             return self.meta["lists"][name]
         else:
@@ -304,15 +285,52 @@ class Processing(object):
         return name in self.meta["lists"]
     
     
-    def outlist(self, name, files):
-        FileList(files).save(self.get_list(name))
+    def save(self, name, *args, **kwargs):
+        mode = kwargs.pop("mode", "mixed")
+        assert mode in {"list", "mixed"}
+        
+        if mode == "list":
+            assert len(args) > 0
+            assert gm.all_same(args, fun=lambda x: type(x))
+            
+            save({
+                    "type": "file_list",
+                    "ftype": type(files[0]).__name__,
+                    "files": args
+            }, self.list(name))
+        
+        else:
+            save({
+                    "type": "mixed",
+                    "dict": {
+                        key: typedval(value)
+                        for key, value in kwargs.items()
+                    }
+            }, self.list(name))
+        
+    
+    def load(self, name):
+        load = Save.load_file(self.list(name))
+        
+        if load["type"] == "list":
+           converter = ftypes[load["ftype"]]
+           
+           return list(converter(elem) for elem in load["files"])
+        
+        elif load["type"] = "mixed":
+           return tuple(
+            ftypes[elem["ftype"]](elem)
+            for elem in self.load(name)
+        )
+            
+
     
     
     def inlist(self, name):
-        flist = Save.load_file(self.get_list(name))
-        conv = FileList.ftypes[flist["ftype"]]
-        
-        return tuple(conv.from_json(line) for line in flist["files"])
+           return tuple(
+            ftypes[elem["ftype"]](elem)
+            for elem in self.load(name)
+        )
     
     
     def select_date(self, name, date):
@@ -323,14 +341,13 @@ class Processing(object):
                      if elem.datestr() == date)[0]
     
     
-    def get_out_master(self):
-        output_dir  = self.params.get("general", "output_dir")
+    def master_date(self):
         master_date = self.meta.get("master_date")
         
         if master_date is None:
             raise ValueError("master_date is not defined.")
         
-        return output_dir, master_date
+        return master_date
 
     
     @staticmethod
@@ -502,15 +519,11 @@ class Processing(object):
 
         general = self.section("general")
         
-        output_dir, master_date = self.get_out_master()
+        master_date = self.master_date()
         pol = general.get("pol")
         
-        dir_uncrop = self.get_dir("uncrop")
-        dir_crop   = self.get_dir("crop")
-
-
-        log.info("Importing SLCs.")
-        
+        dir_uncrop = self.dir("uncrop")
+        dir_crop   = self.dir("crop")
         SLC = self.inlist("s1zip")
         
         uncrop = []
@@ -561,7 +574,7 @@ class Processing(object):
         
         output_dir = general.get("output_dir", ".")
         pol        = general.get("pol", "vv")
-        slc_dir    = self.get_dir("merged")
+        slc_dir    = self.dir("merged")
 
         merged, used_SLC = [], []
         SLC = self.inlist("crop")
@@ -610,11 +623,11 @@ class Processing(object):
         general = self.section("general")
         
         output_dir    = general.get("output_dir", ".")
-        range_looks   = general.getint("range_looks", 1)
-        azimuth_looks = general.getint("azimuth_looks", 4)
+        range_looks   = general.int("range_looks", 1)
+        azimuth_looks = general.int("azimuth_looks", 4)
         pol           = general.get("pol")
         
-        mli_dir = self.get_dir("mli")
+        mli_dir = self.dir("mli")
         
         tpl = pth.join(mli_dir, "%s.%s.mli")
         
@@ -622,15 +635,11 @@ class Processing(object):
         
         
         for slc in self.inlist("merged"):
-            # create MLI file paths
             mli = gm.MLI(datfile=tpl % (slc.datestr(), pol))
             
-            # multi looking
             slc.multi_look(mli, range_looks, azimuth_looks)
-            
             mli.raster()
             
-            # write to file
             MLI.append(mli)
         
         
@@ -642,8 +651,8 @@ class Processing(object):
         general = self.section("general")
         
         output_dir      = general.get("output_dir", ".")
-        range_looks     = general.getint("range_looks", 1)
-        azimuth_looks   = general.getint("azimuth_looks", 4)
+        range_looks     = general.int("range_looks", 1)
+        azimuth_looks   = general.int("azimuth_looks", 4)
         pol             = general.get("pol", "vv")
         
         
@@ -669,12 +678,12 @@ class Processing(object):
         
         check_iono = self.params.section("check_ionoshpere")
         
-        rng_win = check_iono.getint("rng_win", 256)
-        azi_win = check_iono.getint("azi_win", 256)
-        thresh  = check_iono.getfloat("iono_thresh", 0.1)
+        rng_win = check_iono.int("rng_win", 256)
+        azi_win = check_iono.int("azi_win", 256)
+        thresh  = check_iono.float("iono_thresh", 0.1)
         
-        rng_step = check_iono.getint("rng_step")
-        azi_step = check_iono.getint("azi_step")
+        rng_step = check_iono.int("rng_step")
+        azi_step = check_iono.int("azi_step")
         
         raise NotImplementedError("This processing step needs to be reworked.")
         
@@ -687,11 +696,11 @@ class Processing(object):
         general = self.section("general")
         
         output_dir    = general.get("output_dir", ".")
-        range_looks   = general.getint("range_looks", 1)
-        azimuth_looks = general.getint("azimuth_looks", 4)
+        range_looks   = general.int("range_looks", 1)
+        azimuth_looks = general.int("azimuth_looks", 4)
         pol           = general.get("pol")
         
-        mli_dir = gm.mkdir(pth.join(output_dir, "RMLI"))
+        mli_dir = self.dir("rmli")
         
         RSLC = self.meta["SLC_coreg"]
         
@@ -702,21 +711,20 @@ class Processing(object):
         RMLI = tuple(MLI(tpl % (date, pol)) for date in datestr)
 
         for rmli, rslc in zip(MLI, RSLC):
-            rslc.multi_look(rmli, rng_looks=range_looks, azi_looks=azimuth_looks)
-
-        for rmli in RMLI:
-            gm.ras_extter(rmli.dat, parfile=rmli.par, comp_fact=750)
+            rslc.multi_look(rmli, rng_looks=range_looks,
+                            azi_looks=azimuth_looks)
+            rmli.raster()
         
-        self.meta["RMLI"] = RMLI
+        self.outlist("RMLI", RMLI)
 
 
     def geocode(self):
         
-        output_dir, master_date = self.get_out_master()
+        master_date = self.master_date()
         general = self.section("general")
         
-        rng_looks = general.getint("range_looks", 1)
-        azi_looks = general.getint("azimuth_looks", 4)
+        rng_looks = general.int("range_looks", 1)
+        azi_looks = general.int("azimuth_looks", 4)
         
         geoc = self.section("geocode")
         
@@ -752,9 +760,6 @@ class Processing(object):
         im.geocode(geoc, m_slc, m_mli,
                    rng_looks=rng_looks, azi_looks=azi_looks,
                    out_dir=output_dir))
-        
-        self.meta.update({"geo": geo, "dem_orig": dem_orig, "dem": dem,
-                          "hgt": hgt})
 
 
     def check_geocode(self):
@@ -769,7 +774,7 @@ class Processing(object):
         
         dem.raster("lookup")
         
-        # TODO: make gm.ras_extter2
+        # TODO: make gm.raster2
         log.info("Creating quicklook hgt.bmp file.")
         hgt.raster(m_per_cycle=500.0)
         
@@ -785,30 +790,29 @@ class Processing(object):
         general = self.section("general")
         
         pol       = general.get("pol", "vv")
-        rng_looks = general.getint("range_looks", 1)
-        azi_looks = general.getint("azimuth_looks", 4)
+        rng_looks = general.int("range_looks", 1)
+        azi_looks = general.int("azimuth_looks", 4)
 
         coregp = self.section("coreg")
         
-        cc_thresh   = coregp.getfloat("cc_thresh", 0.8)
-        frac_thresh = coregp.getfloat("fraction_thresh", 0.01)
-        ph_std_thresh  = coregp.getfloat("ph_stdev_thresh", 0.8)
-        itmax       = coregp.getint("itmax", 5)
+        cc_thresh      = coregp.float("cc_thresh", 0.8)
+        frac_thresh    = coregp.float("fraction_thresh", 0.01)
+        ph_std_thresh  = coregp.float("ph_stdev_thresh", 0.8)
+        itmax          = coregp.int("itmax", 5)
         
         cleaning, flag1, poly1, poly2 = True, True, None, None
         
         hgt = self.meta["hgt"].dat
         
-        coreg_dir = self.get_dir("coreg_out")
-        rmli_dir  = self.get_dir("RMLI")
-        diff_dir  = self.get_dir("IFG")
+        coreg_dir = self.dir("coreg_out")
+        rmli_dir  = self.dir("rmli")
+        diff_dir  = self.dir("ifg")
         
-        tpl_iw = pth.join(coreg_dir, "{date}_iw{iw}.{pol}.rslc")
-        tpl_tab = pth.join(coreg_dir, "{date}.{pol}.RSLC_tab")
-        fmt = "%Y%m%d"
+        # tpl_iw = pth.join(coreg_dir, "{date}_iw{iw}.{pol}.rslc")
+        # tpl_tab = pth.join(coreg_dir, "{date}.{pol}.RSLC_tab")
+        # fmt = "%Y%m%d"
         
-        with self.inlist("merged") as f:
-            SLC = tuple(slc for slc in f)
+        SLC = self.inlist("merged")
         
         SLC_sort = sorted(SLC, key=lambda x: x.date(start_stop=True).center)
         midx = tuple(ii for ii, slc in enumerate(SLC_sort)
@@ -843,56 +847,55 @@ class Processing(object):
             "MLI": self.select_date("mli", master_date)
         }
         
-        with self.outlist("RSLC", "S1SLC") as f:
-            for ii, slc in enumerate(itr):
-                if ii == midx:
-                    continue
-                
-                # log_coreg(ii, n_sar, master_par, parfile, prev)
+        for ii, slc in enumerate(itr):
+            if ii == midx:
+                continue
+            
+            # log_coreg(ii, n_sar, master_par, parfile, prev)
 
-                SLC_coreg = \
-                gm.S1SLC.from_template(pol, slc.date(start_stop=True), slc.IWs, tpl_tab=tpl_tab,
-                                       fmt=fmt, tpl=tpl_iw)
+            SLC_coreg = slc.make_other(dirpath=coreg_dir)
+            # gm.S1SLC.from_template(pol, slc.date(start_stop=True), slc.IWs,
+            #                        tpl_tab=tpl_tab, fmt=fmt, tpl=tpl_iw)
 
-                gm.coreg(master, slc, SLC_coreg, hgt, rng_looks, azi_looks, poly1,
-                         poly2, cc_thresh, frac_thresh, ph_std_thresh, cleaning,
-                         flag1, prev, diff_dir)
-                
-                rslc = pth.join(coreg_dir, slc.date.date2str()) + ".rslc"
-                rmli = gm.MLI(pth.join(rmli_dir, slc.date.date2str()) + ".rmli")
-                
-                # SLC_coreg.mosaic(datfile=rslc, rng_looks=rng_looks,
-                #                  azi_looks=azi_looks)
-                
-                # SLC_coreg.slc.multi_look(rmli, rng_looks=rng_looks,
-                #                          azi_looks=azi_looks)
-                
-                # RSLC.append(SLC_coreg)
-                # RMLI.append(rmli)
-                # 
-                # rmli.gm.ras_extter()
-                
-                    #gs.S1_coreg(mslc, slc, SLC_coreg, hgt, range_looks, azimuth_looks,
-                            #poly1, poly2, cc_thresh, frac_thresh, std_thresh,
-                            #cleaning, flag1, prev)
+            gm.coreg(master, slc, SLC_coreg, hgt, rng_looks, azi_looks, poly1,
+                     poly2, cc_thresh, frac_thresh, ph_std_thresh, cleaning,
+                     flag1, prev, diff_dir)
+            
+            rslc = pth.join(coreg_dir, slc.date.date2str()) + ".rslc"
+            rmli = gm.MLI(pth.join(rmli_dir, slc.date.date2str()) + ".rmli")
+            
+            # SLC_coreg.mosaic(datfile=rslc, rng_looks=rng_looks,
+            #                  azi_looks=azi_looks)
+            
+            # SLC_coreg.slc.multi_look(rmli, rng_looks=rng_looks,
+            #                          azi_looks=azi_looks)
+            
+            # RSLC.append(SLC_coreg)
+            # RMLI.append(rmli)
+            # 
+            # rmli.gm.ras_extter()
+            
+                #gs.S1_coreg(mslc, slc, SLC_coreg, hgt, range_looks, azimuth_looks,
+                        #poly1, poly2, cc_thresh, frac_thresh, std_thresh,
+                        #cleaning, flag1, prev)
 
-                prev = SLC_coreg
-                f.write("%s\n" % SLC_coreg.tab)
+            prev = SLC_coreg
+            RSLC.append(rslc_coreg)
+            RMLI.append(rmli)
         
+        self.outlist("rslc", RSLC)
 
 
     def deramp(self):
-        log.info("Starting DERAMP_SLCS.")
-        
-        mslc = self.meta["master"]["S1SLC"]
-        gen = self.params.general
+        mslc = self.select_master("")
+        gen = self.section("general")
 
-        rng_looks = gen.get("range_looks", 1)
-        azi_looks = gen.get("azimuth_looks", 4)
+        rng_looks = gen.int("range_looks", 1)
+        azi_looks = gen.int("azimuth_looks", 4)
         output_dir = gen.get("output_dir", ".")
         
-        deramp_dir = gm.mkdir(pth.join(output_dir, "deramp"))
         
+        deramp_dir = self.dir("deramp")
         
         mslcd = gm.S1SLC.from_SLC(mslc, ".deramp")
         _slc = pth.join(deramp_dir, "%s.slc.deramp" % mslc.date.date2str())
@@ -919,9 +922,6 @@ class Processing(object):
             dslc.mosaic(datfile=_slc, rng_looks=rng_looks, azi_looks=azi_looks)
         
         deramped.append(mslcd)
-        
-        self.meta["RSLC_deramped"] = deramped
-        self.meta["master_idx"] = -1
 
 
     def base_plot(self):
@@ -983,15 +983,15 @@ class Processing(object):
         
     def candidate_list(self):
         ipta_dir = self.params.general.get("ipta_dir", ".")
-        pt_select = self.params.pt_select
+        pt_select = self.section("pt_select")
         
         sp_dir = gm.mkdir(pth.join(ipta_dir, "sp"))
         
-        rng_spec_lk = pt_select.get("rng_spec_lk", 4)
-        azi_spec_lk = pt_select.get("azi_spec_lk", 4)
-        pwr_thresh = pt_select.get("pwr_thresh", 0)
-        cc_thresh = pt_select.get("cc_thresh", 0.4)
-        msr_thresh = pt_select.get("msr_thresh", 1.0)
+        rng_spec_lk = pt_select.int("rng_spec_lk", 4)
+        azi_spec_lk = pt_select.int("azi_spec_lk", 4)
+        pwr_thresh = pt_select.float("pwr_thresh", 0)
+        cc_thresh = pt_select.float("cc_thresh", 0.4)
+        msr_thresh = pt_select.float("msr_thresh", 1.0)
         cc_lims = pt_select.get("cc_lims", (0.37, 1.0))
         msr_lims = pt_select.get("msr_lims", (0.5, 100.0))
         rng_ovr = pt_select.get("rng_ovr", 1)

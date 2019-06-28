@@ -19,7 +19,7 @@ __all__ = [
     "make_object",
     "make_join",
     "Params",
-    "get_tmp",
+    "tmp_file",
     "get_par",
     "cat",
     "Files",
@@ -41,8 +41,13 @@ __all__ = [
 tmpdir = _get_default_tempdir()
 
 
-def all_same(iterable):
-    return len(set(tee(iterable,1))) == 1
+def all_same(iterable, fun=None):
+    if fun is not None:
+        n = len(set(tee(map(fun, iterable),1)))
+    else:
+        n = len(set(tee(iterable,1)))
+    
+    return n == 1
 
 
 def make_object(name, inherit=(object,), **kwargs):
@@ -68,17 +73,16 @@ class Params(object):
     def __getitem__(self, key):
         return self.params[key]
 
-    def getfloat(self, key, idx=0):
+    def float(self, key, idx=0):
         return float(self[key].split()[idx])
 
-    def getint(self, key, idx=0):
+    def int(self, key, idx=0):
         return int(self[key].split()[idx])
 
 
 tmp = []
 
-
-def get_tmp(path=tmpdir):
+def tmp_file(path=tmpdir):
     global tmp
     path = pth.join(path, next(_get_candidate_names()))
     

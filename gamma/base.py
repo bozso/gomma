@@ -65,11 +65,13 @@ settings = {
 }
 
 
-os.environ["LD_LIBRARY_PATH"] = \
-os.getenv("LD_LIBRARY_PATH") + settings["libpaths"]
+# os.environ["LD_LIBRARY_PATH"] = \
+# os.getenv("LD_LIBRARY_PATH") + settings["libpaths"]
 
+os.environ["LD_LIBRARY_PATH"] += settings["libpaths"]
 
 log = getLogger("gamma.base")
+
 
 gamma_cmaps = pth.join(settings["path"], "DISP", "cmaps")
 
@@ -114,9 +116,9 @@ def make_cmd(command):
 
 # gamma_commands = ("rashgt", "ScanSAR_burst_corners")
     
-gamma_progs = type("Gamma", (object,),
-                   {(pth.basename(cmd): staticmethod(make_cmd(cmd))}
-                   for cmd in gamma_commands))
+gamma_progs = type("Gamma", (object,), 
+                   {pth.basename(cmd): staticmethod(make_cmd(cmd))
+                    for cmd in gamma_commands})
 
 
 gp = gamma_progs
@@ -134,13 +136,22 @@ class Parfile(object):
     
     
     def __init__(self, **kwargs):
+        self.cache = {}
         self.par = kwargs.get("parfile")
     
     def __str__(self):
         return self.par
     
+    
     def __getitem__(self, item):
-        return gm.get_par(item, self.par)
+        if item in self.cache
+            value = self.cache[item]
+        else:
+            value = gm.get_par(item, self.par)
+            self.cache[item] = value
+            
+        return value
+    
     
     def __contains__(self, item):
         return self[item] is not None
@@ -148,10 +159,10 @@ class Parfile(object):
     def __str__(self):
         return self.par
     
-    def getfloat(self, key, idx=0):
+    def float(self, key, idx=0):
         return float(self[key].split()[idx])
     
-    def getint(self, key, idx=0):
+    def int(self, key, idx=0):
         return int(self[key].split()[idx])
     
     
@@ -178,9 +189,11 @@ class Parfile(object):
             
 
 class DataFile(gm.Files, Parfile):
-    __save__ = {"dat", "par", "tab"}
+    __save__ = {"dat", "par", "tab", "ftype"}
     __slots__ = {"dat", "datpar", "tab"}
-
+    
+    ftype = "DataFile"
+    
     data_types = {
         "FCOMPLEX": 0,
         "SCOMPLEX": 1,
@@ -197,7 +210,7 @@ class DataFile(gm.Files, Parfile):
         parfile   = kwargs.get("parfile")
         
         if datfile is None:
-            datfile = gm.get_tmp(**kwargs)
+            datfile = gm.tmp_file(**kwargs)
         
         if parfile is None:
             parfile = datfile + ".par"
@@ -237,10 +250,10 @@ class DataFile(gm.Files, Parfile):
 
 
     def rng(self):
-        return self.getint("range_samples")
+        return self.int("range_samples")
 
     def azi(self):
-        return self.getint("azimuth_lines")
+        return self.int("azimuth_lines")
     
     def img_fmt(self):
         return self["image_format"]
@@ -261,7 +274,7 @@ class DataFile(gm.Files, Parfile):
         stat = self.stat(**kwargs)
         
         print("Mean\t+-\tstd\n%1.4g\t+-\t%1.2g" % 
-              (stat.getfloat("mean"), stat.getfloat("stdev")))
+              (stat.float("mean"), stat.float("stdev")))
 
     
     def date(self, start_stop=False):
@@ -269,9 +282,9 @@ class DataFile(gm.Files, Parfile):
         datetime.strptime(" ".join(self["date"].split()[:3]), "%Y %m %d")
         
         if start_stop:
-            start = timedelta(seconds=self.getfloat("start_time"))
-            cent  = timedelta(seconds=self.getfloat("center_time"))
-            stop  = timedelta(seconds=self.getfloat("end_time"))
+            start = timedelta(seconds=self.float("start_time"))
+            cent  = timedelta(seconds=self.float("center_time"))
+            stop  = timedelta(seconds=self.float("end_time"))
             
             return gm.Date(date + start, date + stop, date + cent)
         else:
@@ -279,6 +292,7 @@ class DataFile(gm.Files, Parfile):
     
     
     def datestr(self, fmt="%Y%m%d"):
+        # TODO: use regexp for matching?
         if any(elem in fmt for elem in ("%H", "%M", "%S")):
             date = self.date(start_stop=True)
             return date.center.strftime(fmt)
@@ -422,6 +436,7 @@ class DataFile(gm.Files, Parfile):
 
 
 class SLC(DataFile):
+    ftype = "SLC"
     def multi_look(self, MLI, **kwargs):
         args = parse_ml_args(**kwargs)
         gp.multi_look(self.datpar, MLI.datpar, args["rng_looks"],
@@ -441,6 +456,7 @@ class SLC(DataFile):
     
 
 class MLI(DataFile):
+    ftype = "MLI"
     def plot_cmd(self):
         return "pwr"
     

@@ -14,7 +14,14 @@ log = getLogger("gamma.sentinel1")
 gp = gm.gamma_progs
 
 
-__all__ = ("S1Zip", "S1IW", "S1SLC", "deramp_master", "deramp_slave", "coreg")
+__all__ = {
+    "S1Zip",
+    "S1IW",
+    "S1SLC",
+    "deramp_master",
+    "deramp_slave",
+    "coreg"
+}
 
 
 def check_paths(path):
@@ -44,8 +51,8 @@ class S1Zip(object):
                  "prod_type", "resolution", "level", "prod_class", "pol",
                  "abs_orb", "DTID", "UID"}
     
-    __save__ = {"zipfile", "burst_nums", "date", "mission"}
-    
+    __save__ = {"zipfile", "burst_nums", "date", "mission", "ftype"}
+    ftype = "S1Zip"
     
     def __init__(self, zipfile, extra_info=False):
         zip_base = pth.basename(zipfile)
@@ -130,23 +137,20 @@ class S1Zip(object):
             testzip = slc_zip.testzip()
     
             if testzip:
-                log.error("Bad zipfile detected. First bad file is "
-                          "\"%s\" in zipfile \"%s\"."
+                log.error('Bad zipfile detected. First bad file is '
+                          '"%s" in zipfile "%s".'
                           % (testzip, zipfile))
                 return False
         return True
 
     
     def burst_info(self, iw_num, pol, remove_temps=False):
+        par, TOPS_par = gm.tmp_file(), gm.tmp_file()
         annot = self.extract_annot(iw_num, pol)[0]
 
         gp.par_S1_SLC(None, annot, None, None, "tmp_par", None, "tmp_TOPS_par")
         
-        out = S1Zip.burst_fun("tmp_par", "tmp_TOPS_par").decode()
-        
-        
-        if remove_temps:
-            rm("tmp_par", "tmp_TOPS_par")
+        out = S1Zip.burst_fun(par, TOPS_par).decode()
         
         return out
 
@@ -223,26 +227,10 @@ class S1IW(gm.DataFile):
             if ret is None:
                 raise ValueError('Keyword "%s" not found in parameter files.'
                                  % key)
-            else:
-                return ret
-        else:
-            return ret
+        
+        return ret
     
     
-    # def date(self, start_stop=False):
-    #     date = \
-    #     datetime.strptime(" ".join(self["date"].split()[:3]), "%Y %m %d")
-    #     
-    #     if start_stop:
-    #         start = timedelta(seconds=self.getfloat("start_time"))
-    #         cent  = timedelta(seconds=self.getfloat("center_time"))
-    #         stop  = timedelta(seconds=self.getfloat("end_time"))
-    #         
-    #         return gm.Date(date + start, date + stop, date + cent)
-    #     else:
-    #         return date
-    
-
     @classmethod
     def from_tabline(cls, line):
         split = [elem.strip() for elem in line.split()]
@@ -261,9 +249,9 @@ class S1IW(gm.DataFile):
 
 
     def lines_offset(self):
-        fl = (self.getfloat("burst_start_time_2")
-              - self.getfloat("burst_start_time_1")) \
-              / self.getfloat("azimuth_line_time")
+        fl = (self.float("burst_start_time_2")
+              - self.float("burst_start_time_1")) \
+              / self.float("azimuth_line_time")
         
         return Offset(fl, int(0.5 + fl))
 

@@ -4,11 +4,11 @@ from os import path as pth
 from logging import getLogger
 
 
-__all__ = [
+__all__ = {
     "DEM",
-    "HGT",
-    "Geocode"
-]
+    "Geocode",
+    "geocode"
+}
 
 log = getLogger("gamma.geo")
 
@@ -16,9 +16,10 @@ gp = gm.gamma_progs
 
 
 class DEM(gm.DataFile):
-    __slots__ = ("lookup", "lookup_old")
-    __save__ = gm.save(gm.DataFile) | {"lookup"}
+    __slots__ = {"lookup"}
+    __save__ = {"dat", "par", "lookup"}
     
+    ftype = "DEM"
     
     _geo2rdc = {
         "dist": 0,
@@ -33,22 +34,25 @@ class DEM(gm.DataFile):
     }
     
 
-    def __init__(self, datfile, parfile=None, lookup=None, lookup_old=None,
-                 keep=True):
+    def __init__(self, datfile, parfile=None, lookup=None):
         self.dat = datfile
         
         if parfile is None:
             parfile = pth.splitext(datfile) + ".dem_par"
         
-        self.par, self.lookup, self.lookup_old = parfile, lookup, lookup_old
-        self.keep = keep
+        self.par, self.lookup = parfile, lookup
     
     
+    @classmethod
+    def from_json(cls, line):
+        return cls(line["dat"], line["par"], line["lookup"])
+        
+        
     def rng(self):
-        return self.getint("par", "width")
+        return self.int("width")
     
     def azi(self):
-        return self.getint("par", "nlines")
+        return self.int("nlines")
     
     
     def geo2rdc(self, infile, outfile, width, nlines=0, interp="dist",
@@ -80,56 +84,33 @@ class DEM(gm.DataFile):
         DataFile.raster(self, **kwargs)
 
 
-class Geocode(gm.Files):
-    _items = {"sim_sar", "zenith", "orient", "inc", "pix", "psi", "ls_map",
-              "diff_par", "offs", "offsets", "ccp", "coffs", "coffsets"}
-    __save__ = {"par"} | _items
+class Geocode(gm.DataFile):
+    _items = {"hgt", "sim_sar", "zenith", "orient", "inc", "pix", "psi",
+              "ls_map", "diff_par", "offs", "offsets", "ccp", "coffs",
+              "coffsets"}
     
-    
-    
-    def __init__(self, path, mli, sigma0=None, gamma0=None, **kwargs):
-        self.par = mli.par
-        
-        if sigma0 is None:
-            sigma0 = pth.join(path, "sigma0")
-
-        if gamma0 is None:
-            gamma0 = pth.join(path, "gamma0")
-        
-        self.sigma0, self.gamma0 = sigma0, gamma0
-        
-        
-        elems = (
-            (item, pth.join(path, kwargs[item]))
-            if item in kwargs else
-            (item, None)
-            for item in self._items
-        )
-
-        self.__dict__.update(elems)
-    
-    
-    def rng(self):
-        return self.getint("par", "range_samples")
-
-    def azi(self):
-        return self.getint("par", "azimuth_lines")
-
-
-class HGT(gm.DataFile):
-    __save__ = {"dat", "par", "mli"}
+    __save__ = {"dat", "par", "ftype"} | _items
     
     rashgt = getattr(gp, "rashgt")
-    
-    def __init__(self, hgt, mli, keep=True):
-        self.keep = None
-        self.dat = hgt
-        self.mli = mli
-        self.par = mli.par
+    ftype = "Geocode"
     
     
-    def __str__(self):
-        return self.dat
+    def __init__(self, mli=None, **kwargs):
+        if mli is not None:
+            self.dat = mli.dat
+            self.par = mli.par
+        
+        self.__dict__.update(kwargs)
+    
+    
+    
+    @classmethod
+    def from_json(cls, line):
+        ret = cls(**line)
+        ret.dat, ret.par = line["dat"], line["par"]
+        
+        return ret
+    
     
     def raster(self, start_hgt=None, start_pwr=None, m_per_cycle=None,
                **kwargs):
@@ -139,8 +120,9 @@ class HGT(gm.DataFile):
                    start_hgt, start_pwr, args["nlines"], args["arng"],
                    args["aazi"], m_per_cycle, args["scale"], args["exp"],
                    args["LR"], args["raster"], args["debug"])
+    
 
-        
+
 def geocode(params, m_slc, m_mli, rng_looks=1, azi_looks=1, out_dir="."):
     
     demdir = pth.join(out_dir, "dem")
@@ -190,14 +172,16 @@ def geocode(params, m_slc, m_mli, rng_looks=1, azi_looks=1, out_dir="."):
               lookup=gjoin("lookup"), lookup_old=gjoin("lookup_old"))
     
     
-    geo = gm.Geocode(geodir, m_mli, sim_sar="sim_sar", zenith="zenith",
-                     orient="orient", inc="inc", pix="pix", psi="psi",
-                     ls_map="ls_map", diff_par="diff_par", offs="offs",
-                     offsets="offsets", ccp="ccp", coffs="coffs",
-                     coffsets="coffsets")
+    items = {
+        name: gjoin(name)
+        for name in {"hgt", "sim_sar", "zeinth", "orient", "inc", "pix",
+                     "psi", "ls_map", "diff_par", "offs", "offsets", "ccp",
+                     "coffs", "coffsets"}
+    }
     
+    geo = gm.Geocode(mli=m_mli, **items)    
     
-    if not (dem.exist("lookup") and dem.exist("par")):
+    if not dem.exist("lookup", "par"):
         log.info("Calculating initial lookup table.")
         gp.gc_map(mmli.par, None, dem_orig.par, dem_orig.dat,
                   dem.par, dem.dat, dem.lookup, dem_lat_ovs, dem_lon_ovs,
@@ -252,6 +236,5 @@ def geocode(params, m_slc, m_mli, rng_looks=1, azi_looks=1, out_dir="."):
     return {
         "geo": geo,
         "dem_orig": dem_orig,
-        "dem": dem,
-        "hgt": hgt
+        "dem": dem
     }
