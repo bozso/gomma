@@ -248,7 +248,7 @@ class S1IW(gm.DataFile):
         split = [elem.strip() for elem in line.split()]
         
         return cls(0, datfile=split[0], parfile=split[1],
-                   TOPS_parfile=split[2], keep=True)
+                   TOPS_parfile=split[2])
     
     
     @classmethod
@@ -257,7 +257,7 @@ class S1IW(gm.DataFile):
             tpl = cls.tpl
         
         return cls(num, datfile=tpl.format(date=date, iw=num, pol=pol),
-                   keep=True, **kwargs)
+                   **kwargs)
 
 
     def lines_offset(self):
@@ -301,7 +301,7 @@ class S1SLC(object):
         tabfile = other.tab + extra
         
         IWs = tuple(
-                S1IW(ii, datfile=iw.dat + extra, keep=True)
+                S1IW(ii, datfile=iw.dat + extra)
                 if iw is not None else None
                 for ii, iw in enumerate(other.IWs)
         )

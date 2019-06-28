@@ -115,7 +115,7 @@ def make_cmd(command):
 # gamma_commands = ("rashgt", "ScanSAR_burst_corners")
     
 gamma_progs = type("Gamma", (object,),
-                   dict((pth.basename(cmd), staticmethod(make_cmd(cmd)))
+                   {(pth.basename(cmd): staticmethod(make_cmd(cmd))}
                    for cmd in gamma_commands))
 
 
@@ -179,7 +179,7 @@ class Parfile(object):
 
 class DataFile(gm.Files, Parfile):
     __save__ = {"dat", "par", "tab"}
-    __slots__ = {"dat", "datpar", "tab", "keep"}
+    __slots__ = {"dat", "datpar", "tab"}
 
     data_types = {
         "FCOMPLEX": 0,
@@ -193,7 +193,6 @@ class DataFile(gm.Files, Parfile):
 
     
     def __init__(self, **kwargs):
-        self.keep = None
         datfile   = kwargs.get("datfile")
         parfile   = kwargs.get("parfile")
         
@@ -205,9 +204,8 @@ class DataFile(gm.Files, Parfile):
         
         self.datpar = "%s %s" % (datfile, parfile)
         
-        self.dat, self.par, self.tab, self.keep = \
-        datfile, parfile, kwargs.get("tabfile", None), \
-        bool(kwargs.get("keep", True))
+        self.dat, self.par, self.tab, = \
+        datfile, parfile, kwargs.get("tabfile", None)
 
     
     @classmethod
@@ -228,15 +226,6 @@ class DataFile(gm.Files, Parfile):
         self.mv("par", parfile)
         
         self.dat, self.par = datfile, parfile
-        
-        self.keep = True
-
-
-    def __del__(self):
-        keep = self.keep
-        
-        if keep is not None and not keep:
-            self.rm()
 
     
     def __str__(self):
@@ -303,8 +292,7 @@ class DataFile(gm.Files, Parfile):
             pass
         
         split = line.split()
-        return cls(datfile=split[0].strip(), parfile=split[1].strip(),
-                   keep=True)
+        return cls(datfile=split[0].strip(), parfile=split[1].strip())
     
     
     def avg_fact(self, fact=750):

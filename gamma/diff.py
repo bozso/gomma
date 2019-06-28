@@ -35,8 +35,6 @@ class IFG(gm.DataFile):
 
     def __init__(self, datfile, parfile=None, sim_unw=None, diff_par=None,
                  quality=None):
-        
-        self.keep = True
         self.dat = datfile
         
         base = pth.splitext(datfile)[0]

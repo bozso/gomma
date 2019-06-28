@@ -17,6 +17,7 @@ import gamma as gm
 __all__ = [
     "all_same",
     "make_object",
+    "make_join",
     "Params",
     "get_tmp",
     "get_par",
@@ -251,8 +252,6 @@ def Multi(**kwargs):
 
 class Base(Files):
     def __init__(self, base, **kwargs):
-        self.keep = kwargs.pop("keep", True)
-        
         for key, value in kwargs.items():
             setattr(self, key, "%s%s" % (base, value))
         
@@ -261,10 +260,6 @@ class Base(Files):
     def rm(self):
         for elem in dir(self):
             Files.rm(self, elem)
-
-    def __del__(self):
-        if not self.keep:
-            self.rm()
 
 
 class Date(object):
@@ -347,6 +342,13 @@ def mv(*args, **kwargs):
             rm(pth.join(dst, src))
             sh.move(src, dst)
             log.debug("File \"%s\" moved to \"%s\"." % (src, dst))    
+
+            
+def make_join(path):
+    def f(*args, **kwargs):
+        return pth.join(path, *args, **kwargs)
+    
+    return f
 
 
 def pos(action="store", help=None, type=str, choices=None,

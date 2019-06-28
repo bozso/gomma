@@ -718,35 +718,11 @@ class Processing(object):
         rng_looks = general.getint("range_looks", 1)
         azi_looks = general.getint("azimuth_looks", 4)
         
-        
         geoc = self.section("geocode")
-        
-        vrt_path = geoc.get("dem_path")
-
-        if vrt_path is None:
-            raise ValueError("dem_path is not defined!")
-        
-        dem_lat_ovs = geoc.getfloat("dem_lat_ovs", 1.0)
-        dem_lon_ovs = geoc.getfloat("dem_lon_ovs", 1.0)
-
-        n_rng_off = geoc.getint("n_rng_off", 64)
-        n_azi_off = geoc.getint("n_azi_off", 32)
-
-        rng_ovr = geoc.getint("rng_overlap", 100)
-        azi_ovr = geoc.getint("azi_overlap", 100)
-
-        npoly = geoc.getint("npoly", 4)
-
-        itr = geoc.getint("iter", 0)
-        
-        demdir = self.get_dir("geo")
-        geodir = self.get_dir("dem")
-        
         
         m_s1slc = self.select_date("merged", master_date)
         
         assert m_s1slc is not None, "Master date S1SLC not found!"
-        
         
         m_slc = self.select_date("slc", master_date)
         
@@ -772,95 +748,10 @@ class Processing(object):
                 f.write("%s\n" % m_mli)
         
         
-        dem_orig = gm.MLI(datfile=pth.join(demdir, "srtm.dem"),
-                          parfile=pth.join(demdir, "srtm.dem_par"))
-        
-        
-        if not dem_orig.exist("dat"):
-            log.info("Creating DEM from %s." % vrt_path)
-            
-            gp.vrt2dem(vrt_path, mmli.par, dem_orig, 2, None)
-        else:
-            log.info("DEM already imported.")
-
-
-        geo_path = geodir
-
-        mli_rng, mli_azi = int(m_mli.rng()), int(m_mli.azi())
-        
-        rng_patch, azi_patch = int(mli_rng / n_rng_off + rng_ovr / 2), \
-                               int(mli_azi / n_azi_off + azi_ovr / 2)
-        
-        # make sure the number of patches are even
-        if rng_patch % 2: rng_patch += 1
-        
-        if azi_patch % 2: azi_patch += 1
-
-        dem = gm.DEM(pth.join(demdir, "dem_seg.dem"),
-                     parfile=pth.join(demdir, "dem_seg.dem_par"),
-                     lookup=pth.join(geo_path, "lookup"),
-                     lookup_old=pth.join(geo_path, "lookup_old"))
-        
-        
-        geo = gm.Geocode(geo_path, m_mli, sim_sar="sim_sar", zenith="zenith",
-                         orient="orient", inc="inc", pix="pix", psi="psi",
-                         ls_map="ls_map", diff_par="diff_par", offs="offs",
-                         offsets="offsets", ccp="ccp", coffs="coffs",
-                         coffsets="coffsets")
-        
-        
-        if not (dem.exist("lookup") and dem.exist("par")):
-            log.info("Calculating initial lookup table.")
-            gp.gc_map(mmli.par, None, dem_orig.par, dem_orig.dat,
-                      dem.par, dem.dat, dem.lookup, dem_lat_ovs, dem_lon_ovs,
-                      geo.sim_sar, geo.zenith, geo.orient, geo.inc, geo.psi,
-                      geo.pix, geo.ls_map, 8, 2)
-        else:
-            log.info("Initial lookup table already created.")
-
-        dem_segpent_width = dem["width"]
-        dem_segpent_lines = dem["lines"]
-
-        gp.pixel_area(m_mli.par, dem.par, dem.dat, dem.lookup, geo.ls_map,
-                      geo.inc, geo.sigma0, geo.gamma0, 20)
-        
-        gp.create_diff_par(m_mli.par, None, geo.diff_par, 1, 0)
-        
-        log.info("Refining lookup table.")
-
-        if itr >= 1:
-            log.info("ITERATING OFFSET REFINEMENT.")
-
-            for ii in range(itr):
-                log.info("ITERATION %d / %d" % (ii + 1, itr))
-
-                geo.rm("diff_par")
-
-                # copy previous lookup table
-                dem.cp("lookup", dem.lookup_old)
-
-                gp.create_diff_par(m_mli.par, None, geo.diff_par, 1, 0)
-
-                gp.offset_pwrm(geo.sigma0, m_mli.dat, geo.diff_par, geo.offs,
-                               geo.ccp, rng_patch, azi_patch, geo.offsets, 2,
-                               n_rng_off, n_azi_off, 0.1, 5, 0.8)
-
-                gp.offset_fitm(geo.offs, geo.ccp, geo.diff_par, geo.coffs,
-                               geo.coffsets, 0.1, npoly)
-
-                # update previous lookup table
-                gp.gc_map_fine(dem.lookup_old, dem_segpent_width, geo.diff_par,
-                               dem.lookup, 1)
-
-                # create new simulated ampliutides with the new lookup table
-                gp.pixel_area(m_mli.par, dem.par, dem.dat, dem.lookup, geo.ls_map,
-                              geo.inc, geo.sigma0, geo.gamma0, 20)
-
-            # end for
-            log.info("ITERATION DONE.")
-        # end if
-        
-        hgt = gm.HGT(pth.join(geo_path, "dem.rdc"), m_mli)
+        self.meta.update(
+        im.geocode(geoc, m_slc, m_mli,
+                   rng_looks=rng_looks, azi_looks=azi_looks,
+                   out_dir=output_dir))
         
         self.meta.update({"geo": geo, "dem_orig": dem_orig, "dem": dem,
                           "hgt": hgt})
