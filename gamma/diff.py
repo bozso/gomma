@@ -7,10 +7,10 @@ log = getLogger("gamma.interferometry")
 gp = gm.gamma_progs
 
 
-__all__ = [
+__all__ = (
     "IFG",
     "base_plot"
-]
+)
 
 
 class IFG(gm.DataFile):

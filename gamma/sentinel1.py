@@ -14,14 +14,14 @@ log = getLogger("gamma.sentinel1")
 gp = gm.gamma_progs
 
 
-__all__ = {
+__all__ = (
     "S1Zip",
     "S1IW",
     "S1SLC",
     "deramp_master",
     "deramp_slave",
     "coreg"
-}
+)
 
 
 def check_paths(path):
@@ -47,12 +47,13 @@ class S1Zip(object):
     r_noise_tpl = ".*.SAFE/annotation/calibration/noise-s1.*-"\
                   "iw{iw}-slc-{pol}.*.xml"
     
-    __slots__ = {"zipfile", "mission", "date", "burst_nums", "mode",
+    __slots__ = ("zipfile", "mission", "date", "burst_nums", "mode",
                  "prod_type", "resolution", "level", "prod_class", "pol",
-                 "abs_orb", "DTID", "UID"}
+                 "abs_orb", "DTID", "UID")
     
-    __save__ = {"zipfile", "burst_nums", "date", "mission", "ftype"}
-    ftype = "S1Zip"
+    
+    __save__ = ("zipfile", "burst_nums", "date", "mission")
+    
     
     def __init__(self, zipfile, extra_info=False):
         zip_base = pth.basename(zipfile)
@@ -308,7 +309,7 @@ class S1SLC(object):
     
     @classmethod
     def from_template(cls, date, burst_num, pol, fmt="short", dirpath=".",
-                      **kwargs):
+                      ext=None, **kwargs):
         tpl_tab = pth.join(dirpath, cls.tab_tpl)
         
         if fmt is not None:
@@ -316,6 +317,11 @@ class S1SLC(object):
         
         
         tpl = pth.join(dirpath, S1IW.tpl)
+        
+        if ext is not None:
+            tpl = "%s.%s" % (tpl, ext)
+            tpl_tab = "%s.%s" % (tpl_tab, ext)
+        
         
         IWs = tuple(
                 S1IW.from_template(pol, date, ii + 1, tpl=tpl, **kwargs)
@@ -364,22 +370,52 @@ class S1SLC(object):
         
     
     def mosaic(self, rng_looks=1, azi_looks=1, debug=False, **kwargs):
-        self.slc = gm.SLC(**kwargs)
+        slc = gm.SLC(**kwargs)
         
-        gp.SLC_mosaic_S1_TOPS(self.tab, self.slc.datpar, rng_looks, azi_looks,
+        gp.SLC_mosaic_S1_TOPS(self.tab, slc.datpar, rng_looks, azi_looks,
                               debug=debug)
         
-        return self.slc
+        return slc
         
 
-    def multi_look(self, MLI, rng_looks=1, azi_looks=1, wflg=0):
-        gp.multi_S1_TOPS(self.tab, MLI.datpar, rng_looks, azi_looks, wflg)
+    def multi_look(self, rng_looks=1, azi_looks=1, wflg=0, **kwargs):
+        mli = gm.MLI(**kwargs)
+        
+        gp.multi_S1_TOPS(self.tab, mli.datpar, rng_looks, azi_looks, wflg)
+        
+        return mli
 
+    
+    def deramp(self, **kwargs):
+        kwargs.setdefault("ext", "deramp")
 
-def coreg(master, SLC, RSLC, hgt=0.1, rng_looks=10, azi_looks=2,
-          poly1=None, poly2=None, cc_thresh=0.8, frac_thresh=0.01,
-          ph_std_thresh=0.8, clean=True, use_inter=False, RSLC3=None,
-          diff_dir="."):
+        master, rng_looks, azi_looks, cleaning = \
+        kwargs.get("master"), kwargs.get("rng_looks", 10), \
+        kwargs.get("azi_looks", 2), kwargs.get("cleaning", False)
+        
+        
+        if master is True:
+            gp.S1_deramp_TOPS_reference(self.tab)
+            
+            return self.make_other(**kwargs)
+        
+        elif isinstance(master, S1SLC):
+            cleaning = 1 if cleaning else 0
+            
+            gp.S1_deramp_TOPS_slave(self.tab, self.datestr(), master.tab,
+                                    rng_looks, azi_look, cleaning)
+            
+            return self.make_other(**kargs)
+        
+        else:
+            raise ValueError('"master" should either be a boolean or the '
+                             'master S1SLC object!')
+    
+    
+def S1_coreg(master, SLC, RSLC, hgt=0.1, rng_looks=10, azi_looks=2,
+             poly1=None, poly2=None, cc_thresh=0.8, frac_thresh=0.01,
+             ph_std_thresh=0.8, clean=True, use_inter=False, RSLC3=None,
+             diff_dir="."):
     
     mslc = master["S1SLC"]
     

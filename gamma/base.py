@@ -18,7 +18,7 @@ import gamma as gm
 
 PY3 = version_info[0] == 3
 
-__all__ = [
+__all__ = (
     "save",
     "Parfile",
     "DataFile",
@@ -33,7 +33,7 @@ __all__ = [
     "display",
     "raster",
     "make_cmd"
-]
+)
 
 
 ScanSAR = True
@@ -51,7 +51,7 @@ versions = {
 
 settings = {
     "ras_ext": "bmp",
-    "path": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
+    "path": versions["20181130"],
     "modules": ("DIFF", "DISP", "ISP", "LAT", "IPTA"),
     "libpaths": "/home/istvan/miniconda3/lib:",
     "templates": {
@@ -84,15 +84,13 @@ tuple(binfile for module in settings["modules"]
 
 def make_cmd(command):
     def cmd(*args, **kwargs):
-        debug = kwargs.pop("debug", False)
         _log = kwargs.pop("log", None)
         
         Cmd = "%s %s" % (command, " ".join(_proc_arg(arg) for arg in args))
         
-        log.debug('Issued command is "%s"' % Cmd)
         
-        if debug:
-            print(Cmd)
+        if gm.is_debug():
+            log.debug('Issued command is "%s"' % Cmd)
             return
         
         try:
@@ -113,9 +111,9 @@ def make_cmd(command):
     return cmd
 
 
+if 1:
+    gamma_commands = ("rashgt", "ScanSAR_burst_corners")
 
-# gamma_commands = ("rashgt", "ScanSAR_burst_corners")
-    
 gamma_progs = type("Gamma", (object,), 
                    {pth.basename(cmd): staticmethod(make_cmd(cmd))
                     for cmd in gamma_commands})
@@ -144,7 +142,7 @@ class Parfile(object):
     
     
     def __getitem__(self, item):
-        if item in self.cache
+        if item in self.cache:
             value = self.cache[item]
         else:
             value = gm.get_par(item, self.par)
@@ -189,10 +187,8 @@ class Parfile(object):
             
 
 class DataFile(gm.Files, Parfile):
-    __save__ = {"dat", "par", "tab", "ftype"}
+    __save__ = {"dat", "par", "tab"}
     __slots__ = {"dat", "datpar", "tab"}
-    
-    ftype = "DataFile"
     
     data_types = {
         "FCOMPLEX": 0,
@@ -202,7 +198,7 @@ class DataFile(gm.Files, Parfile):
         "DOUBLE": 2
     }
     
-    pols = frozenset(("vv", "hh", "hv", "vh"))
+    pols = frozenset({"vv", "hh", "hv", "vh"})
 
     
     def __init__(self, **kwargs):
@@ -436,17 +432,18 @@ class DataFile(gm.Files, Parfile):
 
 
 class SLC(DataFile):
-    ftype = "SLC"
-    def multi_look(self, MLI, **kwargs):
+    plot_cmd = "SLC"
+    
+    def multi_look(self, **kwargs):
+        mli = MLI(**kwargs)
         args = parse_ml_args(**kwargs)
-        gp.multi_look(self.datpar, MLI.datpar, args["rng_looks"],
+        
+        gp.multi_look(self.datpar, mli.datpar, args["rng_looks"],
                       args["azi_looks"], args["start"], args["nlines"],
                       args["scale"], args["exp"])
-    
-    
-    def plot_cmd(self):
-        return "SLC"
-
+        
+        return mli
+        
     
     def copy(self, other, conv=None, scale=None, rng_off=0,
              rng_num=0, azi_off=0, azi_num=0, swap=0, nheader=0):
@@ -456,9 +453,7 @@ class SLC(DataFile):
     
 
 class MLI(DataFile):
-    ftype = "MLI"
-    def plot_cmd(self):
-        return "pwr"
+    plot_cmd = "pwr"
     
     def rdc_trans(self, dem_rdc, other, lookup):
         gp.rdc_trans(self.par, dem_rdc, other.par, lookup)

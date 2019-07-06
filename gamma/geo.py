@@ -2,13 +2,18 @@ import gamma as gm
 
 from os import path as pth
 from logging import getLogger
+from collections import namedtuple
 
 
-__all__ = {
+__all__ = (
     "DEM",
     "Geocode",
     "geocode"
-}
+)
+
+
+RDC = namedtuple("RDC", "rng azi")
+
 
 log = getLogger("gamma.geo")
 
@@ -18,8 +23,6 @@ gp = gm.gamma_progs
 class DEM(gm.DataFile):
     __slots__ = {"lookup"}
     __save__ = {"dat", "par", "lookup"}
-    
-    ftype = "DEM"
     
     _geo2rdc = {
         "dist": 0,
@@ -75,8 +78,17 @@ class DEM(gm.DataFile):
                         nlines, interp, dtype, lr_in, lr_out, order)
     
     
+    def calc_rdc(latlon, mpar, hgt, diff_par):
+            out = gp.coord_to_sarpix(mpar, None, self.par, latlon[0],
+                                     latlon[1], hgt, diff_par).decode()
+        
+            for line in out.split("\n"):
+                if "corrected SLC/MLI range, azimuth pixel (int)" in line:
+                    split = line.split(":")[1].split()
+                    return RDC(int(split[0]), int(split[1]))
+
     def raster(self, obj, **kwargs):
-        assert obj in ("lookup", "lookup_old")
+        assert obj in {"lookup", "lookup_old"}
         
         kwargs.setdefault("image_format", "FCOMPLEX")
         kwargs.setdefault("datfile", getattr(self, obj))
@@ -89,10 +101,9 @@ class Geocode(gm.DataFile):
               "ls_map", "diff_par", "offs", "offsets", "ccp", "coffs",
               "coffsets"}
     
-    __save__ = {"dat", "par", "ftype"} | _items
+    __save__ = {"dat", "par"} | _items
     
     rashgt = getattr(gp, "rashgt")
-    ftype = "Geocode"
     
     
     def __init__(self, mli=None, **kwargs):
@@ -116,10 +127,10 @@ class Geocode(gm.DataFile):
                **kwargs):
         args = DataFile.parse_ras_args(self, **kwargs)
         
-        HGT.rashgt(args["datfile"], self.mli.dat, args["rng"],
-                   start_hgt, start_pwr, args["nlines"], args["arng"],
-                   args["aazi"], m_per_cycle, args["scale"], args["exp"],
-                   args["LR"], args["raster"], args["debug"])
+        Geocode.rashgt(args["datfile"], self.mli.dat, args["rng"],
+                       start_hgt, start_pwr, args["nlines"], args["arng"],
+                       args["aazi"], m_per_cycle, args["scale"], args["exp"],
+                       args["LR"], args["raster"], args["debug"])
     
 
 

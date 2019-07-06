@@ -209,9 +209,6 @@ def avg_factor(rng, azi, comp_fact=750):
     return avg_rng, avg_azi
 
 
-
-
-
 inits = {
     "tsprep": \
     """\

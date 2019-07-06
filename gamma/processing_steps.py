@@ -11,7 +11,15 @@ from shutil import copy
 from sys import stdout
 from json import load as jload, dump as jdump, JSONEncoder
 
-ProcStep = namedtuple("ProcStep", ["fun", "opt"])
+
+__all__ = (
+    "Processing",
+    "is_debug"
+)
+
+
+ProcStep = namedtuple("ProcStep", "fun opt")
+
 
 def typedval(obj):
     return {
@@ -35,7 +43,11 @@ gp = gm.gamma_progs
 log = logging.getLogger("gamma.steps")
 
 
-__all__ = ["Processing"]
+debug = False
+
+def is_debug():
+    return debug
+
 
 # *********************
 # * Utility functions *
@@ -133,7 +145,7 @@ class Processing(object):
     
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
-    steps = frozenset({"select", "load", "merge",  "make_mli", "make_rmli",
+    steps = frozenset({"select", "load_slc", "merge",  "make_mli", "make_rmli",
                        "check_geocode"})
     
     
@@ -285,60 +297,59 @@ class Processing(object):
         return name in self.meta["lists"]
     
     
+    def self.load_file(self, name):
+        return Save.load_file(self.list(name))
+    
+    
     def save(self, name, *args, **kwargs):
-        mode = kwargs.pop("mode", "mixed")
-        assert mode in {"list", "mixed"}
+        assert "list" not in kwargs
         
-        if mode == "list":
-            assert len(args) > 0
-            assert gm.all_same(args, fun=lambda x: type(x))
-            
-            save({
-                    "type": "file_list",
-                    "ftype": type(files[0]).__name__,
-                    "files": args
-            }, self.list(name))
+        to_save = {"list": (typedval(elem) for elem in args)}
         
-        else:
-            save({
-                    "type": "mixed",
-                    "dict": {
-                        key: typedval(value)
-                        for key, value in kwargs.items()
-                    }
-            }, self.list(name))
+        if len(kwargs) > 0:
+            to_save.update({key: typedval(value)
+                            for key, value in kwargs.items()})
         
+        save(self.list(name), to_save)
+    
     
     def load(self, name):
-        load = Save.load_file(self.list(name))
+        load = self.load_file(name)
+        _list = load.pop("list")
+        ret = {}
         
-        if load["type"] == "list":
-           converter = ftypes[load["ftype"]]
-           
-           return list(converter(elem) for elem in load["files"])
+        if _list is not None:
+            ret["list"] = [ftypes[elem["ftype"]](elem)
+                           for elem in load["list"]]
         
-        elif load["type"] = "mixed":
-           return tuple(
-            ftypes[elem["ftype"]](elem)
-            for elem in self.load(name)
-        )
+        if len(load) > 0:
+            ret.update({key: ftypes[value["ftype"]](value)
+                        for key, value in load.items()})
+        
+        return ret
+        
             
-
+    def load_list(self, name):
+        return self.load(name)["list"]
     
     
-    def inlist(self, name):
-           return tuple(
-            ftypes[elem["ftype"]](elem)
-            for elem in self.load(name)
-        )
-    
-    
+    def update(self, name, **kwargs):
+        load = self.load_file(name)
+        
+        load.update(kwargs)
+        
+        save(self.list(name), load)
+        
+        
     def select_date(self, name, date):
         if not self.is_list(name):
             return None
         
         return tuple(elem for elem in self.inlist(name)
                      if elem.datestr() == date)[0]
+    
+    def select_master(self, name):
+        return self.select_date(name, self.meta.get("master_date"))
     
     
     def master_date(self):
@@ -357,6 +368,9 @@ class Processing(object):
         logger = logging.getLogger(logger_name)
         
         level = getattr(logging, loglevel.upper(), None)
+        
+        if level == logging.DEBUG:
+            debig = True
         
         if not isinstance(level, int):
             raise ValueError("Invalid log level: {}".format(loglevel))
@@ -406,7 +420,7 @@ class Processing(object):
 
         date_start, date_stop, check_zips = \
         select.get("date_start"), select.get("date_stop"), \
-        select.getbool("check_zips", False)
+        select.bool("check_zips", False)
         
         
         IWs = tuple(select.get("iw%d" % (idx + 1)) for idx in range(3))
@@ -453,6 +467,8 @@ class Processing(object):
             SLC = (slc for slc in SLC if slc.test_zip())
         
         SLC = tuple(SLC)
+        
+        assert len(SLC) > 0, "No SLC zipfiles were selected!"
         
         if master_date is None:
             log.info("No master_date defined, using first date.")
@@ -507,11 +523,10 @@ class Processing(object):
         log.info("\nSentinel-1A slave bursts:\n%s" % S1A_bursts)
         log.info("\nSentinel-1B slave bursts:\n%s" % S1B_bursts)
         
-        self.outlist("s1zip", SLC)
-        gm.rm("tmp_par", "tmp_TOPS_par")
+        self.save("s1zip", *SLC)
 
 
-    def load(self):
+    def load_slc(self):
         if gm.ScanSAR:
             copy_fun = getattr(gp, "SLC_copy_ScanSAR")
         else:
@@ -524,7 +539,7 @@ class Processing(object):
         
         dir_uncrop = self.dir("uncrop")
         dir_crop   = self.dir("crop")
-        SLC = self.inlist("s1zip")
+        SLC = self.load_list("s1zip")
         
         uncrop = []
         
@@ -558,7 +573,7 @@ class Processing(object):
             crop.append(_crop)
     
     
-        self.outlist("crop", crop)
+        self.save("crop", *crop)
 
     
     def merge(self):
@@ -577,7 +592,7 @@ class Processing(object):
         slc_dir    = self.dir("merged")
 
         merged, used_SLC = [], []
-        SLC = self.inlist("crop")
+        SLC = self.load_list("crop")
         
         
         for SLC1 in SLC:
@@ -612,7 +627,7 @@ class Processing(object):
             merged.append(SLC3)
         # endfor
         
-        self.outlist("merged", merged)
+        self.save("merged", merged)
         
         # CLEANUP
         #gm.rm("*.SAFE", "*.SLC_tab", "*iw*", "*.slc*")
@@ -634,7 +649,7 @@ class Processing(object):
         MLI = []
         
         
-        for slc in self.inlist("merged"):
+        for slc in self.load_list("merged"):
             mli = gm.MLI(datfile=tpl % (slc.datestr(), pol))
             
             slc.multi_look(mli, range_looks, azimuth_looks)
@@ -643,7 +658,7 @@ class Processing(object):
             MLI.append(mli)
         
         
-        self.outlist("mli", MLI)
+        self.save("mli", MLI)
 
     
     def mosaic_tops(self):
@@ -658,14 +673,14 @@ class Processing(object):
         
         SLC = []
         
-        for s1slc in self.inlist("merged"):
+        for s1slc in self.load_list("merged"):
             dat = pth.join(s1slc.IW[0].dat.split(".")[-2], ".dat")
             slc = s1slc.mosaic(rng_looks=rng_looks, azi_looks=azi_looks,
                                datfile=dat)
             
             SLC.append(slc)
         
-        self.outlist("slc_mosaic", slc)
+        self.save("slc_mosaic", slc)
 
     
     def check_ionoshpere(self):
@@ -690,6 +705,7 @@ class Processing(object):
         # SLC[0].check_ionoshpere(rng_win=rng_win, azi_win=azi_win, thresh=thresh,
         #                         rng_step=rng_step, azi_step=azi_step)
         
+        
 
     def make_rmli(self):
         
@@ -701,9 +717,6 @@ class Processing(object):
         pol           = general.get("pol")
         
         mli_dir = self.dir("rmli")
-        
-        RSLC = self.meta["SLC_coreg"]
-        
         tpl = pth.join(mli_dir, "%s.%s.mli")
         
         datestr = (date.date2str() for date in self.meta["dates"])
@@ -715,12 +728,10 @@ class Processing(object):
                             azi_looks=azimuth_looks)
             rmli.raster()
         
-        self.outlist("RMLI", RMLI)
+        self.save("RMLI", RMLI)
 
 
     def geocode(self):
-        
-        master_date = self.master_date()
         general = self.section("general")
         
         rng_looks = general.int("range_looks", 1)
@@ -728,48 +739,44 @@ class Processing(object):
         
         geoc = self.section("geocode")
         
-        m_s1slc = self.select_date("merged", master_date)
-        
-        assert m_s1slc is not None, "Master date S1SLC not found!"
-        
-        m_slc = self.select_date("slc", master_date)
+        master = self.load("master")
+        m_s1slc = master["s1slc"]
         
         
-        if m_slc is None:
+        if "slc" not in master:
             m_slc = m_s1slc.mosaic(rng_looks=rng_looks, azi_looks=azi_looks,
                                    datfile=\
-                                   pth.join(output_dir, self.get_dir("SLC"),
-                                   "%s.slc" % m_s1slc.datestr()))
+                                   pth.join(self.dir("SLC"),
+                                            "%s.slc" % m_s1slc.datestr()))
             
-            with self.outlist("slc", "SLC") as f:
-                f.write("%s\n" % m_slc)
+            self.update("master", slc=m_slc)
+        else:
+            m_slc = master["slc"]
+        
+        
+        if "mli" not in master:
+            m_mli = mslc.multi_look(rng_looks=rng_looks, azi_looks=azi_looks)
             
+            self.update("master", mli=m_mli)
+        else:
+            m_mli = master["mli"]
         
-        m_mli = self.select_date("mli", master_date)
-        
-        if m_mli is None:
-            mlidir = self.get_dir("MLI")
-            m_mli = gm.MLI(datfile=pth.join(mlidir, "%s.mli" % master_date))
-            m_slc.multi_look(m_mli, rng_looks=rng_looks, azi_looks=azi_looks)
-        
-            with self.outlist("mli", "MLI") as f:
-                f.write("%s\n" % m_mli)
-        
-        
-        self.meta.update(
-        im.geocode(geoc, m_slc, m_mli,
-                   rng_looks=rng_looks, azi_looks=azi_looks,
-                   out_dir=output_dir))
+        self.save("geocode",
+                  **im.geocode(geoc, m_slc, m_mli,
+                               rng_looks=rng_looks,
+                               azi_looks=azi_looks, 
+                               out_dir=output_dir))
 
 
     def check_geocode(self):
-
-        hgt, geo, dem = self.meta["hgt"], self.meta["geo"], self.meta["dem"]
+        geoc = self.load("geocode")
         
-        mrng = hgt.mli.rng()
+        geo, dem = geoc["geo"], geoc["dem"]
+        
+        mrng = geo.mli.rng()
         
         log.info("Geocoding DEM heights into image coordinates.")
-        dem.geo2rdc(dem.dat, hgt.dat, mrng, nlines=hgt.mli.azi(),
+        dem.geo2rdc(dem.dat, geo.hgt, mrng, nlines=hgt.mli.azi(),
                     interp="sqr_dist")
         
         dem.raster("lookup")
@@ -786,23 +793,26 @@ class Processing(object):
     def coreg(self):
         log.info("Starting COREG_SLCS")
         
-        output_dir, master_date = self.get_out_master()
         general = self.section("general")
         
         pol       = general.get("pol", "vv")
         rng_looks = general.int("range_looks", 1)
         azi_looks = general.int("azimuth_looks", 4)
 
-        coregp = self.section("coreg")
+        coreg = self.section("coreg")
         
-        cc_thresh      = coregp.float("cc_thresh", 0.8)
-        frac_thresh    = coregp.float("fraction_thresh", 0.01)
-        ph_std_thresh  = coregp.float("ph_stdev_thresh", 0.8)
-        itmax          = coregp.int("itmax", 5)
+        cc_thresh      = coreg.float("cc_thresh", 0.8)
+        frac_thresh    = coreg.float("fraction_thresh", 0.01)
+        ph_std_thresh  = coreg.float("ph_stdev_thresh", 0.8)
+        itmax          = coreg.int("itmax", 5)
         
         cleaning, flag1, poly1, poly2 = True, True, None, None
         
-        hgt = self.meta["hgt"].dat
+        
+        if self.is_list("geocode")
+            hgt = self.load["geocode"]["geo"].hgt
+        else:
+            hgt = None
         
         coreg_dir = self.dir("coreg_out")
         rmli_dir  = self.dir("rmli")
@@ -812,7 +822,7 @@ class Processing(object):
         # tpl_tab = pth.join(coreg_dir, "{date}.{pol}.RSLC_tab")
         # fmt = "%Y%m%d"
         
-        SLC = self.inlist("merged")
+        SLC = self.load_list("merged")
         
         SLC_sort = sorted(SLC, key=lambda x: x.date(start_stop=True).center)
         midx = tuple(ii for ii, slc in enumerate(SLC_sort)
@@ -821,7 +831,22 @@ class Processing(object):
         # number of slave images
         n_sar = len(SLC) - 1
         prev = None
-
+        
+        m_s1slc = SLC_sort[midx]
+        
+        m_slc = m_s1slc.mosaic(rng_looks=rng_looks, azi_looks=azi_looks,
+                               datfile=\
+                               pth.join(self.dir("SLC"),
+                                        "%s.slc" % m_s1slc.datestr()))
+        
+        m_mli = mslc.multi_look(rng_looks=rng_looks, azi_looks=azi_looks)
+        
+        master = {
+            "s1slc": m_s1slc,
+            "slc": m_slc,
+            "mli": m_mli
+        }
+        
         
         RSLC, RMLI = [], []
         
@@ -841,12 +866,6 @@ class Processing(object):
             range(master_idx - 1, -1, -1)
         
         
-        master = {
-            "S1SLC": self.select_date("merged", master_date),
-            "SLC": self.select_date("slc", master_date),
-            "MLI": self.select_date("mli", master_date)
-        }
-        
         for ii, slc in enumerate(itr):
             if ii == midx:
                 continue
@@ -857,9 +876,9 @@ class Processing(object):
             # gm.S1SLC.from_template(pol, slc.date(start_stop=True), slc.IWs,
             #                        tpl_tab=tpl_tab, fmt=fmt, tpl=tpl_iw)
 
-            gm.coreg(master, slc, SLC_coreg, hgt, rng_looks, azi_looks, poly1,
-                     poly2, cc_thresh, frac_thresh, ph_std_thresh, cleaning,
-                     flag1, prev, diff_dir)
+            gm.S1_coreg(master, slc, SLC_coreg, hgt, rng_looks, azi_looks,
+                        poly1, poly2, cc_thresh, frac_thresh, ph_std_thresh,
+                        cleaning, flag1, prev, diff_dir)
             
             rslc = pth.join(coreg_dir, slc.date.date2str()) + ".rslc"
             rmli = gm.MLI(pth.join(rmli_dir, slc.date.date2str()) + ".rmli")
@@ -883,46 +902,30 @@ class Processing(object):
             RSLC.append(rslc_coreg)
             RMLI.append(rmli)
         
-        self.outlist("rslc", RSLC)
+        self.save("rslc", *RSLC)
+        self.save("rmli", *RMLI)
+        self.save("master", master)
 
-
+    
+    
     def deramp(self):
-        mslc = self.select_master("")
+        mslc, SLC = self.load("master")["slc"], self.load_list("rslc")
         gen = self.section("general")
 
         rng_looks = gen.int("range_looks", 1)
         azi_looks = gen.int("azimuth_looks", 4)
         output_dir = gen.get("output_dir", ".")
         
+        mslc_d = mslc.deramp(master=True)
         
-        deramp_dir = self.dir("deramp")
+        SLC_d = tuple(slc.deramp(master=mslc) for slc in SLC)
         
-        mslcd = gm.S1SLC.from_SLC(mslc, ".deramp")
-        _slc = pth.join(deramp_dir, "%s.slc.deramp" % mslc.date.date2str())
-        
-        gp.S1_deramp_TOPS_reference(mslc.tab)
-        mslcd.mosaic(datfile=_slc, rng_looks=rng_looks, azi_looks=azi_looks)
-        
-        self.meta["master"]["S1SLC_deramp"] = mslcd
-        
-        
-        RSLC = self.meta["RSLC"]
-        #RSLC = self.meta["RLSC"]
-        
-        deramped = [gm.S1SLC.from_SLC(slc, ".deramp") for slc in RSLC]
-        
-        for rslc, dslc in zip(RSLC, deramped):
-            date = rslc.date.date2str()
-            
-            gp.S1_deramp_TOPS_slave(rslc.tab, date, mslc.tab, rng_looks,
-                                    azi_looks, 0)
-            
-            _slc = pth.join(deramp_dir, "%s.slc.deramp" % date)
-            
-            dslc.mosaic(datfile=_slc, rng_looks=rng_looks, azi_looks=azi_looks)
-        
-        deramped.append(mslcd)
+        self.save("deramp", *SLC_d)
+        self.update("master", deramp=mslc_d)
 
+    
+    
+    # IPTA processing from here ?
 
     def base_plot(self):
         ipta_dir = self.params.general.get("ipta_dir", ".")

@@ -14,7 +14,7 @@ log = getLogger("gamma.sentinel1")
 import gamma as gm
 
 
-__all__ = [
+__all__ = (
     "all_same",
     "make_object",
     "make_join",
@@ -35,7 +35,7 @@ __all__ = [
     "ln",
     "mv",
     "mkdir",
-]
+)
 
 
 tmpdir = _get_default_tempdir()
