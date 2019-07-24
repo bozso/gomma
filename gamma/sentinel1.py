@@ -1,13 +1,16 @@
+import shutil as sh
+
 from os import path as pth
 from datetime import datetime, timedelta
 from zipfile import ZipFile
-import shutil as sh
+from logging import getLogger
 
 
 import gamma as gm
 from gamma.private import extract_file, burst_selection_helper
 
-from logging import getLogger
+
+nothing = gm.nothing
 
 log = getLogger("gamma.sentinel1")
 
@@ -149,11 +152,9 @@ class S1Zip(object):
         par, TOPS_par = gm.tmp_file(), gm.tmp_file()
         annot = self.extract_annot(iw_num, pol)[0]
 
-        gp.par_S1_SLC(None, annot, None, None, "tmp_par", None, "tmp_TOPS_par")
+        gp.par_S1_SLC(None, annot, None, None, par, None, TOPS_par)
         
-        out = S1Zip.burst_fun(par, TOPS_par).decode()
-        
-        return out
+        return S1Zip.burst_fun(par, TOPS_par).decode()
 
     
     def burst_corners(self, iw_num, pol, remove_temps=False):
@@ -278,6 +279,7 @@ class S1SLC(object):
     
     def __str__(self):
         return "\n".join(str(IW) for IW in self.IWs if IW is not None)
+    
     
     @classmethod
     def from_json(cls, line):

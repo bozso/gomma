@@ -76,10 +76,11 @@ log = getLogger("gamma.base")
 gamma_cmaps = pth.join(settings["path"], "DISP", "cmaps")
 
 
-gamma_commands = \
-tuple(binfile for module in settings["modules"]
-      for path in ("bin", "scripts")
-      for binfile in iglob(pth.join(settings["path"], module, path, "*")))
+gamma_commands = {
+    binfile for module in settings["modules"]
+    for path in {"bin", "scripts"}
+    for binfile in iglob(pth.join(settings["path"], module, path, "*"))
+}
 
 
 def make_cmd(command):
@@ -111,15 +112,13 @@ def make_cmd(command):
     return cmd
 
 
-if 1:
-    gamma_commands = ("rashgt", "ScanSAR_burst_corners")
+if 0:
+    gamma_commands = {"rashgt", "ScanSAR_burst_corners"}
 
-gamma_progs = type("Gamma", (object,), 
-                   {pth.basename(cmd): staticmethod(make_cmd(cmd))
-                    for cmd in gamma_commands})
+gp = type("Gamma", (object,), 
+          {pth.basename(cmd): staticmethod(make_cmd(cmd))
+           for cmd in gamma_commands})
 
-
-gp = gamma_progs
 
 imview = make_cmd("eog")
 
