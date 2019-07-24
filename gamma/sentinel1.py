@@ -10,11 +10,9 @@ import gamma as gm
 from gamma.private import extract_file, burst_selection_helper
 
 
-nothing = gm.nothing
-
 log = getLogger("gamma.sentinel1")
 
-gp = gm.gamma_progs
+gp = gm.gp
 
 
 __all__ = (
@@ -23,7 +21,7 @@ __all__ = (
     "S1SLC",
     "deramp_master",
     "deramp_slave",
-    "coreg"
+    "S1_coreg"
 )
 
 
@@ -36,9 +34,12 @@ def check_paths(path):
 
 
 class S1Zip(object):
-    if gm.ScanSAR:
+    cache = None
+    
+    if hasattr(gm, "ScanSAR_burst_corners"):
         cmd = "ScanSAR_burst_corners"
     else:
+        # fallback
         cmd = "SLC_burst_corners"
     
     burst_fun = getattr(gp, cmd)
@@ -59,9 +60,12 @@ class S1Zip(object):
     
     
     def __init__(self, zipfile, extra_info=False):
+        if S1Zip.cache is None:
+           S1Zip.cache =  gm.cache.dir("unzip")
+        
         zip_base = pth.basename(zipfile)
         
-        self.zipfile = zipfile
+        self.zip_path, self.zipfile = zipfile, None
         self.mission = zip_base[:3]
         self.date = gm.Date(datetime.strptime(zip_base[17:32], "%Y%m%dT%H%M%S"),
                             datetime.strptime(zip_base[33:48], "%Y%m%dT%H%M%S"))
@@ -99,6 +103,11 @@ class S1Zip(object):
     def datestr(self, fmt="%Y%m%d"):
         return self.date.center.strftime(fmt)
 
+    
+    def extract(self, name):
+        if self.zipfile is None:
+            self.zipfile = ZipFile(self.zip_path, "r")
+   
     
     def extract_annot(self, iw, pol, out_path="."):
         regx = self.r_annot_tpl.format(iw=iw, pol=pol)

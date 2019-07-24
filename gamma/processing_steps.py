@@ -23,7 +23,7 @@ ProcStep = namedtuple("ProcStep", "fun opt")
 
 def typedval(obj):
     return {
-        "ftype": getattr(type(obj), "__name__"),
+        "ftype": type(obj).__name__,
         "value": obj
     }
 
@@ -38,7 +38,7 @@ except ImportError:
 
 import gamma as gm
 
-gp = gm.gamma_progs
+gp = gm.gp
 
 log = logging.getLogger("gamma.steps")
 
@@ -52,12 +52,6 @@ def is_debug():
 # *********************
 # * Utility functions *
 # *********************
-
-# _terminal_width = gp.get_terminal_size().columns
-
-
-def make_all():
-    pass
 
 
 def delim(msg, sym="*", width=80):
@@ -166,7 +160,8 @@ class Processing(object):
         self.steps = steps
         
         self.metafile = self.params.get("general", "metafile")
-
+        gm.cache = gm.Cache(self.params.get("general", "CACHE_PATH"))
+        
         if pth.isfile(self.metafile):
             self.meta = Meta.from_file(self.metafile)
         else:
@@ -288,7 +283,7 @@ class Processing(object):
         if name in self.meta["lists"]:
             return self.meta["lists"][name]
         else:
-            _path = pth.join(self.get_dir("list_dir"), "%s.file_list" % name)
+            _path = pth.join(self.dir("list_dir"), "%s.file_list" % name)
             self.meta["lists"][name] = _path
             return _path
     
@@ -449,7 +444,8 @@ class Processing(object):
             date_stop = datetime.strptime(date_stop, "%Y%m%d")
             
             SLC = (slc for slc in SLC
-                   if slc.date.start > date_start and slc.date.stop < date_stop)
+                   if slc.date.start > date_start
+                   and slc.date.stop < date_stop)
         
         elif date_start is not None:
             date_start = datetime.strptime(date_start, "%Y%m%d")
@@ -467,6 +463,13 @@ class Processing(object):
             SLC = (slc for slc in SLC if slc.test_zip())
         
         SLC = tuple(SLC)
+        
+        slc = SLC[0]
+        slc.extract()
+        
+        print(slc.zipfile)
+        
+        return
         
         assert len(SLC) > 0, "No SLC zipfiles were selected!"
         

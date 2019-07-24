@@ -1,7 +1,6 @@
 import os
 from os import path as pth
 from itertools import tee
-from atexit import register
 from tempfile import _get_default_tempdir, _get_candidate_names
 from shutil import copyfileobj
 from argparse import ArgumentParser
@@ -11,7 +10,7 @@ from logging import getLogger
 
 log = getLogger("gamma.sentinel1")
 
-import gamma as gm
+# import gamma as gm
 
 
 __all__ = (
@@ -35,12 +34,58 @@ __all__ = (
     "ln",
     "mv",
     "mkdir",
+    "Cache",
+    "cache"
 )
 
 
-tmpdir = _get_default_tempdir()
+class TMP(object):
+    tmpdir = _get_default_tempdir()
+    
+    def __init__(self):
+        self.tmps = []
+    
+    def tmp_file(path=tmpdir):
+        path = pth.join(path, next(_get_candidate_names()))
+        
+        self.tmps.append(path)
+        
+        return path
+    
+    def __del__(self):
+        for path in self.tmps:
+            log.debug('Removed file: "%s"' % path)
+            rm(path)
 
 
+tmp = TMP()
+tmp_file = tmp.tmp_file
+
+
+class Cache(object):
+    empty_iter = iter([])
+    
+    def __init__(self, root):
+        self.root = mkdir(root)
+    
+    def join(self, *args, **kwargs):
+        return pth.join(self.root, *args, **kwargs)
+    
+    
+    def dir(self, name):
+        return Cache(mkdir(self.join(name)))
+
+
+    def list(self, name):
+        if not pth.isdir(self.join(name)):
+            return empty_iter
+        else:
+            return iglob(self.join(name, "*"))
+    
+    
+cache = None
+    
+    
 def all_same(iterable, fun=None):
     if fun is not None:
         n = len(set(tee(map(fun, iterable),1)))
@@ -80,28 +125,6 @@ class Params(object):
         return int(self[key].split()[idx])
 
 
-tmp = []
-
-def tmp_file(path=tmpdir):
-    global tmp
-    path = pth.join(path, next(_get_candidate_names()))
-    
-    tmp.append(path)
-    
-    return path
-
-
-def cleanup_temps():
-    global tmp
-    
-    for path in tmp:
-        log.debug('Removed file: "%s"' % path)
-        rm(path)
-
-
-register(cleanup_temps)
-
-
 def cat(out, *args):
     assert len(args) >= 1, "Minimum one input file is required"
     
@@ -119,18 +142,18 @@ class Files(object):
             setattr(self, key, value)
     
     def stat(self, attrib, rng=None, roff=0, loff=0, nr=None, nl=None):
+        tmp = tmp_file()
         obj = getattr(self, attrib)
         
         if rng is None:
             rng = obj.rng()
         
         if isinstance(obj, string_t):
-            gp.image_stat(obj, rng, roff, loff, nr, nl, "tmp")
+            gp.image_stat(obj, rng, roff, loff, nr, nl, tmp)
         else:
-            gp.image_stat(obj.dat, rng, roff, loff, nr, nl, "tmp")
+            gp.image_stat(obj.dat, rng, roff, loff, nr, nl, tmp)
         
-        pars = Params.from_file("tmp")
-        rm("tmp")
+        pars = Params.from_file(tmp)
         
         return pars
     
@@ -163,15 +186,6 @@ class Files(object):
     def cp(self, attrib, other):
         sh.copy(getattr(self, attrib), other)
     
-    # def get(self, attrib, key):
-    #     return Files.get_par(key, getattr(self, attrib))
-    # 
-    # def getfloat(self, attrib, key, idx=0):
-    #     return Files._getfloat(key, getattr(self, attrib), idx)
-    # 
-    # def getint(self, attrib, key, idx=0):
-    #     return Files._getint(key, getattr(self, attrib), idx)
-    
     def set(self, attrib, key, **kwargs):
         return Files.set_par(key, getattr(self, attrib), **kwargs)
     
@@ -196,42 +210,6 @@ class Files(object):
     @staticmethod
     def is_empty(path):
         return pth.getsize(path) == 0
-    
-    
-
-        
-    @staticmethod
-    def _getfloat(key, data, idx=0):
-        return float(Files.get_par(key, data).split()[idx])
-
-    @staticmethod
-    def _getint(key, data, idx=0):
-        return int(Files.get_par(key, data).split()[idx])
-
-
-    @staticmethod
-    def set_par(key, infile, new=""):
-        if Files.is_empty(infile):
-            with open(infile, "w") as f:
-                f.write("%s: %s\n" % (key, new))
-            
-            return
-        
-        
-        with open(infile, "r+") as f:
-            lines = (line for line in f)
-        
-            lines = (
-                        "%s: %s" % (key, new)
-                        if key in line
-                        else line
-                        for line in lines
-                    )
-            
-            f.seek(0)
-            f.truncate()
-            
-            f.write("%s\n" % "\n".join(lines))
 
 
 def get_par(key, data, sep=":"):
@@ -297,13 +275,13 @@ class Date(object):
 def mkdir(path):
     try:
         os.makedirs(path)
-        log.debug("Directory \"{}\" created.".format(path))
+        log.debug('Directory "%s" created.' % (path))
         return path
     except OSError as e:
         if e.errno != EEXIST:
             raise e
         else:
-            log.debug("Directory \"{}\" already exists.".format(path))
+            log.debug('Directory "{}" already exists.' % (path))
             return path
 
 
@@ -314,7 +292,7 @@ def ln(target, link_name):
         if e.errno == EEXIST:
             os.remove(link_name)
             os.symlink(target, link_name)
-            log.debug("Symlink from \"%s\" to \"%s\" created"
+            log.debug('Symlink from "%s" to "%s" created'
                          % (target, link_name))
         else:
             raise e
@@ -327,25 +305,26 @@ def rm(*args):
                 return
             elif pth.isdir(path):
                 sh.rmtree(path)
-                log.debug("Directory \"%s\" deleted," % path)
+                log.debug('Directory "%s" deleted,' % path)
             elif pth.isfile(path):
                 try:
                     os.remove(path)
-                    log.debug("File \"%s\" deleted." % path)
+                    log.debug('File "%s" deleted.' % path)
                 except OSError as e:
                     if e.errno != ENOENT:
                         raise e
             else:
-                raise Exception("%s is not a file nor is a directory!" % path)
+                raise Exception('"%s" is not a file nor is a directory!' % path)
 
 
 def mv(*args, **kwargs):
     dst = kwargs.pop("dst", None)
+    
     for arg in args:
         for src in iglob(arg): 
             rm(pth.join(dst, src))
             sh.move(src, dst)
-            log.debug("File \"%s\" moved to \"%s\"." % (src, dst))    
+            log.debug('"File "%s" moved to "%s".' % (src, dst))    
 
             
 def make_join(path):

@@ -15,7 +15,7 @@ import gamma as gm
 
 log = getLogger("gamma.ipta")
 
-gp = gm.gamma_progs
+gp = gm.gp
 
 
 __all__ = ("PointData", "merge", "get_llh", "plist_fmt")

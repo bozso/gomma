@@ -4,7 +4,7 @@ from logging import getLogger
 
 log = getLogger("gamma.interferometry")
 
-gp = gm.gamma_progs
+gp = gm.gp
 
 
 __all__ = (

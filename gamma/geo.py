@@ -14,10 +14,9 @@ __all__ = (
 
 RDC = namedtuple("RDC", "rng azi")
 
-
 log = getLogger("gamma.geo")
 
-gp = gm.gamma_progs
+gp = gm.gp
 
 
 class DEM(gm.DataFile):

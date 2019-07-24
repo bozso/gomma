@@ -25,23 +25,25 @@ __all__ = (
     "SLC",
     "MLI",
     "imview",
-    "string_t",
+    "str_t",
     "settings",
-    "gamma_progs",
+    "gp",
     "ScanSAR",
     "settings",
     "display",
     "raster",
-    "make_cmd"
+    "make_cmd",
+    "CACHE_PATH"
 )
 
 
+CACHE_PATH = None
 ScanSAR = True
 
 if PY3:
-    string_t = str,
+    str_t = str,
 else:
-    string_t = basestring,
+    str_t = basestring,
 
 
 versions = {
@@ -52,7 +54,7 @@ versions = {
 settings = {
     "ras_ext": "bmp",
     "path": versions["20181130"],
-    "modules": ("DIFF", "DISP", "ISP", "LAT", "IPTA"),
+    "modules": {"DIFF", "DISP", "ISP", "LAT", "IPTA"},
     "libpaths": "/home/istvan/miniconda3/lib:",
     "templates": {
         "IW": "{date}_iw{iw}.{pol}.slc",

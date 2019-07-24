@@ -4,7 +4,7 @@ from logging import getLogger
 
 log = getLogger("gamma.lat")
 
-gp = gm.gamma_progs
+gp = gm.gp
 
 
 __all__ = ("single_class_mapping", "radcal_MLI")
