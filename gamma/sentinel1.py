@@ -4,11 +4,9 @@ from os import path as pth
 from datetime import datetime, timedelta
 from zipfile import ZipFile
 from logging import getLogger
-
+from re import match
 
 import gamma as gm
-from gamma.private import extract_file, burst_selection_helper
-
 
 log = getLogger("gamma.sentinel1")
 
@@ -25,17 +23,7 @@ __all__ = (
 )
 
 
-def check_paths(path):
-    if len(path) != 1:
-        raise Exception("More than one or none file(s) found in the zip that "
-                        "corresponds to the regexp. Paths: {}".format(path))
-    else:
-        return path[0]
-
-
 class S1Zip(object):
-    cache = None
-    
     if hasattr(gm, "ScanSAR_burst_corners"):
         cmd = "ScanSAR_burst_corners"
     else:
@@ -44,7 +32,7 @@ class S1Zip(object):
     
     burst_fun = getattr(gp, cmd)
 
-    r_tiff_tpl = ".*.SAFE/measurement/s1.*-iw{iw}-slc-{pol}.*.tiff"
+    r_tiff_tpl  = ".*.SAFE/measurement/s1.*-iw{iw}-slc-{pol}.*.tiff"
     r_annot_tpl = ".*.SAFE/annotation/s1.*-iw{iw}-slc-{pol}.*.xml"
     r_calib_tpl = ".*.SAFE/annotation/calibration/calibration"\
                   "-s1.*-iw{iw}-slc-{pol}.*.xml"
@@ -53,19 +41,18 @@ class S1Zip(object):
     
     __slots__ = ("zipfile", "mission", "date", "burst_nums", "mode",
                  "prod_type", "resolution", "level", "prod_class", "pol",
-                 "abs_orb", "DTID", "UID")
+                 "abs_orb", "DTID", "UID", "zip_path", "zip_base")
     
     
     __save__ = ("zipfile", "burst_nums", "date", "mission")
     
     
-    def __init__(self, zipfile, extra_info=False):
-        if S1Zip.cache is None:
-           S1Zip.cache =  gm.cache.dir("unzip")
+    def __init__(self, zippath, extra_info=False):
+        zip_base = pth.basename(zippath)
         
-        zip_base = pth.basename(zipfile)
+        self.zip_path, self.zipfile, self.zip_base = \
+        zippath, ZipFile(zippath, "r"), zip_base
         
-        self.zip_path, self.zipfile = zipfile, None
         self.mission = zip_base[:3]
         self.date = gm.Date(datetime.strptime(zip_base[17:32], "%Y%m%dT%H%M%S"),
                             datetime.strptime(zip_base[33:48], "%Y%m%dT%H%M%S"))
@@ -107,7 +94,10 @@ class S1Zip(object):
     def extract(self, name):
         if self.zipfile is None:
             self.zipfile = ZipFile(self.zip_path, "r")
-   
+        
+        # return tuple(slc_zip.extract(elem, out_path)
+        #              for elem in slc_zip.namelist() if match(regex, elem))
+    
     
     def extract_annot(self, iw, pol, out_path="."):
         regx = self.r_annot_tpl.format(iw=iw, pol=pol)
@@ -117,6 +107,28 @@ class S1Zip(object):
     
         return ret
     
+    
+    def to_unzip(self, pol, iw="*"):
+        namelist = self.zipfile.namelist()
+        
+        regexs = (
+            self.r_annot_tpl.format(iw=iw, pol=pol),
+            self.r_tiff_tpl.format(iw=iw, pol=pol),
+            self.r_calib_tpl.format(iw=iw, pol=pol),
+            self.r_noise_tpl.format(iw=iw, pol=pol)
+        )
+        
+        print(namelist)
+        
+        for regex in regexs:
+            print(regex)
+            for elem in namelist:
+                if match(regex, elem):
+                    print(elem)
+        
+        # return tuple(elem for regex in regexs for elem in namelist
+        #              if match(regex, elem))
+        
     
     def extract_IW(self, pol, IW, annot=None):
         iw_num = IW.num
@@ -504,3 +516,42 @@ def deramp_slave(mslc, rslc, rslcd, rng_looks=4, azi_looks=1):
     deramped.mosaic(datfile=rslcd, rng_looks=rng_looks, azi_looks=azi_looks)
     
     return deramped
+
+
+def diff_burst(burst1, burst2):
+    
+    diff_sqrt = sqrt((burst1 - burst2) * (burst1 - burst2))
+    
+    return int(burst1 - burst2 + 1.0
+               + ((burst1 - burst2) / (0.001 + diff_sqrt)) * 0.5)
+
+
+def burst_selection_helper(ref_burst, slc_burst):
+    if ref_burst is not None:
+        iw_start_burst = slc_burst[0]
+    
+        diff = [diff_burst(ref_burst[0], iw_start_burst),
+                diff_burst(ref_burst[-1], iw_start_burst)]
+        
+        total_slc_bursts = len(slc_burst)
+    
+        if diff[1] < 1 or diff[0] > total_slc_bursts:
+            return None
+    
+        if diff[0] <= 0:
+            diff[0] = 1
+    
+        if diff[1] > total_slc_bursts:
+            diff[1] = total_slc_bursts
+    
+        return tuple((diff[0], diff[1]))
+    else:
+        return None
+
+
+def check_paths(path):
+    if len(path) != 1:
+        raise Exception("More than one or none file(s) found in the zip that "
+                        "corresponds to the regexp. Paths: {}".format(path))
+    else:
+        return path[0]

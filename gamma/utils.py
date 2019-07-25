@@ -1,5 +1,7 @@
+import functools as ft
 import os
 from os import path as pth
+from errno import EEXIST
 from itertools import tee
 from tempfile import _get_default_tempdir, _get_candidate_names
 from shutil import copyfileobj
@@ -10,7 +12,8 @@ from logging import getLogger
 
 log = getLogger("gamma.sentinel1")
 
-# import gamma as gm
+
+cache_default_path = "/mnt/bozso_i/cache"
 
 
 __all__ = (
@@ -35,8 +38,15 @@ __all__ = (
     "mv",
     "mkdir",
     "Cache",
-    "cache"
+    "cache",
+    "compose",
+    "isfile"
 )
+
+
+
+def compose(*functions):
+    return ft.reduce(lambda f, g: lambda x: f(g(x)), functions, lambda x: x)
 
 
 class TMP(object):
@@ -61,12 +71,19 @@ class TMP(object):
 tmp = TMP()
 tmp_file = tmp.tmp_file
 
+empty_iter = iter([])
+isfile = compose(pth.isfile, pth.join)
 
 class Cache(object):
-    empty_iter = iter([])
     
     def __init__(self, root):
         self.root = mkdir(root)
+        
+        mk = compose(mkdir, ft.partial(pth.join, root))
+        
+        self.unzip, self.slc, self.rslc, self.ifg = \
+        mk("unzip"), mk("slc"), mk("rslc"), mk("ifg")
+    
     
     def join(self, *args, **kwargs):
         return pth.join(self.root, *args, **kwargs)
@@ -82,8 +99,9 @@ class Cache(object):
         else:
             return iglob(self.join(name, "*"))
     
+
+# def unzip(zipfile, outpath):
     
-cache = None
     
     
 def all_same(iterable, fun=None):
@@ -272,7 +290,9 @@ class Date(object):
         return "<Date start: %s stop: %s mean: %s>"\
                 % (self.start, self.stop, self.mean)
 
-def mkdir(path):
+def mkdir(*args):
+    path = pth.join(*args)
+    
     try:
         os.makedirs(path)
         log.debug('Directory "%s" created.' % (path))
@@ -281,7 +301,7 @@ def mkdir(path):
         if e.errno != EEXIST:
             raise e
         else:
-            log.debug('Directory "{}" already exists.' % (path))
+            log.debug('Directory "%s" already exists.' % (path))
             return path
 
 
@@ -447,3 +467,6 @@ class CParse(object):
     def parse(self):
         self.args = self.argp.parse_args()
         return self
+
+
+cache = Cache(cache_default_path)

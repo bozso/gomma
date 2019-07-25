@@ -273,26 +273,26 @@ class Processing(object):
         if name in self.meta["dirs"]:
             return self.meta["dirs"][name]
         else:
-            _path = pth.join(self.params.get("general", "output_dir"), name)
-            os.mkdir(_path)
-            self.meta["dirs"][name] = _path
-            return _path
+            path = pth.join(self.params.get("general", "output_dir"), name)
+            os.mkdir(path)
+            self.meta["dirs"][name] = path
+            return path
 
 
     def list(self, name):
         if name in self.meta["lists"]:
             return self.meta["lists"][name]
         else:
-            _path = pth.join(self.dir("list_dir"), "%s.file_list" % name)
-            self.meta["lists"][name] = _path
-            return _path
+            path = pth.join(self.dir("list_dir"), "%s.file_list" % name)
+            self.meta["lists"][name] = path
+            return path
     
     
     def is_list(self, name):
         return name in self.meta["lists"]
     
     
-    def self.load_file(self, name):
+    def load_file(self, name):
         return Save.load_file(self.list(name))
     
     
@@ -464,10 +464,11 @@ class Processing(object):
         
         SLC = tuple(SLC)
         
-        slc = SLC[0]
-        slc.extract()
         
-        print(slc.zipfile)
+        
+        
+        slc = SLC[0]
+        print(slc.to_unzip("vv"))
         
         return
         
@@ -812,7 +813,7 @@ class Processing(object):
         cleaning, flag1, poly1, poly2 = True, True, None, None
         
         
-        if self.is_list("geocode")
+        if self.is_list("geocode"):
             hgt = self.load["geocode"]["geo"].hgt
         else:
             hgt = None

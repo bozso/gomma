@@ -32,12 +32,10 @@ __all__ = (
     "settings",
     "display",
     "raster",
-    "make_cmd",
-    "CACHE_PATH"
+    "make_cmd"
 )
 
 
-CACHE_PATH = None
 ScanSAR = True
 
 if PY3:
