@@ -8,7 +8,7 @@ from shutil import copyfileobj
 from argparse import ArgumentParser
 from glob import iglob
 from logging import getLogger
-
+from types import GeneratorType
 
 log = getLogger("gamma.sentinel1")
 
@@ -73,6 +73,7 @@ tmp_file = tmp.tmp_file
 
 empty_iter = iter([])
 isfile = compose(pth.isfile, pth.join)
+
 
 class Cache(object):
     
@@ -469,4 +470,29 @@ class CParse(object):
         return self
 
 
-cache = Cache(cache_default_path)
+
+class Apply(object):
+    def __or__(self, f):
+        return Generator(f(elem) for elem in self)
+
+    def __str__(self):
+        return " ".join(str(elem) for elem in self)
+
+
+class Generator(Apply):
+    def __init__(self, gen):
+        self.gen = gen
+    
+    def __iter__(self):
+        return self.gen.__iter__()
+
+
+class List(Apply):
+    def __init__(self, *items):
+        self._list = tuple(items)
+    
+    def __iter__(self):
+        return self._list.__iter__()
+    
+
+# cache = Cache(cache_default_path)
