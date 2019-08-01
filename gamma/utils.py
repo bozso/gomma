@@ -1,5 +1,6 @@
 import functools as ft
 import os
+import operator as op
 from os import path as pth
 from errno import EEXIST
 from itertools import tee
@@ -7,16 +8,15 @@ from tempfile import _get_default_tempdir, _get_candidate_names
 from shutil import copyfileobj
 from argparse import ArgumentParser
 from glob import iglob
-from logging import getLogger
-from types import GeneratorType
-
-log = getLogger("gamma.sentinel1")
-
-
-cache_default_path = "/mnt/bozso_i/cache"
 
 
 __all__ = (
+    "exist",
+    "Fun",
+    "Reduce",
+    "Generator",
+    "List",
+    "All",
     "all_same",
     "make_object",
     "make_join",
@@ -37,8 +37,6 @@ __all__ = (
     "ln",
     "mv",
     "mkdir",
-    "Cache",
-    "cache",
     "compose",
     "isfile"
 )
@@ -153,6 +151,10 @@ def cat(out, *args):
     for arg in args[1:]:
         with open(out, 'ab') as f_out, open(arg, 'rb') as f_in:
             copyfileobj(f_in, f_out)
+
+
+def exist(gen):
+    return gen | pth.isfile | All
 
 
 class Files(object):
@@ -470,21 +472,36 @@ class CParse(object):
         return self
 
 
+class Fun(object):
+    def __init__(self, f):
+        self.f = f
+    
+    def __call__(self, *args, **kwargs):
+        return self.f.__call__(*args, **kwargs)
+    
+    
+class Reduce(Fun):
+    def __ror__(self, gen):
+        return ft.reduce(self.f, gen)
+    
 
 class Apply(object):
     def __or__(self, f):
         return Generator(f(elem) for elem in self)
-
+    
+    def __xor__(self, f):
+        return ft.reduce(f, iter(self))
+    
     def __str__(self):
         return " ".join(str(elem) for elem in self)
-
+    
 
 class Generator(Apply):
     def __init__(self, gen):
         self.gen = gen
     
     def __iter__(self):
-        return self.gen.__iter__()
+        return iter(self.gen)
 
 
 class List(Apply):
@@ -492,7 +509,9 @@ class List(Apply):
         self._list = tuple(items)
     
     def __iter__(self):
-        return self._list.__iter__()
-    
+        return iter(self._list)
+
+
+All = ft.partial(ft.reduce, op.and_)
 
 # cache = Cache(cache_default_path)

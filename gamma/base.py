@@ -61,8 +61,10 @@ settings = {
             "long": "%Y%m%dT%H%M%S"
         },
         "tab": "{date}.{pol}.SLC_tab"
-    }
+    },
+    "cache_default_path" : "/mnt/bozso_i/cache"
 }
+
 
 
 # os.environ["LD_LIBRARY_PATH"] = \
@@ -222,8 +224,13 @@ class DataFile(gm.Files, Parfile):
                    tabfile=line["tab"])
     
     
+    def files(self):
+        return gm.Generator((self.dat, self.par))
+    
+    
     def rm(self):
-        Files.rm(self, "dat", "par")
+        self.files | rm
+    
     
     
     def save(self, datfile, parfile=None):
@@ -241,7 +248,7 @@ class DataFile(gm.Files, Parfile):
 
 
     def __bool__(self):
-        return Files.exist(self, "dat", "par")
+        return  self.files() | gm.exist | gm.All
 
 
     def rng(self):

@@ -160,7 +160,7 @@ class Processing(object):
         self.steps = steps
         
         self.metafile = self.params.get("general", "metafile")
-        gm.cache = gm.Cache(self.params.get("general", "CACHE_PATH"))
+        # gm.cache = gm.Cache(self.params.get("general", "CACHE_PATH"))
         
         if pth.isfile(self.metafile):
             self.meta = Meta.from_file(self.metafile)
@@ -401,6 +401,20 @@ class Processing(object):
     
     
     def select(self):
+        a = gm.List(1, 2, 3)
+        print(a ^ gm.All)
+        
+        return
+        
+        a = gm.DataFile(datfile="a.dat")
+        
+        if a:
+            print("Exists: ", a)
+        else:
+            print("Does not exists: ", a)
+        
+        return
+        
         general, select = self.section("general"), self.section("select")
         
         slc_data = general.get("slc_data")
