@@ -3,7 +3,7 @@
 from functools import partial
 
 from gamma import *
-
+from utils import *
 
 class GammaCmd(CParse):
     commands = ("display", "raster", "proc")

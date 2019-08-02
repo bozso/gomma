@@ -1,6 +1,5 @@
 import logging
 import os
-pth = os.path
 
 from datetime import datetime
 from glob import iglob
@@ -10,6 +9,11 @@ from pprint import pprint
 from shutil import copy
 from sys import stdout
 from json import load as jload, dump as jdump, JSONEncoder
+
+from utils import *
+
+
+pth = os.path
 
 
 __all__ = (
@@ -130,8 +134,12 @@ class Save(object):
 class Meta(dict, Save):
     pass
     
-    
+
+
+
 class Processing(object):
+    cache_dirs = frozenset({"ifg", "slc", "rslc", "unzip"})
+    
     ftypes = {
         name: getattr(gm, name).from_json
         for name in {"S1SLC", "SLC", "MLI", "S1Zip", "DEM", "Geocode"}
@@ -160,7 +168,16 @@ class Processing(object):
         self.steps = steps
         
         self.metafile = self.params.get("general", "metafile")
-        # gm.cache = gm.Cache(self.params.get("general", "CACHE_PATH"))
+        cache_path = self.params.get("general", "CACHE_PATH")
+        
+        if cache_path is None:
+            cache_path = gm.settings["cache_default_path"]
+        
+        
+        map(lambda x: mkdir(pth.join(cache_path, x)), self.cache_dirs)
+        
+        self.cache_path = cache_path
+        
         
         if pth.isfile(self.metafile):
             self.meta = Meta.from_file(self.metafile)
@@ -401,20 +418,6 @@ class Processing(object):
     
     
     def select(self):
-        a = gm.List(1, 2, 3)
-        print(a ^ gm.All)
-        
-        return
-        
-        a = gm.DataFile(datfile="a.dat")
-        
-        if a:
-            print("Exists: ", a)
-        else:
-            print("Does not exists: ", a)
-        
-        return
-        
         general, select = self.section("general"), self.section("select")
         
         slc_data = general.get("slc_data")
@@ -443,6 +446,7 @@ class Processing(object):
             for IW in IWs
         )
         
+        
         if IWs[2] is not None and IWs[1] is None:
             raise ValueError("Selected IWs must be contigous. You must have "
                              "selected bursts in IW2 to have bursts in IW3")
@@ -453,28 +457,33 @@ class Processing(object):
         SLC = (gm.S1Zip(zipfile)
                for zipfile in iglob(pth.join(slc_data, "S1*_IW_SLC*.zip")))
         
+        
+        
         if date_start is not None and date_stop is not None:
             date_start = datetime.strptime(date_start, "%Y%m%d")
             date_stop = datetime.strptime(date_stop, "%Y%m%d")
             
-            SLC = (slc for slc in SLC
-                   if slc.date.start > date_start
-                   and slc.date.stop < date_stop)
+            filt = lambda x: x.date.start > date_start and \
+                          x.date.stop < date_stop
+        
         
         elif date_start is not None:
             date_start = datetime.strptime(date_start, "%Y%m%d")
-
-            SLC = (slc for slc in SLC if slc.date.start > date_start)
-
+            
+            filt = lambda x: x.date.start > date_start
 
         elif date_stop is not None:
             date_stop = datetime.strptime(date_stop, "%Y%m%d")
-            SLC = (slc for slc in SLC if slc.date.stop < date_stop)
-
+            
+            filt = lambda x: x.date.stop < date_stop
+        else:
+            filt = lambda x: x
+        
+        SLC = filter(filt, SLC)
         
         if check_zips:
             log("Checking integrity of zipfiles.")
-            SLC = (slc for slc in SLC if slc.test_zip())
+            SLC = filter(lambda x: x.test_zip(), SLC)
         
         SLC = tuple(SLC)
         

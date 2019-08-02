@@ -81,10 +81,12 @@ class S1Zip(object):
     
     
     def __str__(self):
-        line = "%s;" % self.zipfile
+        line = "%s;" % self.zip_path
         
         if self.burst_nums is not None:
             line += ",".join(str(elem) for elem in self.burst_nums)
+        
+        return line
     
     
     def datestr(self, fmt="%Y%m%d"):

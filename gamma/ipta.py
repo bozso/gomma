@@ -80,7 +80,7 @@ class Masks(object):
             return _path
             
 
-class PointData(gm.Files):
+class PointData(object):
     modes = {
         "const": 0,
         "const_bperp": 1,

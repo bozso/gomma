@@ -17,7 +17,6 @@
 Module
 """
 
-from .utils import *
 from .base import *
 from .sentinel1 import *
 from .plot import *

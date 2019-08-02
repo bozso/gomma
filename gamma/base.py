@@ -16,10 +16,13 @@ from json import JSONEncoder
 
 import gamma as gm
 
-PY3 = version_info[0] == 3
+
+from utils import *
+
 
 __all__ = (
     "save",
+    "Date",
     "Parfile",
     "DataFile",
     "SLC",
@@ -38,10 +41,6 @@ __all__ = (
 
 ScanSAR = True
 
-if PY3:
-    str_t = str,
-else:
-    str_t = basestring,
 
 
 versions = {
@@ -66,9 +65,6 @@ settings = {
 }
 
 
-
-# os.environ["LD_LIBRARY_PATH"] = \
-# os.getenv("LD_LIBRARY_PATH") + settings["libpaths"]
 
 os.environ["LD_LIBRARY_PATH"] += settings["libpaths"]
 
@@ -117,6 +113,7 @@ def make_cmd(command):
 if 0:
     gamma_commands = {"rashgt", "ScanSAR_burst_corners"}
 
+
 gp = type("Gamma", (object,), 
           {pth.basename(cmd): staticmethod(make_cmd(cmd))
            for cmd in gamma_commands})
@@ -127,6 +124,35 @@ imview = make_cmd("eog")
 
 def save(obj):
     return obj.__save__
+
+
+class Date(object):
+    __slots__ = ("start", "stop", "center")
+    
+    def __init__(self, start_date, stop_date, center=None):
+        self.start = start_date
+        self.stop = stop_date
+        
+        if center is None:
+            center = (start_date - stop_date) / 2.0
+            center = stop_date + center
+    
+        self.center = center
+    
+    
+    def date2str(self, fmt="%Y%m%d"):
+        return self.center.strftime(fmt)
+    
+    def __eq__(self, other):
+        return (self.start == other.start and self.stop == other.stop and
+                self.mean == other.mean)
+    
+    def __str__(self):
+        return self.date2str()
+
+    def __repr__(self):
+        return "<Date start: %s stop: %s mean: %s>"\
+                % (self.start, self.stop, self.mean)
 
 
 class Parfile(object):
@@ -187,7 +213,7 @@ class Parfile(object):
                 f.write("%s\n" % "\n".join(lines))
             
 
-class DataFile(gm.Files, Parfile):
+class DataFile(Parfile):
     __save__ = {"dat", "par", "tab"}
     __slots__ = {"dat", "datpar", "tab"}
     
@@ -225,11 +251,11 @@ class DataFile(gm.Files, Parfile):
     
     
     def files(self):
-        return gm.Generator((self.dat, self.par))
+        return (self.dat, self.par)
     
     
     def rm(self):
-        self.files | rm
+        rm(*self.files)
     
     
     
@@ -248,7 +274,7 @@ class DataFile(gm.Files, Parfile):
 
 
     def __bool__(self):
-        return  self.files() | gm.exist | gm.All
+        return  all(isfile(path) for path in self.files())
 
 
     def rng(self):

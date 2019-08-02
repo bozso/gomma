@@ -47,6 +47,7 @@ def compose(*functions):
     return ft.reduce(lambda f, g: lambda x: f(g(x)), functions, lambda x: x)
 
 
+
 class TMP(object):
     tmpdir = _get_default_tempdir()
     
@@ -99,9 +100,6 @@ class Cache(object):
             return iglob(self.join(name, "*"))
     
 
-# def unzip(zipfile, outpath):
-    
-    
     
 def all_same(iterable, fun=None):
     if fun is not None:
@@ -151,10 +149,6 @@ def cat(out, *args):
     for arg in args[1:]:
         with open(out, 'ab') as f_out, open(arg, 'rb') as f_in:
             copyfileobj(f_in, f_out)
-
-
-def exist(gen):
-    return gen | pth.isfile | All
 
 
 class Files(object):
@@ -265,37 +259,7 @@ class Base(Files):
             Files.rm(self, elem)
 
 
-class Date(object):
-    __slots__ = ("start", "stop", "center")
-    
-    def __init__(self, start_date, stop_date, center=None):
-        self.start = start_date
-        self.stop = stop_date
-        
-        if center is None:
-            center = (start_date - stop_date) / 2.0
-            center = stop_date + center
-    
-        self.center = center
-    
-    
-    def date2str(self, fmt="%Y%m%d"):
-        return self.center.strftime(fmt)
-    
-    def __eq__(self, other):
-        return (self.start == other.start and self.stop == other.stop and
-                self.mean == other.mean)
-    
-    def __str__(self):
-        return self.date2str()
-
-    def __repr__(self):
-        return "<Date start: %s stop: %s mean: %s>"\
-                % (self.start, self.stop, self.mean)
-
-def mkdir(*args):
-    path = pth.join(*args)
-    
+def mkdir(path):
     try:
         os.makedirs(path)
         log.debug('Directory "%s" created.' % (path))
@@ -306,6 +270,8 @@ def mkdir(*args):
         else:
             log.debug('Directory "%s" already exists.' % (path))
             return path
+
+mkdir = compose(mkdir, pth.join)
 
 
 def ln(target, link_name):
@@ -490,7 +456,7 @@ class Apply(object):
         return Generator(f(elem) for elem in self)
     
     def __xor__(self, f):
-        return ft.reduce(f, iter(self))
+        return ft.reduce(f, self)
     
     def __str__(self):
         return " ".join(str(elem) for elem in self)
@@ -512,6 +478,4 @@ class List(Apply):
         return iter(self._list)
 
 
-All = ft.partial(ft.reduce, op.and_)
-
-# cache = Cache(cache_default_path)
+All = op.and_
