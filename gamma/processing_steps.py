@@ -487,9 +487,6 @@ class Processing(object):
         
         SLC = tuple(SLC)
         
-        
-        
-        
         slc = SLC[0]
         print(slc.to_unzip("vv"))
         

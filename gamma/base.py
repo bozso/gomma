@@ -238,11 +238,11 @@ class DataFile(Parfile):
         if parfile is None:
             parfile = datfile + ".par"
         
-        self.datpar = "%s %s" % (datfile, parfile)
+        self.files = (datfile, parfile)
+        self.datpar = " ".join(self.files)
         
         self.dat, self.par, self.tab, = \
         datfile, parfile, kwargs.get("tabfile", None)
-
     
     @classmethod
     def from_json(cls, line):
@@ -250,13 +250,8 @@ class DataFile(Parfile):
                    tabfile=line["tab"])
     
     
-    def files(self):
-        return (self.dat, self.par)
-    
-    
     def rm(self):
         rm(*self.files)
-    
     
     
     def save(self, datfile, parfile=None):
@@ -274,7 +269,7 @@ class DataFile(Parfile):
 
 
     def __bool__(self):
-        return  all(isfile(path) for path in self.files())
+        return  all(map(isfile, self.files))
 
 
     def rng(self):
@@ -328,15 +323,6 @@ class DataFile(Parfile):
             return self.date().strftime(fmt)
     
         
-    @classmethod
-    def from_line(cls, line):
-        if line.startswith("#") or not line.strip():
-            pass
-        
-        split = line.split()
-        return cls(datfile=split[0].strip(), parfile=split[1].strip())
-    
-    
     def avg_fact(self, fact=750):
         avg_rng = int(float(self.rng()) / fact)
     
