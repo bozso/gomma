@@ -13,6 +13,7 @@ from pprint import pformat
 from subprocess import check_output, CalledProcessError, STDOUT
 from shlex import split
 from json import JSONEncoder
+from collections import namedtuple as nt
 
 import gamma as gm
 
@@ -126,9 +127,26 @@ def save(obj):
     return obj.__save__
 
 
-class Date(object):
-    __slots__ = ("start", "stop", "center")
+def copy_attrs(src, target, *attribs):
+    for attrib in attribs:
+        setattr(target, attrib, getattr(src, attrib))
+    return target
+
+class caseclass(object):
+    def __init__(self, *names):
+        self.names = names
     
+    def __call__(self, cls):
+        # Add namedtuple in the beginning of the inheritance chain
+        nt_bases = (namedtuple(cls.__name__, self.names),) + cls.__bases__
+        # Messing with __bases__ directly is dangerous, so it's
+        # better just to make a new type
+        the_caseclass = type(cls.__name__, nt_bases, dict(cls.__dict__))
+        return copy_attrs(cls, the_caseclass, '__doc__')
+
+
+@caseclass("start", "stop", "center")
+class Date:
     def __init__(self, start_date, stop_date, center=None):
         self.start = start_date
         self.stop = stop_date
@@ -143,16 +161,16 @@ class Date(object):
     def date2str(self, fmt="%Y%m%d"):
         return self.center.strftime(fmt)
     
-    def __eq__(self, other):
-        return (self.start == other.start and self.stop == other.stop and
-                self.mean == other.mean)
-    
-    def __str__(self):
-        return self.date2str()
+    # def __eq__(self, other):
+    #     return (self.start == other.start and self.stop == other.stop and
+    #             self.mean == other.mean)
+    # 
+    # def __str__(self):
+    #     return self.date2str()
 
-    def __repr__(self):
-        return "<Date start: %s stop: %s mean: %s>"\
-                % (self.start, self.stop, self.mean)
+    # def __repr__(self):
+    #     return "<Date start: %s stop: %s mean: %s>"\
+    #             % (self.start, self.stop, self.mean)
 
 
 class Parfile(object):
@@ -211,11 +229,12 @@ class Parfile(object):
                 f.truncate()
             
                 f.write("%s\n" % "\n".join(lines))
-            
 
-class DataFile(Parfile):
+
+@caseclass("dat", "par", "tab", "datpar", "files")
+class DataFile:
     __save__ = {"dat", "par", "tab"}
-    __slots__ = {"dat", "datpar", "tab"}
+    # __slots__ = {"dat", "datpar", "tab"}
     
     data_types = {
         "FCOMPLEX": 0,
@@ -244,6 +263,7 @@ class DataFile(Parfile):
         self.dat, self.par, self.tab, = \
         datfile, parfile, kwargs.get("tabfile", None)
     
+    
     @classmethod
     def from_json(cls, line):
         return cls(datfile=line["dat"], parfile=line["par"],
@@ -258,8 +278,8 @@ class DataFile(Parfile):
         if parfile is None:
             parfile = datfile + ".par"
         
-        self.mv("dat", datfile)
-        self.mv("par", parfile)
+        mv(self.dat, datfile)
+        mv(self.par, parfile)
         
         self.dat, self.par = datfile, parfile
 
@@ -267,10 +287,8 @@ class DataFile(Parfile):
     def __str__(self):
         return self.datpar
 
-
     def __bool__(self):
         return  all(map(isfile, self.files))
-
 
     def rng(self):
         return self.int("range_samples")
@@ -309,14 +327,15 @@ class DataFile(Parfile):
             cent  = timedelta(seconds=self.float("center_time"))
             stop  = timedelta(seconds=self.float("end_time"))
             
-            return gm.Date(date + start, date + stop, date + cent)
+            return gm.Date(start=date + start, stop=date + stop,
+                           center=date + cent)
         else:
             return date
     
     
     def datestr(self, fmt="%Y%m%d"):
         # TODO: use regexp for matching?
-        if any(elem in fmt for elem in ("%H", "%M", "%S")):
+        if any(map(lambda x: x in fmt, {"%H", "%M", "%S"})):
             date = self.date(start_stop=True)
             return date.center.strftime(fmt)
         else:

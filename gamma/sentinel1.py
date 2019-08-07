@@ -206,11 +206,9 @@ class S1Zip(object):
         return self.burst_nums
 
 
+@caseclass("TOPS_par")
 class S1IW(gm.DataFile):
-    __slots__ = {"TOPS_par", "num"}
-    
     tpl = gm.settings["templates"]["IW"]
-    
     
     def __init__(self, num, TOPS_parfile=None, **kwargs):
         
