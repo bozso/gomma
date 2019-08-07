@@ -5,9 +5,12 @@ from datetime import datetime, timedelta
 from zipfile import ZipFile
 from logging import getLogger
 from re import match
-from functools import partial
+from functools import partial, reduce
+import operator as op
 
 import gamma as gm
+
+from utils import *
 
 log = getLogger("gamma.sentinel1")
 
@@ -22,6 +25,8 @@ __all__ = (
     "deramp_slave",
     "S1_coreg"
 )
+
+make_match = partial(partial, match)
 
 
 class S1Zip(object):
@@ -111,26 +116,33 @@ class S1Zip(object):
         return ret
     
     
-    def to_unzip(self, pol, iw="*"):
+    def unzip_all(self, pol, iw=".*"):
+        fmt = partial(str.format, iw=iw, pol=pol)
+        
+        matchers = List(
+            self.r_annot_tpl,
+            self.r_tiff_tpl,
+            self.r_calib_tpl,
+            self.r_noise_tpl
+        ) | fmt
+        
+        return self.unzip_search(matchers)
+        
+        
+    def unzip_search(self, *tpl):
+        assert len(tpl) > 0
+        
         namelist = self.zipfile.namelist()
+        regex_filter = lambda x: filter(x, namelist)
         
-        regexs = (
-            self.r_annot_tpl.format(iw=iw, pol=pol),
-            self.r_tiff_tpl.format(iw=iw, pol=pol),
-            self.r_calib_tpl.format(iw=iw, pol=pol),
-            self.r_noise_tpl.format(iw=iw, pol=pol)
-        )
+        print(tpl)
         
-        print(namelist)
+        if isinstance(tpl[0], (List, Generator)):
+            tpl = tpl[0]
+        else:
+            tpl = List(*tpl)
         
-        for regex in regexs:
-            print(regex)
-            for elem in namelist:
-                if match(regex, elem):
-                    print(elem)
-        
-        # return tuple(elem for regex in regexs for elem in namelist
-        #              if match(regex, elem))
+        return sum(tpl | make_match | regex_filter | list, [])
         
     
     def extract_IW(self, pol, IW, annot=None):
