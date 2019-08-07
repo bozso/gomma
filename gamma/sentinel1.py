@@ -119,31 +119,25 @@ class S1Zip(object):
     def unzip_all(self, pol, iw=".*"):
         fmt = partial(str.format, iw=iw, pol=pol)
         
-        matchers = List(
+        matchers = Seq(
             self.r_annot_tpl,
             self.r_tiff_tpl,
             self.r_calib_tpl,
             self.r_noise_tpl
-        ) | fmt
+        ).map(fmt)
         
         return self.unzip_search(matchers)
         
         
     def unzip_search(self, *tpl):
-        assert len(tpl) > 0
-        
         namelist = self.zipfile.namelist()
-        regex_filter = lambda x: filter(x, namelist)
         
-        print(tpl)
-        
-        if isinstance(tpl[0], (List, Generator)):
-            tpl = tpl[0]
-        else:
-            tpl = List(*tpl)
-        
-        return sum(tpl | make_match | regex_filter | list, [])
-        
+        return (Seq(*tpl)
+                .map(make_match)
+                .map(lambda x: filter(x, namelist))
+                .map(list)
+                .sum([]))
+    
     
     def extract_IW(self, pol, IW, annot=None):
         iw_num = IW.num
