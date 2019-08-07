@@ -19,8 +19,8 @@ log = getLogger("gamma.geo")
 gp = gm.gp
 
 
-class DEM(gm.DataFile):
-    __slots__ = {"lookup"}
+@gm.extend(gm.DataFile, "lookup")
+class DEM:
     __save__ = {"dat", "par", "lookup"}
     
     _geo2rdc = {
@@ -95,7 +95,10 @@ class DEM(gm.DataFile):
         DataFile.raster(self, **kwargs)
 
 
-class Geocode(gm.DataFile):
+@gm.extend(gm.DataFile, "hgt", "sim_sar", "zenith", "orient", "inc", "pix", 
+           "psi", "ls_map", "diff_par", "offs", "offsets", "ccp", "coffs",
+           "coffsets")
+class Geocode:
     _items = {"hgt", "sim_sar", "zenith", "orient", "inc", "pix", "psi",
               "ls_map", "diff_par", "offs", "offsets", "ccp", "coffs",
               "coffsets"}
@@ -104,14 +107,13 @@ class Geocode(gm.DataFile):
     
     rashgt = getattr(gp, "rashgt")
     
-    
     def __init__(self, mli=None, **kwargs):
         if mli is not None:
             self.dat = mli.dat
             self.par = mli.par
         
-        self.__dict__.update(kwargs)
-    
+        for attrib in set(self.__slots__) - {"dat", "par"}:
+            setattr(self, attrib, kwargs.get(attrib))
     
     
     @classmethod
@@ -131,7 +133,6 @@ class Geocode(gm.DataFile):
                        args["aazi"], m_per_cycle, args["scale"], args["exp"],
                        args["LR"], args["raster"], args["debug"])
     
-
 
 def geocode(params, m_slc, m_mli, rng_looks=1, azi_looks=1, out_dir="."):
     

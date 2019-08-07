@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from zipfile import ZipFile
 from logging import getLogger
 from re import match
+from functools import partial
 
 import gamma as gm
 
@@ -206,8 +207,8 @@ class S1Zip(object):
         return self.burst_nums
 
 
-@caseclass("TOPS_par")
-class S1IW(gm.DataFile):
+@gm.extend(gm.DataFile, "TOPS_par")
+class S1IW:
     tpl = gm.settings["templates"]["IW"]
     
     def __init__(self, num, TOPS_parfile=None, **kwargs):
@@ -224,13 +225,13 @@ class S1IW(gm.DataFile):
     def save(self, datfile, parfile=None, TOPS_parfile=None):
         DataFile.save(self, datfile, parfile)
         
-        self.mv("TOPS_par", TOPS_parfile)
+        mv(self.TOPS_par, TOPS_parfile)
         
         self.TOPS_par = gm.Parfile(TOPS_parfile)
     
     
     def rm(self):
-        Files.rm(self, "dat", "par", "TOPS_par")
+        rm(self, "dat", "par", "TOPS_par")
     
 
     def __bool__(self):
@@ -279,10 +280,13 @@ class S1IW(gm.DataFile):
         return Offset(fl, int(0.5 + fl))
 
 
+not_none = partial(filter, lambda x: x is not None)
 
-class S1SLC(object):
-    __slots__ = {"IWs", "tab", "slc"}
+
+@gm.Struct("IWs", "tab", "slc")
+class S1SLC:
     __save__ = {"tab",}
+    
     
     tab_tpl = gm.settings["templates"]["tab"]
     
@@ -295,11 +299,11 @@ class S1SLC(object):
     
     
     def __bool__(self):
-        return all(bool(IW) for IW in self.IWs if IW is not None)
+        return all(map(bool, not_none(self.IWs)))
 
     
     def __str__(self):
-        return "\n".join(str(IW) for IW in self.IWs if IW is not None)
+        return "\n".join(map(str, not_none(self.IWs)))
     
     
     @classmethod
@@ -312,10 +316,11 @@ class S1SLC(object):
         
         tabfile = other.tab + extra
         
+        
+        
         IWs = tuple(
                 S1IW(ii, datfile=iw.dat + extra)
-                if iw is not None else None
-                for ii, iw in enumerate(other.IWs)
+                for ii, iw in enumerate(not_none(other.IWs))
         )
         
         return cls(IWs, tabfile)
@@ -325,7 +330,7 @@ class S1SLC(object):
     def from_tabfile(cls, tabfile):
         
         with open(tabfile, "r") as f:
-            IWs = tuple(S1IW.from_tabline(line) for line in f)
+            IWs = tuple(map(S1IW.from_tabline, f))
         
         return cls(IWs, tabfile)    
     
@@ -348,8 +353,7 @@ class S1SLC(object):
         
         IWs = tuple(
                 S1IW.from_template(pol, date, ii + 1, tpl=tpl, **kwargs)
-                if iw is not None else None
-                for ii, iw in enumerate(burst_num)
+                for ii, iw in enumerate(not_none(burst_num))
         )
         
         return cls(IWs, tpl_tab.format(date=date, pol=pol))

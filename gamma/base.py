@@ -13,7 +13,9 @@ from pprint import pformat
 from subprocess import check_output, CalledProcessError, STDOUT
 from shlex import split
 from json import JSONEncoder
-from collections import namedtuple as nt
+from keyword import iskeyword
+from collections import OrderedDict
+
 
 import gamma as gm
 
@@ -23,6 +25,8 @@ from utils import *
 
 __all__ = (
     "save",
+    "Struct",
+    "extend",
     "Date",
     "Parfile",
     "DataFile",
@@ -126,26 +130,60 @@ imview = make_cmd("eog")
 def save(obj):
     return obj.__save__
 
-
-def copy_attrs(src, target, *attribs):
-    for attrib in attribs:
-        setattr(target, attrib, getattr(src, attrib))
-    return target
-
-class caseclass(object):
-    def __init__(self, *names):
-        self.names = names
+def extend(base, *field_names):
+    def inner(cls):
+        attribs = {"__slots__": base.__slots__ + field_names}
+        attribs.update({key: val for key, val in cls.__dict__.items()
+                        if key not in {"__dict__", "__weakref__"}})
+        
+        return type(cls.__name__, (base,), attribs)
     
-    def __call__(self, cls):
-        # Add namedtuple in the beginning of the inheritance chain
-        nt_bases = (namedtuple(cls.__name__, self.names),) + cls.__bases__
-        # Messing with __bases__ directly is dangerous, so it's
-        # better just to make a new type
-        the_caseclass = type(cls.__name__, nt_bases, dict(cls.__dict__))
-        return copy_attrs(cls, the_caseclass, '__doc__')
+    return inner
+
+class PlainBase(object):
+    def init(self, *args, **kwargs):
+        for field in self.__slots__:
+            setattr(self, field, kwargs.get(field))
+    
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        return all(i == j for i, j in zip(self, other))
+
+    def __iter__(self):
+        for name in self.__slots__:
+            yield getattr(self, name)
+
+    def __repr__(self):
+        txt = ", ".join("%s: %s" % (val, getattr(self, val))
+                        for val in self.__slots__)
+        return "%s(%s)"% (type(self).__name__, txt)
+
+    def to_dict(self):
+        return OrderedDict(zip(self.__slots__, self))
 
 
-@caseclass("start", "stop", "center")
+def Struct(*field_names):
+    def inner(cls):
+        attribs = {"__slots__": field_names}
+        attribs.update({key: val for key, val in cls.__dict__.items()
+                        if key not in {"__dict__", "__weakref__"}})
+        
+        return type(cls.__name__, (PlainBase,), attribs)
+    
+    return inner
+
+
+def check_name(name):
+    if not all(c.isalnum() or c == '_' for c in name):
+        raise ValueError('Type names and field names can only contain alphanumeric characters and underscores: %r' % name)
+    if iskeyword(name):
+        raise ValueError('Type names and field names cannot be a keyword: %r' % name)
+    if name[0].isdigit():
+        raise ValueError('Type names and field names cannot start with a number: %r' % name)
+
+
+@Struct("start", "stop", "center")
 class Date:
     def __init__(self, start_date, stop_date, center=None):
         self.start = start_date
@@ -161,20 +199,12 @@ class Date:
     def date2str(self, fmt="%Y%m%d"):
         return self.center.strftime(fmt)
     
-    # def __eq__(self, other):
-    #     return (self.start == other.start and self.stop == other.stop and
-    #             self.mean == other.mean)
-    # 
     # def __str__(self):
     #     return self.date2str()
 
-    # def __repr__(self):
-    #     return "<Date start: %s stop: %s mean: %s>"\
-    #             % (self.start, self.stop, self.mean)
-
 
 class Parfile(object):
-    __slots__ = ("par",)
+    __slots__ = ("par", "cache")
     __save__ = __slots__
     
     
@@ -231,10 +261,9 @@ class Parfile(object):
                 f.write("%s\n" % "\n".join(lines))
 
 
-@caseclass("dat", "par", "tab", "datpar", "files")
+@Struct("dat", "par", "datpar", "tab", "files")
 class DataFile:
     __save__ = {"dat", "par", "tab"}
-    # __slots__ = {"dat", "datpar", "tab"}
     
     data_types = {
         "FCOMPLEX": 0,
@@ -252,7 +281,7 @@ class DataFile:
         parfile   = kwargs.get("parfile")
         
         if datfile is None:
-            datfile = gm.tmp_file(**kwargs)
+            datfile = tmp_file(**kwargs)
         
         if parfile is None:
             parfile = datfile + ".par"
@@ -466,6 +495,7 @@ class DataFile:
                  debug=args["debug"])
         
         self.ras = args["raster"]
+
 
 
 class SLC(DataFile):
