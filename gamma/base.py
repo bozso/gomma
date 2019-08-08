@@ -15,7 +15,7 @@ from shlex import split
 from json import JSONEncoder
 from keyword import iskeyword
 from collections import OrderedDict
-
+from functools import partial
 
 import gamma as gm
 
@@ -27,6 +27,8 @@ __all__ = (
     "save",
     "Struct",
     "extend",
+    "Extract",
+    "extract",
     "Date",
     "Parfile",
     "DataFile",
@@ -181,6 +183,14 @@ def check_name(name):
         raise ValueError('Type names and field names cannot be a keyword: %r' % name)
     if name[0].isdigit():
         raise ValueError('Type names and field names cannot start with a number: %r' % name)
+
+Extract = namedtuple("Extract", "zipfile, files")
+
+
+def extract(ext, outpath):
+    extractor = partial(ext.zipfile.extract, path=outpath)
+    
+    return ext.files.map(extractor)
 
 
 @Struct("start", "stop", "center")

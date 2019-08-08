@@ -9,6 +9,7 @@ from pprint import pprint
 from shutil import copy
 from sys import stdout
 from json import load as jload, dump as jdump, JSONEncoder
+from functools import partial
 
 from utils import *
 
@@ -27,7 +28,7 @@ ProcStep = namedtuple("ProcStep", "fun opt")
 
 def typedval(obj):
     return {
-        "ftype": type(obj).__name__,
+        "type": type(obj).__name__,
         "value": obj
     }
 
@@ -173,11 +174,13 @@ class Processing(object):
         if cache_path is None:
             cache_path = gm.settings["cache_default_path"]
         
-        
-        map(lambda x: mkdir(pth.join(cache_path, x)), self.cache_dirs)
+        for path in self.cache_dirs:
+            mkdir(cache_path, path)
         
         self.cache_path = cache_path
-        
+        self.caches = type("CacheDirectories", (object,), 
+                            {val: pth.join(cache_path, val)
+                             for val in self.cache_dirs})
         
         if pth.isfile(self.metafile):
             self.meta = Meta.from_file(self.metafile)
@@ -286,56 +289,38 @@ class Processing(object):
                 self.meta.save(self.metafile)
 
     
-    def dir(self, name):
-        if name in self.meta["dirs"]:
-            return self.meta["dirs"][name]
-        else:
-            path = pth.join(self.params.get("general", "output_dir"), name)
-            os.mkdir(path)
-            self.meta["dirs"][name] = path
-            return path
-
-
-    def list(self, name):
-        if name in self.meta["lists"]:
-            return self.meta["lists"][name]
-        else:
-            path = pth.join(self.dir("list_dir"), "%s.file_list" % name)
-            self.meta["lists"][name] = path
-            return path
-    
-    
-    def is_list(self, name):
-        return name in self.meta["lists"]
-    
-    
-    def load_file(self, name):
-        return Save.load_file(self.list(name))
-    
+    def filename(self, name):
+        return pth.join(self.params.get("general", "output_dir"),
+                        "%s.json" % name)
     
     def save(self, name, *args, **kwargs):
+        path = self.filename(name)
+        
         assert "list" not in kwargs
         
-        to_save = {"list": (typedval(elem) for elem in args)}
+        to_save = {"list": [typedval(elem) for elem in args]}
         
         if len(kwargs) > 0:
             to_save.update({key: typedval(value)
                             for key, value in kwargs.items()})
         
-        save(self.list(name), to_save)
+        save(to_save, path)
     
     
     def load(self, name):
-        load = self.load_file(name)
+        load = Save.load_file(self.filename(name))
+        
         _list = load.pop("list")
         ret = {}
         
+        print(_list)
+        
         if _list is not None:
-            ret["list"] = [ftypes[elem["ftype"]](elem)
-                           for elem in load["list"]]
+            ret["list"] = [self.ftypes[elem["type"]](elem["value"])
+                           for elem in _list]
         
         if len(load) > 0:
-            ret.update({key: ftypes[value["ftype"]](value)
+            ret.update({key: self.ftypes[value["type"]](value)
                         for key, value in load.items()})
         
         return ret
@@ -435,29 +420,7 @@ class Processing(object):
         select.bool("check_zips", False)
         
         
-        IWs = tuple(select.get("iw%d" % (idx + 1)) for idx in range(3))
-        
-        IWs = tuple(
-            tuple(
-                int(elem)
-                for elem in IW.split(",")
-            ) 
-            if IW is not None else None
-            for IW in IWs
-        )
-        
-        
-        if IWs[2] is not None and IWs[1] is None:
-            raise ValueError("Selected IWs must be contigous. You must have "
-                             "selected bursts in IW2 to have bursts in IW3")
-        
-        log.info("Creating SLC directories, checking dates and creating "
-                 "zipfile list.")
-        
-        SLC = (gm.S1Zip(zipfile)
-               for zipfile in iglob(pth.join(slc_data, "S1*_IW_SLC*.zip")))
-        
-        
+        SLC = Seq(map(gm.S1Zip, ls(slc_data, "S1*_IW_SLC*.zip")))
         
         if date_start is not None and date_stop is not None:
             date_start = datetime.strptime(date_start, "%Y%m%d")
@@ -479,25 +442,36 @@ class Processing(object):
         else:
             filt = lambda x: x
         
-        SLC = filter(filt, SLC)
         
         if check_zips:
             log("Checking integrity of zipfiles.")
-            SLC = filter(lambda x: x.test_zip(), SLC)
+            filt = lambda x: x.test_zip() and filt
         
-        SLC = tuple(SLC)
+        SLC = SLC.filter(filt)
         
-        slc = SLC[0]
-        print(slc.unzip_all("vv"))
+        self.save("zipfiles", *SLC.collect())
+        
+        print(self.load_list("zipfiles"))
         
         return
         
-        assert len(SLC) > 0, "No SLC zipfiles were selected!"
+        unzip = self.caches.unzip
+        
+        extract = partial(gm.extract, outpath=unzip)
+        is_unzipped = partial(isfile, unzip)
+        
+        to_unzip = (SLC.omap(gm.S1Zip.unzip_all, "vv")
+                       .map(lambda x:
+                            gm.Extract(x.zipfile,
+                                       x.files.filter_false(is_unzipped))))
+        
+        
+        to_unzip.map(extract).chain().collect()
         
         if master_date is None:
             log.info("No master_date defined, using first date.")
             
-            master_slc = sorted(SLC, key=lambda x: x.date.center)[0]
+            master_slc = SLC.sorted(key=lambda x: x.date.center)[0]
             master_date = master_slc.date.date2str()
             
             self.meta["master_date"] = master_date
@@ -512,43 +486,6 @@ class Processing(object):
 
         log.info("Selected master date is %s" % master_date)
         
-        # if we have selected bursts
-        if any(IWs):
-            master_burst_nums = master_slc.get_burst_nums(pol)
-            
-            master_burst_nums = \
-            tuple(None if IW is None
-                  else tuple((master_burst[IW[0] - 1], master_burst[IW[-1] - 1]))
-                  for IW, master_burst in zip(IWs, master_burst_nums))
-            
-            burst_nums = tuple(slc.select_bursts(pol, master_burst_nums)
-                               for slc in SLC)
-        # end select AOE
-        
-        
-        S1A_bursts = set(
-                " ".join(
-                "IW%d: %s" % (ii + 1, item)
-                for ii, item in enumerate(burst_num)
-                )
-            for slc, burst_num in zip(SLC, burst_nums) if slc.mission == "S1A"
-        )
-
-        
-        S1B_bursts = set(
-                " ".join(
-                "IW%d: %s" % (ii + 1, item)
-                for ii, item in enumerate(burst_num)
-                )
-            for slc, burst_num in zip(SLC, burst_nums) if slc.mission == "S1B"
-        )
-
-        # log.debug("Master bursts:\n{}\n\n".format(S1A_bursts))
-        log.info("\nSentinel-1A slave bursts:\n%s" % S1A_bursts)
-        log.info("\nSentinel-1B slave bursts:\n%s" % S1B_bursts)
-        
-        self.save("s1zip", *SLC)
-
 
     def load_slc(self):
         if gm.ScanSAR:

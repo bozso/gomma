@@ -50,7 +50,7 @@ class S1Zip(object):
                  "abs_orb", "DTID", "UID", "zip_path", "zip_base")
     
     
-    __save__ = ("zipfile", "burst_nums", "date", "mission")
+    __save__ = ("zip_path", "burst_nums", "mission")
     
     
     def __init__(self, zippath, extra_info=False):
@@ -80,7 +80,7 @@ class S1Zip(object):
     
     @classmethod
     def from_json(cls, line):
-        ret = cls(line["zipfile"])
+        ret = cls(line["zip_path"])
         ret.burst_nums = line["burst_nums"]
         
         return ret
@@ -132,11 +132,13 @@ class S1Zip(object):
     def unzip_search(self, *tpl):
         namelist = self.zipfile.namelist()
         
-        return (Seq(*tpl)
-                .map(make_match)
-                .map(lambda x: filter(x, namelist))
-                .map(list)
-                .sum([]))
+        gm.Extract(zipfile=self.zipfile, files=[])
+        
+        return gm.Extract(zipfile=self.zipfile,
+                          files=Seq(*tpl).map(make_match)
+                                         .map(lambda x: filter(x, namelist))
+                                         .map(list)
+                                         .sum([]))
     
     
     def extract_IW(self, pol, IW, annot=None):
