@@ -17,6 +17,7 @@ from keyword import iskeyword
 from collections import OrderedDict
 from functools import partial
 from re import match
+from zipfile import ZipFile
 
 import gamma as gm
 
@@ -29,6 +30,8 @@ __all__ = (
     "Struct",
     "extend",
     "Extract",
+    "make_extract",
+    "select_not_extracted",
     "extract",
     "Date",
     "Parfile",
@@ -186,25 +189,31 @@ def check_name(name):
         raise ValueError('Type names and field names cannot start with a number: %r' % name)
 
 
-Extract = new_type("Extract", "zipfile, files")
-
-
-def extract(ext, outpath):
-    extractor = partial(ext.zipfile.extract, path=outpath)
-    
-    return ext.files.map(extractor)
-
+Extract = new_type("Extract", "comp_file, files")
 
 make_match = partial(partial, match)
 
-
-def search_extract(zipfile, *tpl):
-    namelist = zipfile.namelist()
+def make_extract(comp_info, *args, **kwargs):
+    comp_file = ZipFile(comp_info.path, "r")
+    namelist = comp_file.namelist()
     
-    return gm.Extract(zipfile=zipfile,
-                      files=Seq(*tpl).map(make_match)
-                                     .map(lambda x: filter(x, namelist))
-                                     .chain())
+    files = comp_info.extract_templates(*args, **kwargs)
+    
+    return gm.Extract(comp_file=comp_file,
+                      files=Seq(files).map(make_match)
+                                      .map(lambda x: filter(x, namelist))
+                                      .chain())
+
+def select_not_extracted(ext, fun):
+    return gm.Extract(ext.comp_file, ext.files.filter_false(fun))
+    
+
+
+def extract(ext, outpath):
+    extractor = partial(ext.comp_file.extract, path=outpath)
+    
+    return ext.files.map(extractor)
+
 
 
 @Struct("start", "stop", "center")

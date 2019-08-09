@@ -36,27 +36,29 @@ class S1Zip(object):
         cmd = "SLC_burst_corners"
     
     burst_fun = getattr(gp, cmd)
-
-    r_tiff_tpl  = ".*.SAFE/measurement/s1.*-iw{iw}-slc-{pol}.*.tiff"
-    r_annot_tpl = ".*.SAFE/annotation/s1.*-iw{iw}-slc-{pol}.*.xml"
-    r_calib_tpl = ".*.SAFE/annotation/calibration/calibration"\
-                  "-s1.*-iw{iw}-slc-{pol}.*.xml"
-    r_noise_tpl = ".*.SAFE/annotation/calibration/noise-s1.*-"\
-                  "iw{iw}-slc-{pol}.*.xml"
     
-    __slots__ = ("zipfile", "mission", "date", "burst_nums", "mode",
+    extract_regex = {
+        "tiff": ".*.SAFE/measurement/s1.*-iw{iw}-slc-{pol}.*.tiff",
+        "annot": ".*.SAFE/annotation/s1.*-iw{iw}-slc-{pol}.*.xml",
+        "calib": ".*.SAFE/annotation/calibration/calibration"\
+                 "s1.*-iw{iw}-slc-{pol}.*.xml",
+        "noise": ".*.SAFE/annotation/calibration/noise-s1.*-"\
+                 "iw{iw}-slc-{pol}.*.xml",
+    }
+    
+    
+    __slots__ = ("path", "mission", "date", "burst_nums", "mode",
                  "prod_type", "resolution", "level", "prod_class", "pol",
-                 "abs_orb", "DTID", "UID", "zip_path", "zip_base")
+                 "abs_orb", "DTID", "UID", "zip_base")
     
     
-    __save__ = ("zip_path", "burst_nums", "mission")
+    __save__ = ("path", "burst_nums", "mission")
     
     
     def __init__(self, zippath, extra_info=False):
         zip_base = pth.basename(zippath)
         
-        self.zip_path, self.zipfile, self.zip_base = \
-        zippath, ZipFile(zippath, "r"), zip_base
+        self.path, self.zip_base = zippath, zip_base
         
         self.mission = zip_base[:3]
         self.date = gm.Date(datetime.strptime(zip_base[17:32], "%Y%m%dT%H%M%S"),
@@ -86,7 +88,7 @@ class S1Zip(object):
     
     
     def __str__(self):
-        line = "%s;" % self.zip_path
+        line = "%s;" % self.path
         
         if self.burst_nums is not None:
             line += ",".join(str(elem) for elem in self.burst_nums)
@@ -98,12 +100,9 @@ class S1Zip(object):
         return self.date.center.strftime(fmt)
 
     
-    def extract(self, name):
-        if self.zipfile is None:
-            self.zipfile = ZipFile(self.zip_path, "r")
-        
-        # return tuple(slc_zip.extract(elem, out_path)
-        #              for elem in slc_zip.namelist() if match(regex, elem))
+    def extract_templates(self, names, pol="vv", iw=".*"):
+        return Seq(self.extract_regex.get(name) for name in names)\
+                   .map(partial(str.format, pol=pol, iw=iw))
     
     
     def extract_annot(self, iw, pol, out_path="."):
@@ -113,20 +112,6 @@ class S1Zip(object):
             ret = extract_file(slc_zip, regx, out_path)
     
         return ret
-    
-    
-    def unzip_all(self, pol, iw=".*"):
-        fmt = partial(str.format, iw=iw, pol=pol)
-        
-        matchers = Seq(
-            self.r_annot_tpl,
-            self.r_tiff_tpl,
-            self.r_calib_tpl,
-            self.r_noise_tpl
-        ).map(fmt)
-        
-        return self.unzip_search(matchers)
-        
     
     
     
@@ -176,6 +161,8 @@ class S1Zip(object):
               zip(ref_burst_nums, self.get_burst_nums(pol)))
         
         return self.burst_nums
+
+
 
 
 @gm.extend(gm.DataFile, "TOPS_par")

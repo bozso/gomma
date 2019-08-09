@@ -1,5 +1,6 @@
 import logging
 import os
+import os.path as pth
 
 from datetime import datetime
 from glob import iglob
@@ -10,11 +11,18 @@ from shutil import copy
 from sys import stdout
 from json import load as jload, dump as jdump, JSONEncoder
 from functools import partial
+from itertools import tee
+
+try:
+    from configparser import SafeConfigParser
+except ImportError:
+    from ConfigParser import SafeConfigParser
+
+
 
 from utils import *
-
-
-pth = os.path
+import gamma as gm
+import gamma.sentinel1 as s1
 
 
 __all__ = (
@@ -33,20 +41,9 @@ def typedval(obj):
     }
 
 
-
-
-try:
-    from configparser import SafeConfigParser
-except ImportError:
-    from ConfigParser import SafeConfigParser
-
-
-import gamma as gm
-
 gp = gm.gp
 
 log = logging.getLogger("gamma.steps")
-
 
 debug = False
 
@@ -139,7 +136,7 @@ class Meta(dict, Save):
 
 
 class Processing(object):
-    cache_dirs = frozenset({"ifg", "slc", "rslc", "unzip"})
+    cache_dirs = frozenset({"ifg", "slc", "rslc", "extracted"})
     
     ftypes = {
         name: getattr(gm, name).from_json
@@ -181,6 +178,9 @@ class Processing(object):
         self.caches = type("CacheDirectories", (object,), 
                             {val: pth.join(cache_path, val)
                              for val in self.cache_dirs})
+        self.extractor = \
+        partial(gm.extract, outpath=pth.join(self.caches.extracted))
+        self.is_extracted = partial(isfile, self.caches.extracted)
         
         if pth.isfile(self.metafile):
             self.meta = Meta.from_file(self.metafile)
@@ -397,9 +397,6 @@ class Processing(object):
         return Config(self.params.items(name))
     
     
-    def make_exrtract(self, name):
-        return partial(gm.extract, outpath=pth.join(self.cache_path, name))
-    
     #                            ********************
     #                            * Processing steps *
     #                            ********************
@@ -451,21 +448,32 @@ class Processing(object):
             filt = lambda x: x.test_zip() and filt
         
         SLC = SLC.filter(filt)
+        zips = SLC.copy()
         
-        self.save("zipfiles", *SLC.collect())
+        exit()
         
-        unzip = self.caches.unzip
+        make_extract = partial(gm.make_extract,
+                               names=("tiff", "annot", "calib", "noise"),
+                               pol=pol)
         
-        extract = self.make_extract("unzip")
-        is_unzipped = partial(isfile, unzip)
-        
-        to_unzip = (SLC.omap(gm.S1Zip.unzip_all, "vv")
-                       .map(lambda x:
-                            gm.Extract(x.zipfile,
-                                       x.files.filter_false(is_unzipped))))
+        extracted = self.caches.extracted
         
         
-        to_unzip.map(extract).chain().collect()
+        not_extracted = partial(gm.select_not_extracted,
+                                fun=partial(isfile, extracted))
+        
+        extract = partial(gm.extract, outpath=extracted)
+        
+        to_extract = (SLC.map(make_extract)
+                         .map(not_extracted)
+                         .map(extract))
+        
+        
+        extract_path = partial(pth.join, extracted)
+        
+        print(to_extract.chain().collect())
+        print(SLC.collect())
+        exit()
         
         if master_date is None:
             log.info("No master_date defined, using first date.")
@@ -484,6 +492,8 @@ class Processing(object):
 
 
         log.info("Selected master date is %s" % master_date)
+        
+        self.save("zipfiles", *SLC.collect())
         
 
     def load_slc(self):
