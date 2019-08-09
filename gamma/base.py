@@ -16,6 +16,7 @@ from json import JSONEncoder
 from keyword import iskeyword
 from collections import OrderedDict
 from functools import partial
+from re import match
 
 import gamma as gm
 
@@ -184,13 +185,26 @@ def check_name(name):
     if name[0].isdigit():
         raise ValueError('Type names and field names cannot start with a number: %r' % name)
 
-Extract = namedtuple("Extract", "zipfile, files")
+
+Extract = new_type("Extract", "zipfile, files")
 
 
 def extract(ext, outpath):
     extractor = partial(ext.zipfile.extract, path=outpath)
     
     return ext.files.map(extractor)
+
+
+make_match = partial(partial, match)
+
+
+def search_extract(zipfile, *tpl):
+    namelist = zipfile.namelist()
+    
+    return gm.Extract(zipfile=zipfile,
+                      files=Seq(*tpl).map(make_match)
+                                     .map(lambda x: filter(x, namelist))
+                                     .chain())
 
 
 @Struct("start", "stop", "center")

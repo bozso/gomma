@@ -26,7 +26,6 @@ __all__ = (
     "S1_coreg"
 )
 
-make_match = partial(partial, match)
 
 
 class S1Zip(object):
@@ -128,45 +127,9 @@ class S1Zip(object):
         
         return self.unzip_search(matchers)
         
-        
-    def unzip_search(self, *tpl):
-        namelist = self.zipfile.namelist()
-        
-        gm.Extract(zipfile=self.zipfile, files=[])
-        
-        return gm.Extract(zipfile=self.zipfile,
-                          files=Seq(*tpl).map(make_match)
-                                         .map(lambda x: filter(x, namelist))
-                                         .map(list)
-                                         .sum([]))
     
     
-    def extract_IW(self, pol, IW, annot=None):
-        iw_num = IW.num
-        log.info("Extracting IW%d of %s" % (iw_num, pth.basename(self.zipfile)))
-        
-        r_tiff = self.r_tiff_tpl.format(iw=iw_num, pol=pol)
-        r_calib = self.r_calib_tpl.format(iw=iw_num, pol=pol)
-        r_noise = self.r_noise_tpl.format(iw=iw_num, pol=pol)
     
-        with ZipFile(self.zipfile, "r") as slc_zip:
-            tiff  = extract_file(slc_zip, r_tiff, ".")
-            calib = extract_file(slc_zip, r_calib, ".")
-            noise = extract_file(slc_zip, r_noise, ".")
-    
-            if annot is None:
-                r_annot = self.r_annot_tpl.format(iw=iw_num, pol=pol)
-                annot = extract_file(slc_zip, r_annot, ".")
-        
-        tiff, annot, calib, noise = check_paths(tiff), check_paths(annot), \
-                                    check_paths(calib), check_paths(noise)
-        
-        gp.par_S1_SLC(tiff, annot, calib, noise, IW.par, IW.dat,
-                      IW.TOPS_par)
-        
-        return IW
-        
-        
     def test_zip(self):
         with ZipFile(self.zipfile, "r") as slc_zip:
     

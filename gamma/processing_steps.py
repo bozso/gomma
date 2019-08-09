@@ -397,6 +397,9 @@ class Processing(object):
         return Config(self.params.items(name))
     
     
+    def make_exrtract(self, name):
+        return partial(gm.extract, outpath=pth.join(self.cache_path, name))
+    
     #                            ********************
     #                            * Processing steps *
     #                            ********************
@@ -451,13 +454,9 @@ class Processing(object):
         
         self.save("zipfiles", *SLC.collect())
         
-        print(self.load_list("zipfiles"))
-        
-        return
-        
         unzip = self.caches.unzip
         
-        extract = partial(gm.extract, outpath=unzip)
+        extract = self.make_extract("unzip")
         is_unzipped = partial(isfile, unzip)
         
         to_unzip = (SLC.omap(gm.S1Zip.unzip_all, "vv")
