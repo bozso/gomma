@@ -38,18 +38,18 @@ class S1Zip(object):
     burst_fun = getattr(gp, cmd)
     
     extract_regex = {
-        "tiff": ".*.SAFE/measurement/s1.*-iw{iw}-slc-{pol}.*.tiff",
-        "annot": ".*.SAFE/annotation/s1.*-iw{iw}-slc-{pol}.*.xml",
-        "calib": ".*.SAFE/annotation/calibration/calibration"\
-                 "s1.*-iw{iw}-slc-{pol}.*.xml",
-        "noise": ".*.SAFE/annotation/calibration/noise-s1.*-"\
-                 "iw{iw}-slc-{pol}.*.xml",
+        "file": '{mission}-iw{iw}-slc-{pol}-.*-{obj.abs_orb}-'
+                '{obj.DTID}-.*',
+        "tiff":  "measurement/{tpl}.tiff",
+        "annot": "annotation/{tpl}.xml",
+        "calib": "annotation/{tpl}.xml",
+        "noise": "annotation/calibration/noise-{tpl}.xml"
     }
     
     
-    __slots__ = ("path", "mission", "date", "burst_nums", "mode",
+    __slots__ = ("path", "mission", "datestr", "date", "burst_nums", "mode",
                  "prod_type", "resolution", "level", "prod_class", "pol",
-                 "abs_orb", "DTID", "UID", "zip_base")
+                 "abs_orb", "DTID", "UID", "zip_base", "safe_join")
     
     
     __save__ = ("path", "burst_nums", "mission")
@@ -61,22 +61,21 @@ class S1Zip(object):
         self.path, self.zip_base = zippath, zip_base
         
         self.mission = zip_base[:3]
+        self.datestr = zip_base[17:48]
         self.date = gm.Date(datetime.strptime(zip_base[17:32], "%Y%m%dT%H%M%S"),
                             datetime.strptime(zip_base[33:48], "%Y%m%dT%H%M%S"))
         
-        self.burst_nums = None
-        
-        
-        if extra_info:
-            self.mode = zip_base[4:6]
-            self.prod_type = zip_base[7:10]
-            self.resolution = zip_base[10]
-            self.level = int(zip_base[12])
-            self.prod_class = zip_base[13]
-            self.pol = zip_base[14:16]
-            self.abs_orb = int(zip_base[49:55])
-            self.DTID = zip_base[56:62]
-            self.UID = zip_base[63:67]
+        self.mode = zip_base[4:6]
+        self.prod_type = zip_base[7:10]
+        self.resolution = zip_base[10]
+        self.level = int(zip_base[12])
+        self.prod_class = zip_base[13]
+        self.pol = zip_base[14:16]
+        self.abs_orb = zip_base[49:55]
+        self.DTID = zip_base[56:62]
+        self.UID = zip_base[63:67]
+        self.safe_join = partial(pth.join,
+                                 zip_base.replace(".zip", ".SAFE"))
     
     
     @classmethod
@@ -90,29 +89,36 @@ class S1Zip(object):
     def __str__(self):
         line = "%s;" % self.path
         
-        if self.burst_nums is not None:
-            line += ",".join(str(elem) for elem in self.burst_nums)
-        
         return line
     
     
-    def datestr(self, fmt="%Y%m%d"):
+    def date2str(self, fmt="%Y%m%d"):
         return self.date.center.strftime(fmt)
 
     
-    def extract_templates(self, names, pol="vv", iw=".*"):
-        return Seq(self.extract_regex.get(name) for name in names)\
-                   .map(partial(str.format, pol=pol, iw=iw))
-    
-    
-    def extract_annot(self, iw, pol, out_path="."):
-        regx = self.r_annot_tpl.format(iw=iw, pol=pol)
+    def burst_info(self, extracted, **kwargs):
+        annots = (self.extract_templates(("annot",), **kwargs)
+                      .map(gm.matcher, match_list=extracted)
+                      .chain())
         
-        with ZipFile(self.zipfile, "r") as slc_zip:
-            ret = extract_file(slc_zip, regx, out_path)
+        print(annots.collect())
+        
+        exit()
+        
+        par, TOPS_par = tmp_file(), tmp_file()
+
+        gp.par_S1_SLC(None, annot, None, None, par, None, TOPS_par)
+        
+        return S1Zip.burst_fun(par, TOPS_par).decode()
     
-        return ret
     
+    def extract_templates(self, names, pol="vv", iw=".*"):
+        tpl = self.extract_regex["file"]\
+              .format(obj=self, mission=self.mission.lower(), pol=pol, iw=iw)
+        
+        return (Seq(self.extract_regex.get(name) for name in names)
+                    .map(partial(str.format, tpl=tpl))
+                    .map(self.safe_join))
     
     
     def test_zip(self):
@@ -128,14 +134,6 @@ class S1Zip(object):
         return True
 
     
-    def burst_info(self, iw_num, pol, remove_temps=False):
-        par, TOPS_par = gm.tmp_file(), gm.tmp_file()
-        annot = self.extract_annot(iw_num, pol)[0]
-
-        gp.par_S1_SLC(None, annot, None, None, par, None, TOPS_par)
-        
-        return S1Zip.burst_fun(par, TOPS_par).decode()
-
     
     def burst_corners(self, iw_num, pol, remove_temps=False):
         return tuple(float(elem) for elem in line.split()[:8] for line in

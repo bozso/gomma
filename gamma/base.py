@@ -31,6 +31,7 @@ __all__ = (
     "extend",
     "Extract",
     "make_extract",
+    "matcher",
     "select_not_extracted",
     "extract",
     "Date",
@@ -193,6 +194,10 @@ Extract = new_type("Extract", "comp_file, files")
 
 make_match = partial(partial, match)
 
+def matcher(elem, match_list):
+    return filter(make_match(elem), match_list)
+
+
 def make_extract(comp_info, *args, **kwargs):
     comp_file = ZipFile(comp_info.path, "r")
     namelist = comp_file.namelist()
@@ -200,19 +205,20 @@ def make_extract(comp_info, *args, **kwargs):
     files = comp_info.extract_templates(*args, **kwargs)
     
     return gm.Extract(comp_file=comp_file,
-                      files=Seq(files).map(make_match)
-                                      .map(lambda x: filter(x, namelist))
+                      files=Seq(files).map(matcher, match_list=namelist)
                                       .chain())
 
-def select_not_extracted(ext, fun):
-    return gm.Extract(ext.comp_file, ext.files.filter_false(fun))
+# TODO: something goes wrong here
+def select_not_extracted(ext, filt_fun):
+    return gm.Extract(ext.comp_file, ext.files.filter_false(filt_fun))
     
 
 
 def extract(ext, outpath):
-    extractor = partial(ext.comp_file.extract, path=outpath)
+    if len(files) == 0:
+        return Seq(())
     
-    return ext.files.map(extractor)
+    return ext.files.map(ext.comp_file.extract, path=outpath)
 
 
 

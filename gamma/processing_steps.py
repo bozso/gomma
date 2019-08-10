@@ -447,32 +447,30 @@ class Processing(object):
             log("Checking integrity of zipfiles.")
             filt = lambda x: x.test_zip() and filt
         
-        SLC = SLC.filter(filt)
-        zips = SLC.copy()
+        
+        zips, SLC = SLC.filter(filt).tee(2)
+        
+        extracted = self.caches.extracted
+        extract_path = partial(pth.join, extracted)
+        
+        
+        names = ("tiff", "annot", "calib", "noise")
+        
+        extracted, to_extract = (SLC.map(gm.make_extract, pol=pol, names=names)
+                                    .tee(2))
+        
+        print(to_extract.map(gm.select_not_extracted,
+                        filt_fun=partial(isfile, extracted))
+                   #.map(gm.extract, outpath=extracted)
+                   .select("files")
+                   .chain()
+                   .collect())
+        
+        extracted = extracted.select("files").chain()
         
         exit()
         
-        make_extract = partial(gm.make_extract,
-                               names=("tiff", "annot", "calib", "noise"),
-                               pol=pol)
-        
-        extracted = self.caches.extracted
-        
-        
-        not_extracted = partial(gm.select_not_extracted,
-                                fun=partial(isfile, extracted))
-        
-        extract = partial(gm.extract, outpath=extracted)
-        
-        to_extract = (SLC.map(make_extract)
-                         .map(not_extracted)
-                         .map(extract))
-        
-        
-        extract_path = partial(pth.join, extracted)
-        
-        print(to_extract.chain().collect())
-        print(SLC.collect())
+        zips.map(gm.S1Zip.burst_info, extracted=extracted, pol=pol).collect()
         exit()
         
         if master_date is None:
