@@ -454,23 +454,16 @@ class Processing(object):
         extract_path = partial(pth.join, extracted)
         
         
-        names = ("tiff", "annot", "calib", "noise")
+        names = ("annot", "quicklook")
         
-        extracted, to_extract = (SLC.map(gm.make_extract, pol=pol, names=names)
-                                    .tee(2))
+        extract = (SLC.map(gm.make_extract, pol=pol, names=names)
+                      .map(gm.extract, filt_fun=partial(isfile, extracted),
+                          outpath=extracted)
+                      .chain()
+                      .collect())
         
-        print(to_extract.map(gm.select_not_extracted,
-                        filt_fun=partial(isfile, extracted))
-                   #.map(gm.extract, outpath=extracted)
-                   .select("files")
-                   .chain()
-                   .collect())
+        zips.map(gm.S1Zip.burst_info, namelist=extract, pol=pol).collect()
         
-        extracted = extracted.select("files").chain()
-        
-        exit()
-        
-        zips.map(gm.S1Zip.burst_info, extracted=extracted, pol=pol).collect()
         exit()
         
         if master_date is None:

@@ -18,6 +18,7 @@ from collections import OrderedDict
 from functools import partial
 from re import match
 from zipfile import ZipFile
+from pprint import pprint
 
 import gamma as gm
 
@@ -31,7 +32,7 @@ __all__ = (
     "extend",
     "Extract",
     "make_extract",
-    "matcher",
+    "filter_files",
     "select_not_extracted",
     "extract",
     "Date",
@@ -190,35 +191,41 @@ def check_name(name):
         raise ValueError('Type names and field names cannot start with a number: %r' % name)
 
 
+
 Extract = new_type("Extract", "comp_file, files")
+
 
 make_match = partial(partial, match)
 
-def matcher(elem, match_list):
-    return filter(make_match(elem), match_list)
 
-
+def filter_files(templates, namelist):
+    return (Seq(templates).map(make_match)
+                          .map(lambda x: filter(x, namelist))
+                          .chain())
+    
+    
 def make_extract(comp_info, *args, **kwargs):
     comp_file = ZipFile(comp_info.path, "r")
     namelist = comp_file.namelist()
     
-    files = comp_info.extract_templates(*args, **kwargs)
+    templates = comp_info.extract_templates(*args, **kwargs)
     
     return gm.Extract(comp_file=comp_file,
-                      files=Seq(files).map(matcher, match_list=namelist)
-                                      .chain())
+                      files=filter_files(templates, namelist))
 
-# TODO: something goes wrong here
+
 def select_not_extracted(ext, filt_fun):
     return gm.Extract(ext.comp_file, ext.files.filter_false(filt_fun))
     
 
 
-def extract(ext, outpath):
-    if len(files) == 0:
-        return Seq(())
+def extract(ext, filt_fun, outpath):
+    extracted = ext.files.collect()
     
-    return ext.files.map(ext.comp_file.extract, path=outpath)
+    (Seq(extracted).filter_false(filt_fun)
+                  .map(ext.comp_file.extract, path=outpath))
+    
+    return extracted
 
 
 

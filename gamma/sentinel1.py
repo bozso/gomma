@@ -8,6 +8,7 @@ from re import match
 from functools import partial, reduce
 import operator as op
 
+
 import gamma as gm
 
 from utils import *
@@ -27,6 +28,11 @@ __all__ = (
 )
 
 
+BurstInfo = new_type("BurstInfo", ("num", "string"))
+
+def parse_burst(path):
+    iw_num = int(path.split("iw")[1][0])
+
 
 class S1Zip(object):
     if hasattr(gm, "ScanSAR_burst_corners"):
@@ -39,11 +45,13 @@ class S1Zip(object):
     
     extract_regex = {
         "file": '{mission}-iw{iw}-slc-{pol}-.*-{obj.abs_orb}-'
-                '{obj.DTID}-.*',
+                '{DTID}-[0-9]{{3}}',
         "tiff":  "measurement/{tpl}.tiff",
         "annot": "annotation/{tpl}.xml",
         "calib": "annotation/{tpl}.xml",
-        "noise": "annotation/calibration/noise-{tpl}.xml"
+        "noise": "annotation/calibration/noise-{tpl}.xml",
+        "preview": "preview/product-preview.html",
+        "quicklook": "preview/quick-look.png"
     }
     
     
@@ -96,13 +104,11 @@ class S1Zip(object):
         return self.date.center.strftime(fmt)
 
     
-    def burst_info(self, extracted, **kwargs):
-        annots = (self.extract_templates(("annot",), **kwargs)
-                      .map(gm.matcher, match_list=extracted)
-                      .chain())
-        
+    def burst_info(self, namelist, **kwargs):
+        annots = gm.filter_files(self.extract_templates(("annot",), **kwargs),
+                                 namelist)
+        iw_num
         print(annots.collect())
-        
         exit()
         
         par, TOPS_par = tmp_file(), tmp_file()
@@ -112,9 +118,10 @@ class S1Zip(object):
         return S1Zip.burst_fun(par, TOPS_par).decode()
     
     
-    def extract_templates(self, names, pol="vv", iw=".*"):
+    def extract_templates(self, names, pol="vv", iw="[1-3]"):
         tpl = self.extract_regex["file"]\
-              .format(obj=self, mission=self.mission.lower(), pol=pol, iw=iw)
+              .format(obj=self, mission=self.mission.lower(), 
+                      DTID=self.DTID.lower(), pol=pol, iw=iw)
         
         return (Seq(self.extract_regex.get(name) for name in names)
                     .map(partial(str.format, tpl=tpl))
