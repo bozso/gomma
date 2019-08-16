@@ -485,7 +485,7 @@ class Processing(object):
         slc = SLC.filter(s1.points_in_SLC, outpath=extracted, points=aoi,
                          namelist=extracted_files)
         
-        pprint(slc.collect())
+        # pprint(slc[0:2].collect())
         exit()
         
         if master_date is None:
