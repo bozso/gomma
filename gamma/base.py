@@ -29,9 +29,13 @@ from utils import *
 __all__ = (
     "save",
     "Struct",
+    "Point",
+    "Rect",
+    "point_in_rect",
     "extend",
     "Extract",
     "make_extract",
+    "filter_file",
     "filter_files",
     "select_not_extracted",
     "extract",
@@ -198,6 +202,10 @@ Extract = new_type("Extract", "comp_file, files")
 make_match = partial(partial, match)
 
 
+def filter_file(template, namelist):
+    return filter(make_match(template), namelist)
+
+
 def filter_files(templates, namelist):
     return (Seq(templates).map(make_match)
                           .map(lambda x: filter(x, namelist))
@@ -214,18 +222,23 @@ def make_extract(comp_info, *args, **kwargs):
                       files=filter_files(templates, namelist))
 
 
-def select_not_extracted(ext, filt_fun):
-    return gm.Extract(ext.comp_file, ext.files.filter_false(filt_fun))
+def select_not_extracted(ext, pred):
+    return gm.Extract(ext.comp_file, ext.files.filter_false(pred))
     
 
+def extract(ext, outpath):
+    return ext.files.map(ext.comp_file.extract, path=outpath)
 
-def extract(ext, filt_fun, outpath):
-    extracted = ext.files.collect()
-    
-    (Seq(extracted).filter_false(filt_fun)
-                  .map(ext.comp_file.extract, path=outpath))
-    
-    return extracted
+
+Point = new_type("Point", ("x", "y"))
+Rect = new_type("Rect", ("max_x", "min_x", "max_y", "min_y"))
+
+
+def point_in_rect(point, rect):
+    return (point.x < rect.max_x and 
+            point.x > rect.min_x and
+            point.y < rect.max_y and
+            point.y > rect.min_y)
 
 
 

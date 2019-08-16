@@ -407,6 +407,18 @@ class Processing(object):
         
         slc_data = general.get("slc_data")
         
+        lower_left, upper_right = \
+        select.get("lower_left").split(","), \
+        select.get("upper_right").split(",")
+        
+        ll_lat, ll_lon, ur_lat, ur_lon = \
+        float(lower_left[0]), float(lower_left[1]), \
+        float(upper_right[0]), float(upper_right[1])
+        
+        aoi = Seq((gm.Point(ll_lon, ll_lat), gm.Point(ll_lon, ur_lat),
+                   gm.Point(ur_lon, ur_lat), gm.Point(ur_lon, ll_lat)))
+        
+        
         if slc_data is None:
             raise ValueError('Parameter "slc_data" not defined.')
 
@@ -456,14 +468,24 @@ class Processing(object):
         
         names = ("annot", "quicklook")
         
+        
+        extracted_files = (SLC.map(gm.make_extract, pol=pol, names=names)
+                              .select("files")
+                              .chain()
+                              .collect())
+        
         extract = (SLC.map(gm.make_extract, pol=pol, names=names)
-                      .map(gm.extract, filt_fun=partial(isfile, extracted),
-                          outpath=extracted)
+                      .map(gm.select_not_extracted,
+                           pred=partial(isfile, extracted))
+                      .map(gm.extract, outpath=extracted)
                       .chain()
                       .collect())
         
-        zips.map(gm.S1Zip.burst_info, namelist=extract, pol=pol).collect()
         
+        slc = SLC.filter(s1.points_in_SLC, outpath=extracted, points=aoi,
+                         namelist=extracted_files)
+        
+        pprint(slc.collect())
         exit()
         
         if master_date is None:
