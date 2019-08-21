@@ -18,18 +18,6 @@ log = getLogger("gamma.sentinel1")
 gp = gm.gp
 
 
-__all__ = (
-    "S1Zip",
-    "S1IW",
-    "S1SLC",
-    "deramp_master",
-    "deramp_slave",
-    "S1_coreg",
-    "points_in_SLC"
-)
-
-
-
 BurstInfo = new_type("BurstInfo", ("num", "string"))
 
 
@@ -98,33 +86,16 @@ class S1Zip(object):
         return ret
     
     
-    def date2str(self, fmt="%Y%m%d"):
-        return self.date.center.strftime(fmt)
-
-    
-    def burst_info(self, namelist, **kwargs):
-        tpls = self.extract_templates(("annot",), **kwargs)
-        
-    
-    def use_extracted(self, names, outpath, **kwargs):
-        return (self.extract_templates(names, **kwargs)
-                    .map(gm.filter_file, **kwargs)
-                    .chain()
-                    .map(partial(pth.join, outpath)))
-    
-    
     def extract_templates(self, names, **kwargs):
-        # assert all(name in self.regex_names for name in names), \
-        #        "All names should be valid"
-        
         pol, iw = kwargs.get("pol", "vv"), kwargs.get("iw", "[1-3]")
         
         tpl = self.extract_regex["file"]\
               .format(obj=self, mission=self.mission.lower(), 
                       DTID=self.DTID.lower(), pol=pol, iw=iw)
         
+        
         return (Seq(self.extract_regex[name] for name in names)
-                    .map(partial(str.format, tpl=tpl))
+                    .map(str.format, tpl=tpl)
                     .map(self.safe_join))
     
     
@@ -141,10 +112,12 @@ class S1Zip(object):
         return True
 
 
-IWCorner = new_type("IWCorner", ("path", "num", "rect"))
+IWInfo = new_type("IWCorner", ("num", "rect", "bursts"))
+
+burst_tpl = "burst_asc_node_%d"
 
 
-def iw_corner_from_annot(path):
+def iw_info_from_annot(path):
     iw_num = int(path.split("iw")[1][0])
     
     par, TOPS_par = tmp_file(), tmp_file()
@@ -152,25 +125,41 @@ def iw_corner_from_annot(path):
     gp.par_S1_SLC(None, path, None, None, par, None, TOPS_par)
     
     info = S1Zip.burst_fun(par, TOPS_par).decode()
+    nburst = int(get_par("number_of_bursts", TOPS_par))
+    
+    numbers = tuple(float(get_par(burst_tpl % (ii + 1), TOPS_par).split()[0])
+                    for ii in range(nburst))
+    
     
     max_lat, min_lat, max_lon, min_lon = \
     get_par("Max_Lat", info), get_par("Min_Lat", info), \
     get_par("Max_Lon", info), get_par("Min_Lon", info)
     
-    return IWCorner(path, iw_num, gm.Rect(float(max_lon), float(min_lon),
-                                          float(max_lat), float(min_lat)))
+    return IWInfo(iw_num, 
+                  gm.Rect(float(max_lon), float(min_lon),
+                          float(max_lat), float(min_lat)),
+                  numbers)
 
 
-def points_in_iw(iw, points):
-    return points.map(gm.point_in_rect, rect=iw.rect).any()
+def use_extracted(self, names, extracted, **kwargs):
+    return (self.extract_templates(names, **kwargs)
+                .map(gm.filter_file, namelist=extracted.file_list)
+                .chain()
+                .map(partial(pth.join, extracted.outpath)))
 
 
-def points_in_SLC(self, points, **kwargs):
-    return (self.use_extracted(("annot",), **kwargs)
-                .map(iw_corner_from_annot)
-                .map(points_in_iw, points=points)
-                .any())
+def iw_info(self, **kwargs):
+    return (use_extracted(self, ("annot",), **kwargs)
+            .map(iw_info_from_annot))
     
+
+def point_in_IWs(point, IWs):
+    return any(gm.point_in_rect(point, rect=iw.rect) for iw in IWs)
+
+
+def points_in_IWs(IWs, points):
+    return points.map(point_in_IWs, IWs=IWs.collect())
+
 
 @gm.extend(gm.DataFile, "TOPS_par")
 class S1IW:

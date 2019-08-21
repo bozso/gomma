@@ -4,14 +4,11 @@ import os.path as pth
 
 from datetime import datetime
 from glob import iglob
-from pickle import dump, load
-from collections import namedtuple
 from pprint import pprint
-from shutil import copy
 from sys import stdout
 from json import load as jload, dump as jdump, JSONEncoder
+from copy import copy
 from functools import partial
-from itertools import tee
 
 try:
     from configparser import SafeConfigParser
@@ -31,7 +28,7 @@ __all__ = (
 )
 
 
-ProcStep = namedtuple("ProcStep", "fun opt")
+ProcStep = new_type("ProcStep", "fun, opt")
 
 
 def typedval(obj):
@@ -178,9 +175,8 @@ class Processing(object):
         self.caches = type("CacheDirectories", (object,), 
                             {val: pth.join(cache_path, val)
                              for val in self.cache_dirs})
-        self.extractor = \
-        partial(gm.extract, outpath=pth.join(self.caches.extracted))
-        self.is_extracted = partial(isfile, self.caches.extracted)
+        
+        # self.is_extracted = partial(isfile, self.caches.extracted)
         
         if pth.isfile(self.metafile):
             self.meta = Meta.from_file(self.metafile)
@@ -407,6 +403,8 @@ class Processing(object):
         
         slc_data = general.get("slc_data")
         
+        master_date = select.get("master_date", "auto")
+        
         lower_left, upper_right = \
         select.get("lower_left").split(","), \
         select.get("upper_right").split(",")
@@ -423,9 +421,8 @@ class Processing(object):
             raise ValueError('Parameter "slc_data" not defined.')
 
         
-        master_date, output_dir, pol = \
-        general.get("master_date"), general.get("output_dir", "."), \
-        general.get("pol")
+        output_dir, pol = \
+        general.get("output_dir", "."), general.get("pol")
 
         date_start, date_stop, check_zips = \
         select.get("date_start"), select.get("date_stop"), \
@@ -460,53 +457,71 @@ class Processing(object):
             filt = lambda x: x.test_zip() and filt
         
         
-        zips, SLC = SLC.filter(filt).tee(2)
+        SLC = SLC.filter(filt).seq()
         
         extracted = self.caches.extracted
-        extract_path = partial(pth.join, extracted)
-        
         
         names = ("annot", "quicklook")
-        
         
         extracted_files = (SLC.map(gm.make_extract, pol=pol, names=names)
                               .select("files")
                               .chain()
                               .collect())
         
-        extract = (SLC.map(gm.make_extract, pol=pol, names=names)
-                      .map(gm.select_not_extracted,
-                           pred=partial(isfile, extracted))
-                      .map(gm.extract, outpath=extracted)
-                      .chain()
-                      .collect())
         
+        (SLC.map(gm.make_extract, pol=pol, names=names)
+            .map(gm.select_not_extracted, pred=partial(isfile, extracted))
+            .map(gm.extract, outpath=extracted)
+            .chain()
+            .collect())
         
-        slc = SLC.filter(s1.points_in_SLC, outpath=extracted, points=aoi,
-                         namelist=extracted_files)
+        extracted = gm.Extracted(extracted, extracted_files)
         
-        # pprint(slc[0:2].collect())
+        SLC = (SLC.map(s1.iw_info, extracted=extracted, pol=pol)
+                  .filter(s1.points_in_IWs, points=aoi))
+        
+        # SLC = (SLC.map(s1.use_extracted, names=("annot",), pol=pol,
+        #                extracted=extracted))
+        
+        pprint(SLC.chain().collect())
         exit()
         
-        if master_date is None:
+        # SLC = SLC.filter(s1.points_in_SLC, points=aoi,
+        #                  namelist=extracted_files)
+        
+        
+        # force evaluation
+        SLC = Seq(SLC.collect())
+        
+        # print(SLC.collect())
+        
+        exit()
+        
+        
+        # print(SLC.collect(), SLC2)
+        
+        if master_date == "auto":
+            # TODO: better selection algorithm
             log.info("No master_date defined, using first date.")
             
             master_slc = SLC.sorted(key=lambda x: x.date.center)[0]
-            master_date = master_slc.date.date2str()
+            # sorted(SLC2, key=lambda x: x.date.center)[0]
+            master_date = gm.date2str(master_slc)
             
-            self.meta["master_date"] = master_date
         else:
-            master_date = general["master_date"]
-            
             log.info("Master date already defined: %s", master_date)
             
-            master_slc = [slc for slc in SLC
-                          if slc.datestr() == master_date][0]
-
-
+            master_slc = (SLC.map(gm.date2str)
+                             .filter(lambda x: x == master_date)
+                             .take(1)
+                             .collect())
+        
+        
         log.info("Selected master date is %s" % master_date)
         
-        self.save("zipfiles", *SLC.collect())
+        print(iw_info.chain().collect())
+        
+        # self.save("zipfiles", *SLC.collect())
         
 
     def load_slc(self):

@@ -25,39 +25,7 @@ import gamma as gm
 
 from utils import *
 
-
-__all__ = (
-    "save",
-    "Struct",
-    "Point",
-    "Rect",
-    "point_in_rect",
-    "extend",
-    "Extract",
-    "make_extract",
-    "filter_file",
-    "filter_files",
-    "select_not_extracted",
-    "extract",
-    "Date",
-    "Parfile",
-    "DataFile",
-    "SLC",
-    "MLI",
-    "imview",
-    "str_t",
-    "settings",
-    "gp",
-    "ScanSAR",
-    "settings",
-    "display",
-    "raster",
-    "make_cmd"
-)
-
-
 ScanSAR = True
-
 
 
 versions = {
@@ -196,7 +164,8 @@ def check_name(name):
 
 
 
-Extract = new_type("Extract", "comp_file, files")
+Extract = new_type("Extract", ("comp_file", "files"))
+Extracted = new_type("Extracted", ("outpath", "file_list"))
 
 
 make_match = partial(partial, match)
@@ -207,9 +176,9 @@ def filter_file(template, namelist):
 
 
 def filter_files(templates, namelist):
-    return (Seq(templates).map(make_match)
-                          .map(lambda x: filter(x, namelist))
-                          .chain())
+    return (templates.map(make_match)
+                     .map(lambda x: filter(x, namelist))
+                     .chain())
     
     
 def make_extract(comp_info, *args, **kwargs):
@@ -220,6 +189,7 @@ def make_extract(comp_info, *args, **kwargs):
     
     return gm.Extract(comp_file=comp_file,
                       files=filter_files(templates, namelist))
+
 
 
 def select_not_extracted(ext, pred):
@@ -260,6 +230,15 @@ class Date:
     
     # def __str__(self):
     #     return self.date2str()
+
+
+def date2str(obj, fmt="%Y%m%d"):
+    date = obj.date
+    
+    if isinstance(date, Date):
+        date = date.center
+    
+    return date.strftime(fmt)
 
 
 class Parfile(object):
