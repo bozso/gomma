@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+
+go run /home/istvan/progs/gamma/src/bin/main.go "$*"
