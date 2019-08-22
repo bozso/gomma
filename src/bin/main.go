@@ -16,10 +16,7 @@ func (self Al) String() string {
     return fmt.Sprintf("%d %d", self.a, self.b);
 }
 
-var gamma_cmds = map[string]gm.CmdFun{
-    "eog": gm.MakeCmd("eog"),
-};
 
 func main() {
-    gamma_cmds["eog"]("a", 1, 2.0, "a");
+    fmt.Println(gm.ParseDate(gm.DateLong, "20121203T123112"));
 }
