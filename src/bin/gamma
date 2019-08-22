@@ -1,3 +1,13 @@
 #!/usr/bin/env sh
 
-go run /home/istvan/progs/gamma/src/bin/main.go "$*"
+main() {
+    local main="/home/istvan/progs/gamma/src/bin/main.go"
+    
+    if [ "$1" = "build" ]; then
+        go build "${main}"
+    else
+        go run "${main}" "$*"
+    fi
+}
+
+main $*

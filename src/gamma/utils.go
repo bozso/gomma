@@ -35,8 +35,9 @@ func MakeCmd(cmd string) CmdFun {
 }
 
 
-func Check(err error) {
+func Check(err error, format string, args ...interface{}) {
     if err != nil {
-        log.Fatal("Error: ", err);
+        str := fmt.Sprintf(format, args...);
+        log.Fatalf("Error: %s\nError: %s", str, err);
     }
 }

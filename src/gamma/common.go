@@ -1,9 +1,11 @@
 package gamma;
 
 import (
-    // "fmt";
+    //"fmt";
     fp "path/filepath";
+    //str "strings";
     "time";
+    zip "archive/zip";
 );
 
 type setting map[string]string;
@@ -52,7 +54,7 @@ func makeGamma() map[string]CmdFun {
         
         glob, err := fp.Glob(_path)
         
-        Check(err);
+        Check(err, "Glob in %s failed!", _path);
         
         for _, path := range glob {
             result[fp.Base(path)] = MakeCmd(path);
@@ -62,7 +64,7 @@ func makeGamma() map[string]CmdFun {
         
         glob, err = fp.Glob(_path)
         
-        Check(err);
+        Check(err, "Glob in %s failed!", _path);
         
         for _, path := range glob {
             result[fp.Base(path)] = MakeCmd(path);
@@ -92,11 +94,91 @@ const (
 
 func ParseDate(fmt string, str string) time.Time {
     ret, err := time.Parse(fmt, str)
-    Check(err);
+    Check(err, "Failed to parse date: %s", str);
     return ret;
 }
 
 
+type DataFile interface {
+    Rng() int;
+    Azi() int;
+    Intpar() int;
+    Floatpar() float32;
+    Param() string;
+};
+
+
+type ParamFile struct {
+    par string;
+};
+
+
+// TODO: implement
+func (self ParamFile) Param(name string) string {
+    return "implement";
+}
+
+// TODO: implement
+func toInt(str string, idx int) int {
+    var ret int;
+    return ret;
+}
+
+// TODO: implement
+func toFloat(str string, idx int) float32 {
+    var ret float32;
+    return ret;
+}
+
+func (self ParamFile) Intpar(name string) int {
+    return toInt(self.Param(name), 0);
+}
+
+func (self ParamFile) Floatpar(name string) float32 {
+    return toFloat(self.Param(name), 0);
+}
+
+type dataFile struct {
+    dat string;
+    ParamFile;
+    Date;
+}
+
+func (self dataFile) Rng() int {
+    return self.Intpar("range_samples");
+}
+
+
+func (self dataFile) Azi() int {
+    return self.Intpar("azimuth_samples");
+}
+
+
+type Extract struct {
+    File *zip.ReadCloser;
+    FileList []string;
+};
+
+
+func NewExtract(path string, templates []string) Extract {
+    file, err := zip.OpenReader(path);
+    defer file.Close()
+    
+    Check(err, "Could not open zipfile: \"%s\"", path);
+    
+    list := make([]string, 10);
+    
+    
+    for ii, file := range file.File {
+        // TODO: select if matches template
+        list = append(list, file);
+    }
+    
+    return Extract{file, list}
+}
+
+//func (self Extract) Filter(extracted []string)
+    
 
 
 
