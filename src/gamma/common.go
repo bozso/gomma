@@ -83,11 +83,12 @@ func makeGamma() map[string]CmdFun {
     return result;
 }
 
+
+
 var (
     Gamma = makeGamma();
     Imv = MakeCmd("eog");
 );
-
 
 
 type date struct {
