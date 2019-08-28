@@ -2,11 +2,15 @@ package gamma;
 
 import (
     //"fmt";
-    fp "path/filepath";
     //str "strings";
     "time";
+    "os";
+    fp "path/filepath";
     zip "archive/zip";
+    set "github.com/deckarep/golang-set"
 );
+
+const Bufsize = 100;
 
 type setting map[string]string;
 
@@ -16,6 +20,19 @@ const useVersion = "20181130";
 var versions = map[string]string {
     "20181130": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
 };
+
+
+var (
+    pols = []interface{}{"vv", "hh", "hv", "vh"};
+    Pols = set.NewSetFromSlice(pols);
+    DataTypes = map[string]int {
+        "FCOMPLEX": 0,
+        "SCOMPLEX": 1,
+        "FLOAT": 0,
+        "SHORT_INT": 1,
+        "DOUBLE": 2,
+    };
+);
 
 
 
@@ -155,33 +172,240 @@ func (self dataFile) Azi() int {
 
 
 type Extract struct {
-    File *zip.ReadCloser;
-    FileList []string;
+    file *zip.ReadCloser;
+    fileList []string;
 };
 
 
-func NewExtract(path string, templates []string) Extract {
+func (self Extract) Close() {
+    self.file.Close()
+}
+
+
+type Extracted struct {
+    fileSet set.Set;
+    root string;
+}
+
+func NewExtract(path string, templates []string, root string) Extract {
     file, err := zip.OpenReader(path);
     defer file.Close()
     
     Check(err, "Could not open zipfile: \"%s\"", path);
     
-    list := make([]string, 10);
+    list := make([]string, Bufsize);
     
-    
-    for ii, file := range file.File {
-        // TODO: select if matches template
-        list = append(list, file);
+    for _, file := range file.File {
+        name := file.Name;
+        if _, err := os.Stat(fp.Join(root, name)); err == nil {
+            // TODO: Check if matches template.
+            if os.IsNotExist(err) {
+                list = append(list, name);
+            } else {
+                Check(err, "Stat failed on file : \"%s\"", file);
+            }
+        }
     }
     
     return Extract{file, list}
 }
 
+
 //func (self Extract) Filter(extracted []string)
     
 
+type point struct {
+    x, y float64;
+};
+
+type rect struct {
+    max, min point;
+};
+
+
+func PointInRect(p point, r rect) bool {
+    return (p.x < r.max.x && p.x > r.min.x &&
+            p.y < r.max.y && p.y > r.min.y);
+}
 
 
 func First() string {
     return "First";
 }
+
+type disArgs struct {
+    flip, debug bool;
+    rng, azi int;
+    img_format, datafile string;
+};
+
+type rasArgs struct {
+    disArgs;
+    ext string;
+    avg_fact int;
+};
+
+func ParseDisArgs(d DataFile, args disArgs) disArgs {
+    var (
+        datfile, img_format *string;
+        rng, azi int;
+    );
+    
+    if len(args.datfile) == 0 {
+        args.datfile = d.dat;
+    }
+    
+    if args.rng == 0 {
+        rng = d.rng();
+    }
+    
+    if args.azi == 0 {
+        azi = d.azi();
+    }
+    
+    // parts = pth.basename(datfile).split(".")
+    if len(args.img_format) == 0 {
+        img_format = d.img_format();
+    }
+    
+    // args.flip = -1 if flip else 1
+    
+    /*
+    if cmd is None:
+        try:
+            ext = [ext for ext in parts if ext in extensions][0]
+        except IndexError:
+            raise ValueError("Unrecognized extension of file %s. Available "
+                             "extensions: %s" % (datfile, pr.extensions))
+
+        cmd = [cmd for cmd, exts in plot_cmd_files.items()
+               if ext in exts][0]
+    */
+    
+    return args;
+}
+
+/*
+
+def date2str(obj, fmt="%Y%m%d"):
+    date = obj.date
+    
+    if isinstance(date, Date):
+        date = date.center
+    
+    return date.strftime(fmt)
+
+
+@staticmethod
+def parse_dis_args(gp_file, **kwargs):
+    datfile = kwargs.get("datfile", None)
+    cmd  = kwargs.get("mode", None)
+    flip = bool(kwargs.get("flip", False))
+    rng = kwargs.get("rng", None)
+    azi = kwargs.get("azi", None)
+    img_fmt = kwargs.get("image_format", None)
+    debug = bool(kwargs.get("debug", False))    
+    
+    if datfile is None:
+        datfile = gp_file.dat
+
+    parts = pth.basename(datfile).split(".")
+    
+
+    if rng is None:
+        rng = gp_file.rng()
+
+    if azi is None:
+        azi = gp_file.azi()
+    
+    if img_fmt is None:
+        img_fmt = gp_file.img_fmt()
+    
+    
+    flip = -1 if flip else 1
+    
+
+    if cmd is None:
+        try:
+            ext = [ext for ext in parts if ext in extensions][0]
+        except IndexError:
+            raise ValueError("Unrecognized extension of file %s. Available "
+                             "extensions: %s" % (datfile, pr.extensions))
+
+        cmd = [cmd for cmd, exts in plot_cmd_files.items()
+               if ext in exts][0]
+    
+    
+    return {
+        "cmd"      : cmd,
+        "datfile"  : datfile,
+        "rng"      : rng,
+        "azi"      : azi,
+        "img_fmt"  : DataFile.data_types[img_fmt.upper()],
+        "start"    : kwargs.get("start", None),
+        "nlines"   : kwargs.get("nlines", None),
+        "scale"    : kwargs.get("scale", None),
+        "exp"      : kwargs.get("exp", None),
+        "LR"       : int(flip),
+        "debug"    : debug
+    }
+
+
+@staticmethod
+def parse_ras_args(gp_file, **kwargs):
+    args = DataFile.parse_dis_args(gp_file, **kwargs)
+    
+    raster = kwargs.get("raster", None)
+    avg_fact = kwargs.get("avg_fact", 750)
+    
+    if raster is None:
+        raster = "%s.%s" % (args["datfile"], settings["ras_ext"])
+
+    if avg_fact == "noavg":
+        avg_rng, avg_azi = None, None
+    else:
+        avg_rng, avg_azi = gp_file.avg_fact(avg_fact)
+
+    
+    args.update({
+        "raster" : raster,
+        "arng": avg_rng,
+        "aazi": avg_azi,
+        "hdrsz": int(kwargs.get("hdrsz", 0))
+        })
+
+    return args
+
+
+def raster(self, **kwargs):
+    args = DataFile.parse_ras_args(self, **kwargs)
+    
+    cmd = args["cmd"]
+    ras = getattr(gp, "ras" + cmd)
+    
+    if cmd == "SLC":
+        ras\
+        (args["datfile"], args["rng"], args["start"], args["nlines"],
+         args["arng"], args["aazi"], args["scale"], args["exp"], args["LR"],
+         args["img_fmt"], args["hdrsz"], args["raster"],
+         debug=args["debug"])
+    else:
+        sec = kwargs.pop("sec", None)
+        
+        if sec is None:
+            ras\
+            (args["datfile"], args["rng"], args["start"], args["nlines"],
+             args["arng"], args["aazi"], args["scale"], args["exp"], args["LR"],
+             args["raster"], args["img_fmt"], args["hdrsz"],
+             debug=args["debug"])
+        else:
+            ras\
+            (args["datfile"], sec, args["rng"], args["start"], args["nlines"],
+             args["arng"], args["aazi"], args["scale"], args["exp"], args["LR"],
+             args["raster"], args["img_fmt"], args["hdrsz"],
+             debug=args["debug"])
+    
+    self.ras = args["raster"]
+
+
+*/
