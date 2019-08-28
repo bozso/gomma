@@ -1,5 +1,6 @@
 package main;
 
+
 import (
     "fmt";
     gm "../gamma";
@@ -18,8 +19,5 @@ func (self Al) String() string {
 
 
 func main() {
-    var a string;
-    
-    fmt.Println(a);
     fmt.Println(gm.First());
 }

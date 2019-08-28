@@ -110,59 +110,6 @@ imview = make_cmd("eog")
 def save(obj):
     return obj.__save__
 
-def extend(base, *field_names):
-    def inner(cls):
-        attribs = {"__slots__": base.__slots__ + field_names}
-        attribs.update({key: val for key, val in cls.__dict__.items()
-                        if key not in {"__dict__", "__weakref__"}})
-        
-        return type(cls.__name__, (base,), attribs)
-    
-    return inner
-
-class PlainBase(object):
-    def init(self, *args, **kwargs):
-        for field in self.__slots__:
-            setattr(self, field, kwargs.get(field))
-    
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-        return all(i == j for i, j in zip(self, other))
-
-    def __iter__(self):
-        for name in self.__slots__:
-            yield getattr(self, name)
-
-    def __repr__(self):
-        txt = ", ".join("%s: %s" % (val, getattr(self, val))
-                        for val in self.__slots__)
-        return "%s(%s)"% (type(self).__name__, txt)
-
-    def to_dict(self):
-        return OrderedDict(zip(self.__slots__, self))
-
-
-def Struct(*field_names):
-    def inner(cls):
-        attribs = {"__slots__": field_names}
-        attribs.update({key: val for key, val in cls.__dict__.items()
-                        if key not in {"__dict__", "__weakref__"}})
-        
-        return type(cls.__name__, (PlainBase,), attribs)
-    
-    return inner
-
-
-def check_name(name):
-    if not all(c.isalnum() or c == '_' for c in name):
-        raise ValueError('Type names and field names can only contain alphanumeric characters and underscores: %r' % name)
-    if iskeyword(name):
-        raise ValueError('Type names and field names cannot be a keyword: %r' % name)
-    if name[0].isdigit():
-        raise ValueError('Type names and field names cannot start with a number: %r' % name)
-
-
 
 Extract = new_type("Extract", ("comp_file", "files"))
 Extracted = new_type("Extracted", ("outpath", "file_list"))
@@ -171,14 +118,16 @@ Extracted = new_type("Extracted", ("outpath", "file_list"))
 make_match = partial(partial, match)
 
 
-def filter_file(template, namelist):
+def filter_file(template: str, namelist: List[str]):
     return filter(make_match(template), namelist)
 
 
 def filter_files(templates, namelist):
-    return (templates.map(make_match)
-                     .map(lambda x: filter(x, namelist))
-                     .chain())
+    return 
+    
+    # (templates.map(make_match)
+    #                  .map(lambda x: filter(x, namelist))
+    #                  .chain())
     
     
 def make_extract(comp_info, *args, **kwargs):
