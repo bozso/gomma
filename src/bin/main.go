@@ -18,5 +18,5 @@ func (self Al) String() string {
 
 
 func main() {
-    fmt.Println(gm.ParseDate(gm.DateLong, "20121203T123112"));
+    fmt.Println(gm.First());
 }

@@ -3,14 +3,19 @@ package gamma;
 import (
     //"fmt";
     fp "path/filepath";
-    //str "strings";
+    str "strings";
     "time";
     zip "archive/zip";
+    conv "strconv";
 );
+
 
 type setting map[string]string;
 
-const useVersion = "20181130";
+const (
+    useVersion = "20181130";
+    BufSize = 50;
+)
 
 
 var versions = map[string]string {
@@ -50,16 +55,19 @@ func makeGamma() map[string]CmdFun {
     result := make(map[string]CmdFun);
     
     for _, module := range Settings.modules {
-        _path := fp.Join(Path, module, "bin", "*")
-        
-        glob, err := fp.Glob(_path)
-        
-        Check(err, "Glob in %s failed!", _path);
-        
-        for _, path := range glob {
-            result[fp.Base(path)] = MakeCmd(path);
+        for _, dir := range [2]string{"bin", "scripts"} {
+            _path := fp.Join(Path, module, dir, "*")
+            glob, err := fp.Glob(_path)
+            
+            Check(err, "Glob in %s failed!", _path);
+            
+            for _, path := range glob {
+                result[fp.Base(path)] = MakeCmd(path);
+            }
         }
         
+        
+        /*
         _path = fp.Join(Path, module, "scripts", "*")
         
         glob, err = fp.Glob(_path)
@@ -69,6 +77,7 @@ func makeGamma() map[string]CmdFun {
         for _, path := range glob {
             result[fp.Base(path)] = MakeCmd(path);
         }
+        */
     }
     
     return result;
@@ -81,8 +90,12 @@ var (
 
 
 
-type Date struct {
+type date struct {
     start, stop, center time.Time;
+};
+
+type Date interface {
+    Date() time.Time;
 };
 
 
@@ -102,8 +115,8 @@ func ParseDate(fmt string, str string) time.Time {
 type DataFile interface {
     Rng() int;
     Azi() int;
-    Intpar() int;
-    Floatpar() float32;
+    IntPar() int;
+    FloatPar() float32;
     Param() string;
 };
 
@@ -118,45 +131,50 @@ func (self ParamFile) Param(name string) string {
     return "implement";
 }
 
-// TODO: implement
-func toInt(str string, idx int) int {
-    var ret int;
+func toInt(par string, idx int) int {
+    ret, err := conv.Atoi(str.Split(par, " ")[idx]);
+    Check(err, "Could not convert string to int!");
     return ret;
 }
 
-// TODO: implement
-func toFloat(str string, idx int) float32 {
-    var ret float32;
+func toFloat(par string, idx int) float64 {
+    ret, err := conv.ParseFloat(str.Split(par, " ")[idx], 64);
+    Check(err, "Could not convert string to float64!");
     return ret;
 }
 
-func (self ParamFile) Intpar(name string) int {
+func (self ParamFile) IntPar(name string) int {
     return toInt(self.Param(name), 0);
 }
 
-func (self ParamFile) Floatpar(name string) float32 {
+func (self ParamFile) FloatPar(name string) float64 {
     return toFloat(self.Param(name), 0);
 }
 
 type dataFile struct {
     dat string;
     ParamFile;
-    Date;
+    date;
 }
 
 func (self dataFile) Rng() int {
-    return self.Intpar("range_samples");
+    return self.IntPar("range_samples");
 }
 
 
 func (self dataFile) Azi() int {
-    return self.Intpar("azimuth_samples");
+    return self.IntPar("azimuth_samples");
+}
+
+
+func (self dataFile) Date() time.Time {
+    return self.center;
 }
 
 
 type Extract struct {
-    File *zip.ReadCloser;
-    FileList []string;
+    file *zip.ReadCloser;
+    fileList []string;
 };
 
 
@@ -166,16 +184,21 @@ func NewExtract(path string, templates []string) Extract {
     
     Check(err, "Could not open zipfile: \"%s\"", path);
     
-    list := make([]string, 10);
+    list := make([]string, BufSize);
     
     
-    for ii, file := range file.File {
+    for _, file := range file.File {
         // TODO: select if matches template
-        list = append(list, file);
+        list = append(list, file.Name);
     }
     
     return Extract{file, list}
 }
+
+func (self Extract) Close() {
+    self.file.Close();
+}
+
 
 //func (self Extract) Filter(extracted []string)
     
