@@ -19,5 +19,6 @@ func (self Al) String() string {
 
 
 func main() {
+    defer gm.RemoveTmp();
     fmt.Println(gm.First());
 }

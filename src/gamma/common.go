@@ -6,7 +6,6 @@ import (
     str "strings";
     "time";
     "os";
-    fp "path/filepath";
     zip "archive/zip";
     set "github.com/deckarep/golang-set"
     conv "strconv";
@@ -129,27 +128,27 @@ type ParamFile struct {
 
 
 // TODO: implement
-func (self ParamFile) Param(name string) string {
+func (self *ParamFile) Param(name string) string {
     return "implement";
 }
 
 func toInt(par string, idx int) int {
     ret, err := conv.Atoi(str.Split(par, " ")[idx]);
-    Check(err, "Could not convert string to int!");
+    Check(err, "Could not convert string %s to int!", par);
     return ret;
 }
 
 func toFloat(par string, idx int) float64 {
     ret, err := conv.ParseFloat(str.Split(par, " ")[idx], 64);
-    Check(err, "Could not convert string to float64!");
+    Check(err, "Could not convert string %s to float64!", par);
     return ret;
 }
 
-func (self ParamFile) IntPar(name string) int {
+func (self *ParamFile) IntPar(name string) int {
     return toInt(self.Param(name), 0);
 }
 
-func (self ParamFile) FloatPar(name string) float64 {
+func (self *ParamFile) FloatPar(name string) float64 {
     return toFloat(self.Param(name), 0);
 }
 
@@ -159,13 +158,18 @@ type dataFile struct {
     date;
 }
 
-func (self dataFile) Rng() int {
+func (self *dataFile) Rng() int {
     return self.IntPar("range_samples");
 }
 
 
-func (self dataFile) Azi() int {
+func (self *dataFile) Azi() int {
     return self.IntPar("azimuth_samples");
+}
+
+
+func (self *dataFile) imgFormat() string {
+    return self.Param("image_format");
 }
 
 
@@ -180,8 +184,8 @@ type Extract struct {
 };
 
 
-func (self Extract) Close() {
-    self.file.Close()
+func (self *Extract) Close() {
+    self.file.Close();
 }
 
 
@@ -196,7 +200,7 @@ func NewExtract(path string, templates []string, root string) Extract {
     
     Check(err, "Could not open zipfile: \"%s\"", path);
     
-    list := make([]string, Bufsize);
+    list := make([]string, BufSize);
     
     for _, file := range file.File {
         name := file.Name;
@@ -208,12 +212,9 @@ func NewExtract(path string, templates []string, root string) Extract {
                 Check(err, "Stat failed on file : \"%s\"", file);
             }
         }
+    }
     
-    return Extract{file, list}
-}
-
-func (self Extract) Close() {
-    self.file.Close();
+    return Extract{file, list};
 }
 
 //func (self Extract) Filter(extracted []string)
@@ -228,7 +229,7 @@ type rect struct {
 };
 
 
-func PointInRect(p point, r rect) bool {
+func pointInRect(p point, r rect) bool {
     return (p.x < r.max.x && p.x > r.min.x &&
             p.y < r.max.y && p.y > r.min.y);
 }
@@ -241,36 +242,32 @@ func First() string {
 type disArgs struct {
     flip, debug bool;
     rng, azi int;
-    img_format, datafile string;
+    imgFormat, datfile string;
 };
 
 type rasArgs struct {
     disArgs;
     ext string;
-    avg_fact int;
+    avgFact int;
 };
 
-func ParseDisArgs(d DataFile, args disArgs) disArgs {
-    var (
-        datfile, img_format *string;
-        rng, azi int;
-    );
+func ParseDisArgs(d dataFile, args disArgs) disArgs {
     
     if len(args.datfile) == 0 {
         args.datfile = d.dat;
     }
     
     if args.rng == 0 {
-        rng = d.rng();
+        args.rng = d.Rng();
     }
     
     if args.azi == 0 {
-        azi = d.azi();
+        args.azi = d.Azi();
     }
     
     // parts = pth.basename(datfile).split(".")
-    if len(args.img_format) == 0 {
-        img_format = d.img_format();
+    if len(args.imgFormat) == 0 {
+        args.imgFormat = d.imgFormat();
     }
     
     // args.flip = -1 if flip else 1

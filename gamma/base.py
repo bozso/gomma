@@ -19,6 +19,10 @@ from functools import partial
 from re import match
 from zipfile import ZipFile
 from pprint import pprint
+from inspect import getfullargspec
+from functools import wraps
+
+from typing import get_type_hints, List
 
 import gamma as gm
 
@@ -56,6 +60,33 @@ os.environ["LD_LIBRARY_PATH"] += settings["libpaths"]
 log = getLogger("gamma.base")
 
 
+def validate_input(obj, **kwargs):
+    hints = get_type_hints(obj)
+
+    # iterate all type hints
+    for attr_name, attr_type in hints.items():
+        if attr_name == 'return':
+            continue
+
+        if not isinstance(kwargs[attr_name], attr_type):
+            raise TypeError(
+                'Argument %r is not of type %s' % (attr_name, attr_type)
+            )
+
+
+def type_check(decorator):
+    @wraps(decorator)
+    def wrapped_decorator(*args, **kwargs):
+        # translate *args into **kwargs
+        func_args = getfullargspec(decorator)[0]
+        kwargs.update(dict(zip(func_args, args)))
+
+        validate_input(decorator, **kwargs)
+        return decorator(**kwargs)
+
+    return wrapped_decorator
+
+
 gamma_cmaps = pth.join(settings["path"], "DISP", "cmaps")
 
 
@@ -65,8 +96,8 @@ gamma_commands = {
     for binfile in iglob(pth.join(settings["path"], module, path, "*"))
 }
 
-
-def make_cmd(command):
+@type_check
+def make_cmd(command: str):
     def cmd(*args, **kwargs):
         _log = kwargs.pop("log", None)
         
@@ -161,7 +192,7 @@ def point_in_rect(point, rect):
 
 
 
-@Struct("start", "stop", "center")
+#@Struct("start", "stop", "center")
 class Date:
     def __init__(self, start_date, stop_date, center=None):
         self.start = start_date
@@ -261,9 +292,9 @@ class DataFile:
     }
     
     pols = frozenset({"vv", "hh", "hv", "vh"})
-
     
-    def __init__(self, **kwargs):
+    @classmethod
+    def new(cls, **kwargs)
         datfile   = kwargs.get("datfile")
         parfile   = kwargs.get("parfile")
         
@@ -278,12 +309,13 @@ class DataFile:
         
         self.dat, self.par, self.tab, = \
         datfile, parfile, kwargs.get("tabfile", None)
-    
-    
+        
+        return cls(dat=datfile, par=parfile, )
+        
     @classmethod
     def from_json(cls, line):
-        return cls(datfile=line["dat"], parfile=line["par"],
-                   tabfile=line["tab"])
+        return cls.new(datfile=line["dat"], parfile=line["par"],
+                       tabfile=line["tab"])
     
     
     def rm(self):

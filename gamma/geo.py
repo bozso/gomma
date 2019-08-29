@@ -19,7 +19,7 @@ log = getLogger("gamma.geo")
 gp = gm.gp
 
 
-@gm.extend(gm.DataFile, "lookup")
+#@gm.extend(gm.DataFile, "lookup")
 class DEM:
     __save__ = {"dat", "par", "lookup"}
     
@@ -95,9 +95,9 @@ class DEM:
         DataFile.raster(self, **kwargs)
 
 
-@gm.extend(gm.DataFile, "hgt", "sim_sar", "zenith", "orient", "inc", "pix", 
-           "psi", "ls_map", "diff_par", "offs", "offsets", "ccp", "coffs",
-           "coffsets")
+#@gm.extend(gm.DataFile, "hgt", "sim_sar", "zenith", "orient", "inc", "pix", 
+#           "psi", "ls_map", "diff_par", "offs", "offsets", "ccp", "coffs",
+#           "coffsets")
 class Geocode:
     _items = {"hgt", "sim_sar", "zenith", "orient", "inc", "pix", "psi",
               "ls_map", "diff_par", "offs", "offsets", "ccp", "coffs",

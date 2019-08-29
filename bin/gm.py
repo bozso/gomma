@@ -68,8 +68,10 @@ class GammaCmd(CParse):
         
 
 def main():
+    gm.make_cmd(5.0)
     
     GammaCmd().parse().args.fun()
+    
     
     
 if __name__ == "__main__":

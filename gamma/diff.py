@@ -13,7 +13,7 @@ __all__ = (
 )
 
 
-@gm.extend(gm.DataFile, "diff_par", "qual", "filt", "cc", "dt", "slc1", "slc2", "sim_unw")
+#@gm.extend(gm.DataFile, "diff_par", "qual", "filt", "cc", "dt", "slc1", "slc2", "sim_unw")
 class IFG:
     __save__ = {"diff_par", "qual", "filt", "cc", "dt", "slc1", "slc2",
                 "sim_unw"}

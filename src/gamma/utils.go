@@ -4,6 +4,8 @@ import (
     "fmt";
     "log";
     "os/exec";
+    "os";
+    io "io/ioutil";
 )
 
 
@@ -19,7 +21,11 @@ func MakeCmd(cmd string) CmdFun {
         arg := make([]string, len(args))
         
         for ii, elem := range args {
-            arg[ii] = fmt.Sprint(elem);
+            if elem != nil {
+                arg[ii] = fmt.Sprint(elem);
+            } else {
+                arg[ii] = "-";
+            }
         }
         
         out, err := exec.Command(cmd, arg...).CombinedOutput();
@@ -41,3 +47,31 @@ func Check(err error, format string, args ...interface{}) {
         log.Fatalf("Error: %s\nError: %s", str, err);
     }
 }
+
+type Tmp struct {
+    files []string;
+}
+
+
+var tmp = Tmp{};
+
+
+func TmpFile() string {
+    file, err := io.TempFile("", "*");
+    Check(err, "Could not create temporary file!");
+    defer file.Close()
+    
+    name := file.Name();
+    
+    tmp.files = append(tmp.files, name);
+    
+    return name;
+}
+
+
+func RemoveTmp() {
+    for _, file := range tmp.files {
+        os.Remove(file);
+    }
+}
+

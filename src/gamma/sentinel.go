@@ -1,25 +1,139 @@
-import shutil as sh
+package gamma;
 
-from os import path as pth
-from datetime import datetime, timedelta
-from zipfile import ZipFile
-from logging import getLogger
-from re import match
-from functools import partial, reduce
-import operator as op
-
-
-import gamma as gm
-
-from utils import *
-
-log = getLogger("gamma.sentinel1")
-
-gp = gm.gp
+import (
+    "fmt";
+    "log";
+    //conv "strconv";
+    str "strings";
+);
 
 
-BurstInfo = new_type("BurstInfo", ("num", "string"))
 
+var (
+    burstCorner CmdFun;
+);
+
+
+const (
+    burstTpl = "burst_asc_node_%d";
+);
+
+
+
+func init() {
+    var ok bool;
+    
+    if burstCorner, ok = Gamma["ScanSAR_burst_corners"]; !ok {
+        if burstCorner, ok = Gamma["SLC_burst_corners"]; !ok {
+            log.Fatal("No Fun.")
+        }
+    }
+}
+
+
+var extractRegex = map[string]string {
+        "file": "{{mission}}-iw{{iw}}-slc-{{pol}}-.*-{{abs_orb}}-" + 
+                "{{DTID}}-[0-9]{3}",
+        "tiff":  "measurement/%s.tiff",
+        "annot": "annotation/%s.xml",
+        "calib": "annotation/%s.xml",
+        "noise": "annotation/calibration/noise-%s.xml",
+        "preview": "preview/product-preview.html",
+        "quicklook": "preview/quick-look.png",
+};
+
+
+type S1Zip struct {
+    path, zip_base, mission, datestr, mode, prod_type, resolution string;
+    level, prod_class, pol, abs_orb, DTID, UID string;
+    date date;
+};
+
+func (self *S1Zip) extracTemplates(names []string, pol, iw string) []string  {
+    // TODO: finish
+    // tpl = extractRegex["file"]
+    
+    //    tpl = self.extract_regex["file"]\
+    //          .format(obj=self, mission=self.mission.lower(), 
+    //                  DTID=self.DTID.lower(), pol=pol, iw=iw)
+    //    return (Seq(self.extract_regex[name] for name in names)
+    //                .map(str.format, tpl=tpl)
+    //                .map(self.safe_join))
+    
+    return []string{"asd"}
+}
+
+
+func iwInfo(path string) IWInfo {
+    //num, err := conv.Atoi(str.Split(path, "iw")[1][0]);
+    num := int(str.Split(path, "iw")[1][0])
+    // Check(err, "Failed to retreive IW number from %s", path);
+    
+    par, TOPS_par := TmpFile(), TmpFile()
+    
+    info := Gamma["par_S1_SLC"](nil, path, nil, nil, par, nil, TOPS_par);
+    
+    nburst := toInt(GetPar("number_of_bursts", TOPS_par), 0)
+    numbers := make([]float64, nburst)
+    
+    for ii := 0; ii < nburst; ii++ {
+         tpl := fmt.Sprintf(burstTpl, ii);
+         numbers[ii] = toFloat(str.Split(GetPar(tpl, TOPS_par))[0], 0)
+    }
+    
+    max := point{x:toFloat(GetPar("Max_Lon", info), 0), 
+                 y:toFloat(GetPar("Max_Lat", info), 0)};
+ 
+    min := point{x:toFloat(GetPar("Min_Lon", info), 0), 
+                 y:toFloat(GetPar("Min_Lat", info), 0)};
+
+    return IWInfo{num, rect{min:min, max:max}, numbers};
+}
+
+
+type IWInfo struct {
+    num int;
+    extent rect;
+    bursts []float64;
+}
+
+
+func pointInIWs(p point, IWs []IWInfo) bool {
+    for _, iw := range IWs {
+        if pointInRect(p, iw.extent) {
+            return true;
+        }
+    }
+    return false;
+}
+
+func pointsInSLC(IWs []IWInfo, points [4]point) bool {
+    sum := 0;
+    
+    for _, point := range points {
+        if pointInIWs(point, IWs) {
+            sum++;
+        }
+    }
+    return sum == 4;
+}
+
+
+type S1IW struct {
+    dataFile;
+    TOPS_par ParamFile;
+};
+
+
+type S1SLC struct {
+    nIW int;
+    IWs [9]S1IW;
+    tab string;
+};
+
+
+
+/*
 
 def safe(path):
     return filter(lambda x: ".SAFE" in x, pth.normpath(path).split(pth.sep))
@@ -34,26 +148,7 @@ class S1Zip(object):
     
     burst_fun = getattr(gp, cmd)
     
-    extract_regex = {
-        "file": '{mission}-iw{iw}-slc-{pol}-.*-{obj.abs_orb}-'
-                '{DTID}-[0-9]{{3}}',
-        "tiff":  "measurement/{tpl}.tiff",
-        "annot": "annotation/{tpl}.xml",
-        "calib": "annotation/{tpl}.xml",
-        "noise": "annotation/calibration/noise-{tpl}.xml",
-        "preview": "preview/product-preview.html",
-        "quicklook": "preview/quick-look.png"
-    }
-    
     regex_names = set(extract_regex.keys()) - {"file"}
-    
-    __slots__ = ("path", "mission", "datestr", "date", "burst_nums", "mode",
-                 "prod_type", "resolution", "level", "prod_class", "pol",
-                 "abs_orb", "DTID", "UID", "zip_base", "safe_join")
-    
-    
-    __save__ = ("path", "burst_nums", "mission")
-    
     
     def __init__(self, zippath, extra_info=False):
         zip_base = pth.basename(zippath)
@@ -78,41 +173,6 @@ class S1Zip(object):
                                  zip_base.replace(".zip", ".SAFE"))
     
     
-    @classmethod
-    def from_json(cls, line):
-        ret = cls(line["zip_path"])
-        ret.burst_nums = line["burst_nums"]
-        
-        return ret
-    
-    
-    def extract_templates(self, names, **kwargs):
-        pol, iw = kwargs.get("pol", "vv"), kwargs.get("iw", "[1-3]")
-        
-        tpl = self.extract_regex["file"]\
-              .format(obj=self, mission=self.mission.lower(), 
-                      DTID=self.DTID.lower(), pol=pol, iw=iw)
-        
-        
-        return (Seq(self.extract_regex[name] for name in names)
-                    .map(str.format, tpl=tpl)
-                    .map(self.safe_join))
-    
-    
-    def test_zip(self):
-        with ZipFile(self.zipfile, "r") as slc_zip:
-    
-            testzip = slc_zip.testzip()
-    
-            if testzip:
-                log.error('Bad zipfile detected. First bad file is '
-                          '"%s" in zipfile "%s".'
-                          % (testzip, zipfile))
-                return False
-        return True
-
-
-IWInfo = new_type("IWCorner", ("num", "rect", "bursts"))
 
 burst_tpl = "burst_asc_node_%d"
 
@@ -161,7 +221,7 @@ def points_in_IWs(IWs, points):
     return points.map(point_in_IWs, IWs=IWs.collect())
 
 
-# @gm.extend(gm.DataFile, "TOPS_par")
+@gm.extend(gm.DataFile, "TOPS_par")
 class S1IW:
     tpl = gm.settings["templates"]["IW"]
     
@@ -237,7 +297,7 @@ class S1IW:
 not_none = partial(filter, lambda x: x is not None)
 
 
-#@gm.Struct("IWs", "tab", "slc")
+@gm.Struct("IWs", "tab", "slc")
 class S1SLC:
     __save__ = {"tab",}
     
@@ -513,3 +573,5 @@ def check_paths(path):
                         "corresponds to the regexp. Paths: {}".format(path))
     else:
         return path[0]
+
+*/
