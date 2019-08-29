@@ -2,10 +2,18 @@
 
 main() {
     local root="/home/istvan/progs/gamma/src/bin"
-    local main="${root}/main.go"
-    local gamma="${root}/Gamma"
+    local py="${root}/main.py"
     
-    go build -o "${gamma}" "${main}" && ${gamma} $*
+    # make debug "${root}/Makefile" && 
+    
+    curr="$(pwd)"
+    
+    cd "${root}"
+    haxe -cp ../gamma --no-opt -debug -main "Main.hx" -python "main.py"
+    
+    cd "${curr}"
+    
+    python "${py}" $*
 }
 
 main $*

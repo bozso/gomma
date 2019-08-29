@@ -1,0 +1,4 @@
+-cp gamma
+-main Main.hx
+-python bin/main.py
+--no-opt
