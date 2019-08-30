@@ -7,6 +7,7 @@ from logging import getLogger
 from re import match
 from functools import partial, reduce
 import operator as op
+from typing import Iterable
 
 
 import gamma as gm
@@ -18,7 +19,8 @@ log = getLogger("gamma.sentinel1")
 gp = gm.gp
 
 
-BurstInfo = new_type("BurstInfo", ("num", "string"))
+
+IWInfo = new_type("IWCorner", ("num", "rect", "bursts"))
 
 
 def safe(path):
@@ -86,7 +88,19 @@ class S1Zip(object):
         return ret
     
     
-    def extract_templates(self, names, **kwargs):
+    def make_extract(self, *args, **kwargs) -> gm.Extract:
+        comp_file = ZipFile(self.path, "r")
+        namelist = comp_file.namelist()
+        filterer = partial(gm.filter_file, namelist=namelist)
+        
+        templates = self.extract_templates(*args, **kwargs)
+        
+        return gm.Extract(comp_file=comp_file,
+                          files=";".join(";".join(filterer(tpl))
+                                         for tpl in templates))
+    
+    
+    def extract_templates(self, names: Iterable[str], **kwargs):
         pol, iw = kwargs.get("pol", "vv"), kwargs.get("iw", "[1-3]")
         
         tpl = self.extract_regex["file"]\
@@ -94,9 +108,26 @@ class S1Zip(object):
                       DTID=self.DTID.lower(), pol=pol, iw=iw)
         
         
-        return (Seq(self.extract_regex[name] for name in names)
-                    .map(str.format, tpl=tpl)
-                    .map(self.safe_join))
+        return [self.safe_join(self.extract_regex[name].format(tpl=tpl))
+                for name in names]
+    
+    
+    
+    def use_extracted(self, names, extracted, **kwargs):
+        filterer = partial(gm.filter_file, namelist=extracted.file_list)
+        joiner   = partial(pth.join, extracted.outpath)
+        
+        files = \
+        map(";".join, map(filterer, self.extract_templates(names, **kwargs)))
+        
+        files = ";".join(files).split(";")
+        
+        return map(joiner, files)
+    
+    
+    def iw_info(self, **kwargs):
+        return T(iw_info_from_annot(elem)
+                 for elem in self.use_extracted(("annot",), **kwargs))
     
     
     def test_zip(self):
@@ -112,7 +143,6 @@ class S1Zip(object):
         return True
 
 
-IWInfo = new_type("IWCorner", ("num", "rect", "bursts"))
 
 burst_tpl = "burst_asc_node_%d"
 
@@ -141,16 +171,8 @@ def iw_info_from_annot(path):
                   numbers)
 
 
-def use_extracted(self, names, extracted, **kwargs):
-    return (self.extract_templates(names, **kwargs)
-                .map(gm.filter_file, namelist=extracted.file_list)
-                .chain()
-                .map(partial(pth.join, extracted.outpath)))
 
 
-def iw_info(self, **kwargs):
-    return (use_extracted(self, ("annot",), **kwargs)
-            .map(iw_info_from_annot))
     
 
 def point_in_IWs(point, IWs):
@@ -158,7 +180,8 @@ def point_in_IWs(point, IWs):
 
 
 def points_in_IWs(IWs, points):
-    return points.map(point_in_IWs, IWs=IWs.collect())
+    fun = partial(point_in_IWs, IWs=IWs)
+    return map(fun, points)
 
 
 # @gm.extend(gm.DataFile, "TOPS_par")

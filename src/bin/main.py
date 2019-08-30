@@ -6,6 +6,7 @@ import math as Math
 from os import path as python_lib_os_Path
 import inspect as python_lib_Inspect
 import os as python_lib_Os
+import glob as python_lib_Glob
 import functools as python_lib_Functools
 try:
     import msvcrt as python_lib_Msvcrt
@@ -63,67 +64,15 @@ class Enum:
 class EnumValue:
     _hx_class_name = "EnumValue"
 
-class ItemType(Enum):
-    __slots__ = ()
-    _hx_class_name = "ItemType"
-
-    @staticmethod
-    def Sword(name,attack):
-        return ItemType("Sword", 1, [name,attack])
-
-    @staticmethod
-    def Shield(name,defense):
-        return ItemType("Shield", 2, [name,defense])
-ItemType.Key = ItemType("Key", 0, list())
-
 
 class Main:
     _hx_class_name = "Main"
     __slots__ = ()
-    _hx_statics = ["choose", "make_cmd", "test", "main"]
-
-    @staticmethod
-    def choose(a):
-        # Main.hx:14
-        a1 = a.index
-        # Main.hx:16
-        if (a1 == 0):
-            return "Key"
-        elif (a1 == 1):
-            # Main.hx:17
-            attack = a.params[1]
-            name = a.params[0]
-            # Main.hx:18
-            return "Sword"
-        elif (a1 == 2):
-            # Main.hx:19
-            defense = a.params[1]
-            name1 = a.params[0]
-            # Main.hx:20
-            return "Shield"
-        else:
-            pass
-
-    @staticmethod
-    def make_cmd(name):
-        # Main.hx:28
-        def _hx_local_0(args):
-            # Main.hx:29
-            return "a"
-        return _hx_local_0
-
-    @staticmethod
-    def test(a):
-        # Main.hx:35
-        output = sys_io_Process("ls",[]).stdout.readAll().toString()
-        # Main.hx:36
-        print(str(a))
+    _hx_statics = ["main"]
 
     @staticmethod
     def main():
-        # Main.hx:40
-        Main.test(ItemType.Sword("A",11))
-        # Main.hx:41
+        # Main.hx:12
         print("Hello World!")
 
 
@@ -480,6 +429,120 @@ class Sys:
     def stderr():
         # /home/istvan/packages/haxe/std/python/_std/Sys.hx:163
         return python_io_IoTools.createFileOutputFromText(python_lib_Sys.stderr)
+
+
+class gamma__Common_Settings:
+    _hx_class_name = "gamma._Common.Settings"
+    __slots__ = ("ras_ext", "path", "modules", "libpaths", "templates", "cache_default_path")
+    _hx_fields = ["ras_ext", "path", "modules", "libpaths", "templates", "cache_default_path"]
+
+    def __init__(self,ras_ext,path,modules,libpaths,templates,cache_default_path):
+        # src/gamma/Common.hx:24
+        self.ras_ext = ras_ext
+        # src/gamma/Common.hx:25
+        self.path = path
+        # src/gamma/Common.hx:26
+        self.modules = modules
+        # src/gamma/Common.hx:27
+        self.libpaths = libpaths
+        # src/gamma/Common.hx:28
+        self.templates = templates
+        # src/gamma/Common.hx:29
+        self.cache_default_path = cache_default_path
+
+
+
+class gamma__Common_Templates:
+    _hx_class_name = "gamma._Common.Templates"
+    __slots__ = ("IW", "short", "long", "tab")
+    _hx_fields = ["IW", "short", "long", "tab"]
+
+    def __init__(self,IW,short,long,tab):
+        # src/gamma/Common.hx:41
+        self.IW = IW
+        # src/gamma/Common.hx:42
+        self.short = short
+        # src/gamma/Common.hx:43
+        self.long = long
+        # src/gamma/Common.hx:44
+        self.tab = tab
+
+
+
+class gamma_Printable:
+    _hx_class_name = "gamma.Printable"
+    __slots__ = ()
+    _hx_methods = ["toString"]
+
+
+class gamma_Common:
+    _hx_class_name = "gamma.Common"
+    __slots__ = ()
+    _hx_statics = ["versions", "settings", "gamma_commands", "make_cmd"]
+
+    @staticmethod
+    def make_cmd(name):
+        # src/gamma/Common.hx:80
+        def _hx_local_0(args,debug = False):
+            # src/gamma/Common.hx:81
+            _g = []
+            _g1 = 0
+            while (_g1 < len(args)):
+                elem = (args[_g1] if _g1 >= 0 and _g1 < len(args) else None)
+                _g1 = (_g1 + 1)
+                x = (("[" + HxOverrides.stringOrNull(",".join([python_Boot.toString1(x1,'') for x1 in args]))) + "]")
+                _g.append(x)
+            args1 = _g
+            # src/gamma/Common.hx:82
+            cmd = "${name} ${args}"
+            # src/gamma/Common.hx:84
+            if debug:
+                # src/gamma/Common.hx:85
+                print("Command: ${cmd}")
+                # src/gamma/Common.hx:86
+                return ""
+            # src/gamma/Common.hx:89
+            proc = sys_io_Process("ls",args1)
+            # src/gamma/Common.hx:91
+            if (proc.exitCode() != 0):
+                raise RuntimeError("\nNon zero returncode from command: \n                                       \n'${cmd}'\n \nOUTPUT OF THE COMMAND: \n                                       \n\n{proc.stderr.readAll()}")
+            # src/gamma/Common.hx:97
+            return proc.stdout.readAll().toString()
+        return _hx_local_0
+
+
+class gamma_Point:
+    _hx_class_name = "gamma.Point"
+    __slots__ = ("x", "y")
+    _hx_fields = ["x", "y"]
+    _hx_methods = ["in_rect"]
+
+    def __init__(self,x,y):
+        # src/gamma/Common.hx:107
+        self.x = x
+        # src/gamma/Common.hx:108
+        self.y = y
+
+    def in_rect(self,rect):
+        # src/gamma/Common.hx:112
+        if (((self.x > rect.min.x) and ((self.x < rect.max.x))) and ((self.y > rect.min.y))):
+            return (self.y < rect.max.y)
+        else:
+            return False
+
+
+
+class gamma_Rect:
+    _hx_class_name = "gamma.Rect"
+    __slots__ = ("max", "min")
+    _hx_fields = ["max", "min"]
+
+    def __init__(self,_hx_min,_hx_max):
+        # src/gamma/Common.hx:123
+        self.max = _hx_max
+        # src/gamma/Common.hx:124
+        self.min = _hx_min
+
 
 
 class haxe_io_Bytes:
@@ -2000,6 +2063,7 @@ class sys_io_Process:
     _hx_class_name = "sys.io.Process"
     __slots__ = ("stdout", "stderr", "stdin", "p")
     _hx_fields = ["stdout", "stderr", "stdin", "p"]
+    _hx_methods = ["exitCode"]
 
     def __init__(self,cmd,args = None):
         # /home/istvan/packages/haxe/std/python/_std/sys/io/Process.hx:35
@@ -2031,6 +2095,16 @@ class sys_io_Process:
         self.stderr = python_io_IoTools.createFileInputFromText(python_lib_io_TextIOWrapper(python_lib_io_BufferedReader(self.p.stderr)))
         # /home/istvan/packages/haxe/std/python/_std/sys/io/Process.hx:43
         self.stdin = python_io_IoTools.createFileOutputFromText(python_lib_io_TextIOWrapper(python_lib_io_BufferedWriter(self.p.stdin)))
+
+    def exitCode(self,block = True):
+        # /home/istvan/packages/haxe/std/python/_std/sys/io/Process.hx:49
+        if (block is None):
+            block = True
+        # /home/istvan/packages/haxe/std/python/_std/sys/io/Process.hx:50
+        if (block == False):
+            return self.p.poll()
+        # /home/istvan/packages/haxe/std/python/_std/sys/io/Process.hx:52
+        return self.p.wait()
 
 
 # /home/istvan/packages/haxe/std/python/_std/Math.hx:135
@@ -2064,6 +2138,46 @@ def _hx_init_Sys_environ():
     return _hx_local_0()
 Sys.environ = _hx_init_Sys_environ()
 Sys._programPath = sys_FileSystem.fullPath(python_lib_Inspect.getsourcefile(Sys))
+def _hx_init_gamma_Common_versions():
+    # src/gamma/Common.hx:55
+    def _hx_local_0():
+        # src/gamma/Common.hx:55
+        _g = haxe_ds_StringMap()
+        _g.h["20181130"] = "/home/istvan/progs/GAMMA_SOFTWARE-20181130"
+        return _g
+    return _hx_local_0()
+gamma_Common.versions = _hx_init_gamma_Common_versions()
+gamma_Common.settings = gamma__Common_Settings("bmp",gamma_Common.versions.h.get("20181130",None),["DIFF", "DISP", "ISP", "LAT", "IPTA"],"/home/istvan/miniconda3/lib:",gamma__Common_Templates("{date}_iw{iw}.{pol}.slc","%Y%m%d","%Y%m%dT%H%M%S","{date}.{pol}.SLC_tab"),"/mnt/bozso_i/cache")
+def _hx_init_gamma_Common_gamma_commands():
+    # src/gamma/Common.hx:72
+    def _hx_local_0():
+        # src/gamma/Common.hx:72
+        _g = []
+        # src/gamma/Common.hx:73
+        # src/gamma/Common.hx:73
+        _g1 = 0
+        _g2 = gamma_Common.settings.modules
+        while (_g1 < len(_g2)):
+            module = (_g2[_g1] if _g1 >= 0 and _g1 < len(_g2) else None)
+            _g1 = (_g1 + 1)
+            # src/gamma/Common.hx:74
+            # src/gamma/Common.hx:74
+            _g3 = 0
+            _g4 = ["bin", "scripts"]
+            while (_g3 < len(_g4)):
+                path = (_g4[_g3] if _g3 >= 0 and _g3 < len(_g4) else None)
+                _g3 = (_g3 + 1)
+                # src/gamma/Common.hx:75
+                # src/gamma/Common.hx:75
+                binfile = python_HaxeIterator(python_lib_Glob.iglob(python_lib_os_Path.join(gamma_Common.settings.path,module,path,"*")))
+                while binfile.hasNext():
+                    binfile1 = binfile.next()
+                    # src/gamma/Common.hx:76
+                    _g.append(binfile1)
+        # src/gamma/Common.hx:72
+        return _g
+    return _hx_local_0()
+gamma_Common.gamma_commands = _hx_init_gamma_Common_gamma_commands()
 python_Boot.keywords = set(["and", "del", "from", "not", "with", "as", "elif", "global", "or", "yield", "assert", "else", "if", "pass", "None", "break", "except", "import", "raise", "True", "class", "exec", "in", "return", "False", "continue", "finally", "is", "try", "def", "for", "lambda", "while"])
 python_Boot.prefixLength = len("_hx_")
 

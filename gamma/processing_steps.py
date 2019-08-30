@@ -19,8 +19,7 @@ except ImportError:
 
 from utils import *
 import gamma as gm
-import gamma.sentinel1 as s1
-
+from gamma.sentinel1 import points_in_IWs
 
 __all__ = (
     "Processing",
@@ -70,13 +69,13 @@ falses = frozenset({"false", "off", "0"})
 
 
 class Config(dict):
-    def int(self, key, default):
+    def int(self, key: str, default: int):
         return int(self.get(key, default))
     
-    def float(self, key, default):
+    def float(self, key: str, default: float):
         return float(self.get(key, default))
-   
-    def bool(self, key, default):
+    
+    def bool(self, key: str, default: bool):
         val = self.get(key, default)
         
         if val is None:
@@ -133,7 +132,7 @@ class Meta(dict, Save):
 
 
 class Processing(object):
-    cache_dirs = frozenset({"ifg", "slc", "rslc", "extracted"})
+    cache_dirs = fs("ifg", "slc", "rslc", "extracted")
     
     ftypes = {
         name: getattr(gm, name).from_json
@@ -142,8 +141,8 @@ class Processing(object):
     
     _default_log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
-    steps = frozenset({"select", "load_slc", "merge",  "make_mli", "make_rmli",
-                       "check_geocode"})
+    steps = fs("select", "load_slc", "merge",  "make_mli", "make_rmli",
+               "check_geocode")
     
     
     def __init__(self, args):
@@ -413,8 +412,8 @@ class Processing(object):
         float(lower_left[0]), float(lower_left[1]), \
         float(upper_right[0]), float(upper_right[1])
         
-        aoi = Seq((gm.Point(ll_lon, ll_lat), gm.Point(ll_lon, ur_lat),
-                   gm.Point(ur_lon, ur_lat), gm.Point(ur_lon, ll_lat)))
+        aoi = (gm.Point(ll_lon, ll_lat), gm.Point(ll_lon, ur_lat),
+               gm.Point(ur_lon, ur_lat), gm.Point(ur_lon, ll_lat))
         
         
         if slc_data is None:
@@ -429,7 +428,7 @@ class Processing(object):
         select.bool("check_zips", False)
         
         
-        SLC = Seq(map(gm.S1Zip, ls(slc_data, "S1*_IW_SLC*.zip")))
+        SLC = map(gm.S1Zip, ls(slc_data, "S1*_IW_SLC*.zip"))
         
         if date_start is not None and date_stop is not None:
             date_start = datetime.strptime(date_start, "%Y%m%d")
@@ -449,7 +448,7 @@ class Processing(object):
             
             filt = lambda x: x.date.stop < date_stop
         else:
-            filt = lambda x: x
+            filt = lambda x: True
         
         
         if check_zips:
@@ -457,33 +456,31 @@ class Processing(object):
             filt = lambda x: x.test_zip() and filt
         
         
-        SLC = SLC.filter(filt).seq()
+        SLC = tuple(filter(filt, SLC))
         
         extracted = self.caches.extracted
+        select = partial(isfile, extracted)
+        
         
         names = ("annot", "quicklook")
         
-        extracted_files = (SLC.map(gm.make_extract, pol=pol, names=names)
-                              .select("files")
-                              .chain()
-                              .collect())
+        extractors = T(slc.make_extract(pol=pol, names=names)
+                       for slc in SLC)
+        ext_files = (";".join(elem.files for elem in extractors)).split(";")
         
         
-        (SLC.map(gm.make_extract, pol=pol, names=names)
-            .map(gm.select_not_extracted, pred=partial(isfile, extracted))
-            .map(gm.extract, outpath=extracted)
-            .chain()
-            .collect())
+        for ext in extractors:
+            ext.extract(outpath=extracted)
         
-        extracted = gm.Extracted(extracted, extracted_files)
+        extracted = gm.Extracted(extracted, ext_files)
         
-        SLC = (SLC.map(s1.iw_info, extracted=extracted, pol=pol)
-                  .filter(s1.points_in_IWs, points=aoi))
+        selector = \
+        lambda x: points_in_IWs(x.iw_info(extracted=extracted, pol=pol),
+                                points=aoi)
         
-        # SLC = (SLC.map(s1.use_extracted, names=("annot",), pol=pol,
-        #                extracted=extracted))
+        SLC = T(filter(selector, SLC))
         
-        pprint(SLC.chain().collect())
+        pprint(SLC)
         exit()
         
         # SLC = SLC.filter(s1.points_in_SLC, points=aoi,

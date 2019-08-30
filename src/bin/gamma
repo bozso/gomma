@@ -1,15 +1,16 @@
 #!/usr/bin/env sh
 
 main() {
-    local root="/home/istvan/progs/gamma/src/bin"
-    local py="${root}/main.py"
+    local root="/home/istvan/progs/gamma"
+    local py="${root}/src/bin/main.py"
     
     # make debug "${root}/Makefile" && 
     
     curr="$(pwd)"
     
     cd "${root}"
-    haxe -cp ../gamma --no-opt -debug -main "Main.hx" -python "main.py"
+    haxe -cp src --no-opt -debug -main "Main.hx" -python "${py}"
+    # haxe -cp src -debug -main "Main.hx" -python "${py}"
     
     cd "${curr}"
     

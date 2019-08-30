@@ -19,10 +19,6 @@ from functools import partial
 from re import match
 from zipfile import ZipFile
 from pprint import pprint
-from inspect import getfullargspec
-from functools import wraps
-
-from typing import get_type_hints, List
 
 import gamma as gm
 
@@ -60,33 +56,6 @@ os.environ["LD_LIBRARY_PATH"] += settings["libpaths"]
 log = getLogger("gamma.base")
 
 
-def validate_input(obj, **kwargs):
-    hints = get_type_hints(obj)
-
-    # iterate all type hints
-    for attr_name, attr_type in hints.items():
-        if attr_name == 'return':
-            continue
-
-        if not isinstance(kwargs[attr_name], attr_type):
-            raise TypeError(
-                'Argument %r is not of type %s' % (attr_name, attr_type)
-            )
-
-
-def type_check(decorator):
-    @wraps(decorator)
-    def wrapped_decorator(*args, **kwargs):
-        # translate *args into **kwargs
-        func_args = getfullargspec(decorator)[0]
-        kwargs.update(dict(zip(func_args, args)))
-
-        validate_input(decorator, **kwargs)
-        return decorator(**kwargs)
-
-    return wrapped_decorator
-
-
 gamma_cmaps = pth.join(settings["path"], "DISP", "cmaps")
 
 
@@ -96,8 +65,8 @@ gamma_commands = {
     for binfile in iglob(pth.join(settings["path"], module, path, "*"))
 }
 
-@type_check
-def make_cmd(command: str):
+
+def make_cmd(command):
     def cmd(*args, **kwargs):
         _log = kwargs.pop("log", None)
         
@@ -145,35 +114,25 @@ def save(obj):
 Extract = new_type("Extract", ("comp_file", "files"))
 Extracted = new_type("Extracted", ("outpath", "file_list"))
 
+def __extract(self, outpath):
+    extractor = partial(self.comp_file.extract, path=outpath)
+    checker = compose(isfile, partial(pth.join, outpath))
+    
+    for path in self.files.split(";"):
+        if not checker(path):
+            extractor(path)
+
+Extract.extract = __extract
 
 make_match = partial(partial, match)
 
-
-def filter_file(template: str, namelist: List[str]):
-    return filter(make_match(template), namelist)
-
-
-def filter_files(templates, namelist):
-    return 
-    
-    # (templates.map(make_match)
-    #                  .map(lambda x: filter(x, namelist))
-    #                  .chain())
-    
-    
-def make_extract(comp_info, *args, **kwargs):
-    comp_file = ZipFile(comp_info.path, "r")
-    namelist = comp_file.namelist()
-    
-    templates = comp_info.extract_templates(*args, **kwargs)
-    
-    return gm.Extract(comp_file=comp_file,
-                      files=filter_files(templates, namelist))
-
+def filter_file(template, namelist):
+    matcher = partial(match, template)
+    return T(elem for elem in namelist if matcher(elem))
 
 
 def select_not_extracted(ext, pred):
-    return gm.Extract(ext.comp_file, ext.files.filter_false(pred))
+    return gm.Extract(ext.comp_file, files=filter(pred, ext.files))
     
 
 def extract(ext, outpath):
@@ -192,8 +151,9 @@ def point_in_rect(point, rect):
 
 
 
-#@Struct("start", "stop", "center")
 class Date:
+    __slots__ = ("start", "stop", "center")
+    
     def __init__(self, start_date, stop_date, center=None):
         self.start = start_date
         self.stop = stop_date
@@ -208,9 +168,6 @@ class Date:
     def date2str(self, fmt="%Y%m%d"):
         return self.center.strftime(fmt)
     
-    # def __str__(self):
-    #     return self.date2str()
-
 
 def date2str(obj, fmt="%Y%m%d"):
     date = obj.date
@@ -279,8 +236,9 @@ class Parfile(object):
                 f.write("%s\n" % "\n".join(lines))
 
 
-@Struct("dat", "par", "datpar", "tab", "files")
-class DataFile:
+class DataFile(Parfile):
+    __slots__ = ("dat", "datpar", "tab", "files")
+    
     __save__ = {"dat", "par", "tab"}
     
     data_types = {
@@ -291,10 +249,10 @@ class DataFile:
         "DOUBLE": 2
     }
     
-    pols = frozenset({"vv", "hh", "hv", "vh"})
+    pols = fs("vv", "hh", "hv", "vh")
     
-    @classmethod
-    def new(cls, **kwargs)
+    
+    def __init__(self, **kwargs):
         datfile   = kwargs.get("datfile")
         parfile   = kwargs.get("parfile")
         
@@ -311,7 +269,8 @@ class DataFile:
         datfile, parfile, kwargs.get("tabfile", None)
         
         return cls(dat=datfile, par=parfile, )
-        
+    
+    
     @classmethod
     def from_json(cls, line):
         return cls.new(datfile=line["dat"], parfile=line["par"],
@@ -338,17 +297,17 @@ class DataFile:
     def __bool__(self):
         return  all(map(isfile, self.files))
 
-    def rng(self):
+    def rng(self) -> int:
         return self.int("range_samples")
 
-    def azi(self):
+    def azi(self) -> int:
         return self.int("azimuth_lines")
     
-    def img_fmt(self):
+    def img_fmt(self) -> str:
         return self["image_format"]
     
     
-    def pol(self):
+    def pol(self) -> str:
         dat = self.dat
         for pol in self.pols:
             if pol in dat or pol.upper() in dat:
@@ -366,7 +325,7 @@ class DataFile:
               (stat.float("mean"), stat.float("stdev")))
 
     
-    def date(self, start_stop=False):
+    def date(self, start_stop: bool=False):
         date = \
         datetime.strptime(" ".join(self["date"].split()[:3]), "%Y %m %d")
         
