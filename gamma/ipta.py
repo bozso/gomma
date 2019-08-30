@@ -1,6 +1,5 @@
 import os.path as pth
 
-from tempfile import NamedTemporaryFile
 from glob import glob
 from math import pi
 from collections import namedtuple
@@ -23,6 +22,8 @@ __all__ = ("PointData", "merge", "get_llh", "plist_fmt")
 plist_fmt = ">2I"
 
 class Data(object):
+    __slots__ = ("path", "dtype")
+    
     sizes = {
         "FCOMPLEX" : 2 * sizeof(c_float),
         "SCOMPLEX" : 2 * sizeof(c_short),
@@ -43,14 +44,11 @@ class Data(object):
         "raster"   : 6
     }
 
-    def __init__(self, path, dtype, keep=True):
-        self.keep, self.path, self.dtype  = keep, path, dtype
-    
-    
-    def __del__(self):
-        if not self.keep:
-            gm.rm(self.path)
-
+    def __init__(self, dtype, path=None):
+        if path is None:
+            path = tmp_file()
+        
+        self.path, self.dtype  = path, dtype
 
     def dcode(self):
         return Data.dtypes[self.dtype.upper()]
@@ -65,6 +63,8 @@ class Data(object):
 
 
 class Masks(object):
+    __slots__ = ("root", "mlist")
+    
     def __init__(self, root):
         self.root, self.mlist = root, {}
 
@@ -81,6 +81,8 @@ class Masks(object):
             
 
 class PointData(object):
+    __slots__ = ("root", "data_dir", "plist", "slc", "data", "mask", "mli")
+    
     modes = {
         "const": 0,
         "const_bperp": 1,
@@ -131,11 +133,8 @@ class PointData(object):
         return "<PointData point_list: %s point_datas: %s point_masks: %s>" \
                % (self.plist, self.pdata, self.pmask)
     
-
-    def tmp(self, dtype, **kwargs):
-        return Data(gm.Files.get_tmp(**kwargs), dtype, keep=False)
     
-    def get_mask(self, mask):
+    def mask(self, mask):
         if mask is None:
             return None
         else:
@@ -161,11 +160,10 @@ class PointData(object):
         pth.join(self.sp_msr_dir, "msr_list"),
         
         if 0:
-            with gm.ListIter(slc_list, gm.SLC.from_line) as f, \
-                 open(self.cc_list, "w") as f_cc, \
+            with open(self.cc_list, "w") as f_cc, \
                  open(self.msr_list, "w") as f_msr:
                 
-                for ii, slc in enumerate(f):
+                for ii, slc in enumerate(slc_list):
                     tpl = pth.join(self.sp_msr_dir, slc.datestr() + ".%s")
                     
                     cc, msr, pt = tpl % "sp_cc", tpl % "sp_msr", tpl % "sp_pt"
@@ -234,12 +232,12 @@ class PointData(object):
         
         gm.plot(**kwargs)
     
-    def get_data(self, datfile, parfile, pdata, rec=None, dtype=None):
+    def data(self, datfile, parfile, pdata, rec=None, dtype=None):
         if dtype is None:
             dtype = datfile.img_fmt()
         
-        gp.data2pt(datfile, parfile, self.plist, self.slc.par, self.data[pdata],
-                   rec, self.data[pdata].dcode())
+        gp.data2pt(datfile, parfile, self.plist, self.slc.par,
+                   self.data[pdata], rec, self.data[pdata].dcode())
 
 
     def npoints(self, mask=None):
@@ -255,7 +253,6 @@ class PointData(object):
                 return int(line.split(":")[1])
     
     
-    
     def def_pt(self, diff, itab, model, mask=None, bflag="init", nref=0,
                res="res", dh="dh", defo="def", unw="unw", sigma="sigma",
                mask_out="def_mask", dh_max=60.0, def_min=-0.01, def_max=0.01,
@@ -263,7 +260,7 @@ class PointData(object):
                bmax=-1, dtmax=-1, multi=False, noise_min=0, ref_mode=1,
                radius=7, rpatch=100, **kwargs):
     
-        assert bflag in ("init", "prec")
+        assert bflag in {"init", "prec"}
         bflag = 1 if bflag == "prec" else 0
         
         
@@ -272,7 +269,7 @@ class PointData(object):
         
         dtype = diff.dtype.upper()
         
-        assert dtype in ("FLOAT", "FCOMPLEX")
+        assert dtype in {"FLOAT", "FCOMPLEX"}
         
         diff_type = 0 if dtype == "FLOAT" else 1
         
@@ -335,16 +332,10 @@ class PointData(object):
         
         files = glob("%s*.bmp" % out_tpl)
         
-        tmp = "tmp.bmp"
+        tmp = tmp_file()
         
-        try:
-            gm.montage(tmp, *files, geometry="+2+2", size=imsize)
-            gm.make_colorbar(tmp, out, cmap, stop=pi)
-        except Exception as e:
-            gm.rm(out_tpl + "*", tmp)
-            raise e
-        else:
-            gm.rm(out_tpl + "*", tmp)
+        gm.montage(tmp, *files, geometry="+2+2", size=imsize)
+        gm.make_colorbar(tmp, out, cmap, stop=pi)
     
     
     def ras_pt(self, inras, outras, rng_looks=1, azi_looks=1,
@@ -382,8 +373,7 @@ class PointData(object):
         
         width = self.slc.rng()
         
-        tmp = "tmp.prasdt_pwr24"
-        gm.rm(tmp)
+        tmp = get_tmp()
         
         npt = self.npoints()
         
@@ -442,8 +432,6 @@ class PointData(object):
                     gp.disdt_pwr24(tmp, arg1, arg2)
                 else:
                     gp.rasdt_pwr24(tmp, arg1, cycle, arg2, pth.join(outdir, fras))
-    
-        gm.rm(tmp)
 
 
     def disp(self, data, mli=None, par_out=None, mode="mph", mask=None,
@@ -456,8 +444,7 @@ class PointData(object):
 
         width = self.slc.rng()
         
-        tmp = "tmp.prasdt_pwr24"
-        gm.rm(tmp)
+        tmp = tmp_file()
         
         npt = self.npoints()
         
@@ -503,8 +490,6 @@ class PointData(object):
                 gp.dismph_pwr24(tmp, arg1, arg2)
             else:
                 gp.disdt_pwr24(tmp, arg1, cycle, arg2)
-    
-        gm.rm(tmp)
 
 
     
@@ -517,10 +502,12 @@ def merge(*args, **kwargs):
     if out is None:
         raise RuntimeError("out must be given")
     
+    tmp = tmp_file()
     
-    with NamedTemporaryFile() as f:
+    with open(tmp, "w") as f:
         f.write("%s\n" % "\n".join(pdata.plist for pdata in args))
-        gp.merge_pt(f.name, out.plist, n_occur, rng_tol, azi_tol)
+    
+    gp.merge_pt(tmp, out.plist, n_occur, rng_tol, azi_tol)
 
 
 

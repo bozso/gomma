@@ -69,11 +69,12 @@ gamma_commands = {
 def make_cmd(command):
     def cmd(*args, **kwargs):
         _log = kwargs.pop("log", None)
+        debug = kwargs.pop("debug", False)
         
         Cmd = "%s %s" % (command, " ".join(_proc_arg(arg) for arg in args))
         
         
-        if gm.is_debug():
+        if debug:
             log.debug('Issued command is "%s"' % Cmd)
             return
         
@@ -95,17 +96,20 @@ def make_cmd(command):
     return cmd
 
 
-if 0:
+if 1:
     gamma_commands = {"rashgt", "ScanSAR_burst_corners"}
 
 
-gp = type("Gamma", (object,), 
-          {pth.basename(cmd): staticmethod(make_cmd(cmd))
-           for cmd in gamma_commands})
+gp = make_object("Gamma", 
+                 {pth.basename(cmd): staticmethod(make_cmd(cmd))
+                  for cmd in gamma_commands})
+
+
+def select_alter(name, default):
+    return getattr(gp, name) if hasattr(gp, name) else getattr(gp, default)
 
 
 imview = make_cmd("eog")
-
 
 def save(obj):
     return obj.__save__
@@ -114,40 +118,29 @@ def save(obj):
 Extract = new_type("Extract", ("comp_file", "files"))
 Extracted = new_type("Extracted", ("outpath", "file_list"))
 
+
 def __extract(self, outpath):
-    extractor = partial(self.comp_file.extract, path=outpath)
     checker = compose(isfile, partial(pth.join, outpath))
     
-    for path in self.files.split(";"):
-        if not checker(path):
-            extractor(path)
+    (self.files.filter_false(checker)
+               .map(self.comp_file.extract, path=outpath))
 
 Extract.extract = __extract
 
-make_match = partial(partial, match)
-
 def filter_file(template, namelist):
     matcher = partial(match, template)
-    return T(elem for elem in namelist if matcher(elem))
-
-
-def select_not_extracted(ext, pred):
-    return gm.Extract(ext.comp_file, files=filter(pred, ext.files))
-    
-
-def extract(ext, outpath):
-    return ext.files.map(ext.comp_file.extract, path=outpath)
+    return Seq(filter(matcher, namelist))
 
 
 Point = new_type("Point", ("x", "y"))
-Rect = new_type("Rect", ("max_x", "min_x", "max_y", "min_y"))
+Rect = new_type("Rect", ("max", "min"))
 
 
 def point_in_rect(point, rect):
-    return (point.x < rect.max_x and 
-            point.x > rect.min_x and
-            point.y < rect.max_y and
-            point.y > rect.min_y)
+    return (point.x < rect.max.x and 
+            point.x > rect.min.x and
+            point.y < rect.max.y and
+            point.y > rect.min.y)
 
 
 

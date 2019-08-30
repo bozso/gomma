@@ -11,9 +11,6 @@ gp = gm.gamma_progs
 mkdir = gm.mkdir
 
 
-RDC = namedtuple("RDC", ["rng", "azi"])
-
-
 def calc_rdc(latlon, mpar, dem_par, hgt, diff_par):
     out = gp.coord_to_sarpix(mpar, None, dem_par, latlon[0], latlon[1],
                               hgt, diff_par).decode()

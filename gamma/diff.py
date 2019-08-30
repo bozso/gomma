@@ -13,18 +13,20 @@ __all__ = (
 )
 
 
-#@gm.extend(gm.DataFile, "diff_par", "qual", "filt", "cc", "dt", "slc1", "slc2", "sim_unw")
-class IFG:
+class IFG(gm.DataFile):
+    __slots__ = ("diff_par", "qual", "filt", "cc", "dt", "slc1", 
+                 "slc2", "sim_unw")
+    
     __save__ = {"diff_par", "qual", "filt", "cc", "dt", "slc1", "slc2",
                 "sim_unw"}
     
-    _cc_weights = {
+    cc_weights = {
         "constant": 0,
         "gaussian": 1,
     }
     
     
-    _off_algorithm = {
+    off_algorithm = {
         "int_cc": 1,
         "fringe_vis": 2
     }
@@ -78,7 +80,7 @@ class IFG:
         sim_unw = "%s.sim_unw" % base
         
         gp.create_offset(slc1.par, slc2.par, off,
-                         IFG._off_algorithm[algorithm], rng_looks, azi_looks,
+                         IFG.off_algorithm[algorithm], rng_looks, azi_looks,
                          _int)
         
         slc_ref_par = None if slc_ref is None else slc_ref.par
@@ -109,18 +111,16 @@ class IFG:
 
         
     def rng(self):
-        return self.getint("par", "interferogram_width")
+        return self.int("interferogram_width")
 
     def azi(self):
-        return self.getint("par", "interferogram_azimuth_lines")
-    
+        return self.int("interferogram_azimuth_lines")
     
     def img_fmt(self):
         return "FCOMPLEX"
     
 
     def check_quality(self):
-        
         qual = self.qual
         
         with open(qual, "r") as f:
@@ -150,7 +150,7 @@ class IFG:
 
         self.filt, self.cc = filt, cc
         
-        rng = self["interferogram_width"]
+        rng = self.rng()
         
         gp.adf(self.dat, self.filt, self.cc, rng, alpha, fftwin, ccwin,
                step, loff, nlines, wfrac)
@@ -158,7 +158,7 @@ class IFG:
 
     def coherence(self, slope_win=5, weight_type="gaussian", corr_thresh=0.4,
                   box_lims=(3.0,9.0)):
-        wgt_flag = IFG._cc_weights[weight_type]
+        wgt_flag = IFG.cc_weights[weight_type]
         
         #log.info("CALCULATING COHERENCE AND CREATING QUICKLOOK IMAGES.")
         #log.info('Weight type is "%s"'.format(weight_type))

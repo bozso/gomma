@@ -28,7 +28,7 @@ __all__ = (
 
 
 ProcStep = new_type("ProcStep", "fun, opt")
-
+RDC = new_type("RDC", "rng, azi")
 
 def typedval(obj):
     return {
@@ -428,7 +428,7 @@ class Processing(object):
         select.bool("check_zips", False)
         
         
-        SLC = map(gm.S1Zip, ls(slc_data, "S1*_IW_SLC*.zip"))
+        SLC = Seq(map(gm.S1Zip, ls(slc_data, "S1*_IW_SLC*.zip")))
         
         if date_start is not None and date_stop is not None:
             date_start = datetime.strptime(date_start, "%Y%m%d")
@@ -456,7 +456,7 @@ class Processing(object):
             filt = lambda x: x.test_zip() and filt
         
         
-        SLC = tuple(filter(filt, SLC))
+        SLC = SLC.filter(filt)
         
         extracted = self.caches.extracted
         select = partial(isfile, extracted)
@@ -464,13 +464,16 @@ class Processing(object):
         
         names = ("annot", "quicklook")
         
-        extractors = T(slc.make_extract(pol=pol, names=names)
-                       for slc in SLC)
-        ext_files = (";".join(elem.files for elem in extractors)).split(";")
+        extrs = SLC.omap("make_extract", pol=pol, names=names)
         
         
-        for ext in extractors:
-            ext.extract(outpath=extracted)
+        ext_files = extr.select("files").join(";").split(";")
+        # ext_files = (";".join(elem.files for elem in extractors)).split(";")
+        
+        extrs.omap("extract", outpath=extracted)
+        
+        # for ext in extractors:
+        #     ext.extract(outpath=extracted)
         
         extracted = gm.Extracted(extracted, ext_files)
         
@@ -478,24 +481,15 @@ class Processing(object):
         lambda x: points_in_IWs(x.iw_info(extracted=extracted, pol=pol),
                                 points=aoi)
         
-        SLC = T(filter(selector, SLC))
+        SLC = SLC.filter(selector)
+        
+        # SLC = T(filter(selector, SLC))
         
         pprint(SLC)
         exit()
         
         # SLC = SLC.filter(s1.points_in_SLC, points=aoi,
         #                  namelist=extracted_files)
-        
-        
-        # force evaluation
-        SLC = Seq(SLC.collect())
-        
-        # print(SLC.collect())
-        
-        exit()
-        
-        
-        # print(SLC.collect(), SLC2)
         
         if master_date == "auto":
             # TODO: better selection algorithm
@@ -510,22 +504,18 @@ class Processing(object):
             
             master_slc = (SLC.map(gm.date2str)
                              .filter(lambda x: x == master_date)
-                             .take(1)
-                             .collect())
+                             .take(1))
         
         
         log.info("Selected master date is %s" % master_date)
         
-        print(iw_info.chain().collect())
-        
-        # self.save("zipfiles", *SLC.collect())
-        
-
+        self.save("zipfiles", *SLC._seq)
+    
     def load_slc(self):
-        if gm.ScanSAR:
-            copy_fun = getattr(gp, "SLC_copy_ScanSAR")
-        else:
-            copy_fun = getattr(gp, "SLC_copy_S1_TOPS")
+        pass
+
+    def load_slc_old(self):
+        copy_fun = gm.select_alter("SLC_copy_ScanSAR", "SLC_copy_S1_TOPS")
 
         general = self.section("general")
         

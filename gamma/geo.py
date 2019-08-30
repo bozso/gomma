@@ -19,11 +19,11 @@ log = getLogger("gamma.geo")
 gp = gm.gp
 
 
-#@gm.extend(gm.DataFile, "lookup")
-class DEM:
+class DEM(gm.DataFile):
+    __slots__ = ("lookup")
     __save__ = {"dat", "par", "lookup"}
     
-    _geo2rdc = {
+    geo2rdc = {
         "dist": 0,
         "nearest_neigh": 1,
         "sqr_dist": 2,
@@ -31,7 +31,7 @@ class DEM:
         "gauss": 4
     }
     
-    _rdc2geo = {
+    rdc2geo = {
         "nearest_neigh": 0
     }
     
@@ -60,10 +60,10 @@ class DEM:
     def geo2rdc(self, infile, outfile, width, nlines=0, interp="dist",
                 dtype=0):
 
-        _interp = DEM._geo2rdc[interp]
+        interp = DEM.geo2rdc[interp]
 
         gp.geocode(self.lookup, infile, self.rng(), outfile, width, nlines,
-                   _interp, dtype)
+                   interp, dtype)
 
 
     # TODO: interpolation modes
@@ -85,7 +85,8 @@ class DEM:
                 if "corrected SLC/MLI range, azimuth pixel (int)" in line:
                     split = line.split(":")[1].split()
                     return RDC(int(split[0]), int(split[1]))
-
+    
+    
     def raster(self, obj, **kwargs):
         assert obj in {"lookup", "lookup_old"}
         
@@ -95,10 +96,11 @@ class DEM:
         DataFile.raster(self, **kwargs)
 
 
-#@gm.extend(gm.DataFile, "hgt", "sim_sar", "zenith", "orient", "inc", "pix", 
-#           "psi", "ls_map", "diff_par", "offs", "offsets", "ccp", "coffs",
-#           "coffsets")
-class Geocode:
+class Geocode(gm.DataFile):
+    __slots__ = ("hgt", "sim_sar", "zenith", "orient", "inc", "pix", 
+                 "psi", "ls_map", "diff_par", "offs", "offsets", "ccp", "coffs",
+                 "coffsets")
+    
     _items = {"hgt", "sim_sar", "zenith", "orient", "inc", "pix", "psi",
               "ls_map", "diff_par", "offs", "offsets", "ccp", "coffs",
               "coffsets"}
@@ -139,7 +141,7 @@ def geocode(params, m_slc, m_mli, rng_looks=1, azi_looks=1, out_dir="."):
     demdir = pth.join(out_dir, "dem")
     geodir = pth.join(out_dir, "geo")
     
-    djoin, gjoin = gm.make_join(demdir), gm.make_join(geodir)
+    djoin, gjoin = partial(pth.join, demdir), partial(pth.join, geodir)
     
     dem_orig = DEM(datfile=pth.join(demdir, "srtm.dem"))
     
@@ -217,10 +219,10 @@ def geocode(params, m_slc, m_mli, rng_looks=1, azi_looks=1, out_dir="."):
         for ii in range(itr):
             log.info("ITERATION %d / %d" % (ii + 1, itr))
 
-            geo.rm("diff_par")
+            rm(geo.diff_par)
 
             # copy previous lookup table
-            dem.cp("lookup", dem.lookup_old)
+            cp(dem.lookup, dem.lookup_old)
 
             gp.create_diff_par(m_mli.par, None, geo.diff_par, 1, 0)
 

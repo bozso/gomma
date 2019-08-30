@@ -19,22 +19,12 @@ log = getLogger("gamma.sentinel1")
 gp = gm.gp
 
 
-
-IWInfo = new_type("IWCorner", ("num", "rect", "bursts"))
-
-
 def safe(path):
     return filter(lambda x: ".SAFE" in x, pth.normpath(path).split(pth.sep))
     
 
 class S1Zip(object):
-    if hasattr(gm, "ScanSAR_burst_corners"):
-        cmd = "ScanSAR_burst_corners"
-    else:
-        # fallback
-        cmd = "SLC_burst_corners"
-    
-    burst_fun = getattr(gp, cmd)
+    burst_fun = gm.select_alter("ScanSAR_burst_corners", "SLC_burst_corners")
     
     extract_regex = {
         "file": '{mission}-iw{iw}-slc-{pol}-.*-{obj.abs_orb}-'
@@ -95,9 +85,13 @@ class S1Zip(object):
         
         templates = self.extract_templates(*args, **kwargs)
         
+        files = (self.extract_templates(*args, **kwargs)
+                     .map(gm.filter_file, namelist=namelist)
+                     .join(";")
+                )
+        
         return gm.Extract(comp_file=comp_file,
-                          files=";".join(";".join(filterer(tpl))
-                                         for tpl in templates))
+                          files=";".join(files))
     
     
     def extract_templates(self, names: Iterable[str], **kwargs):
@@ -107,9 +101,8 @@ class S1Zip(object):
               .format(obj=self, mission=self.mission.lower(), 
                       DTID=self.DTID.lower(), pol=pol, iw=iw)
         
-        
-        return [self.safe_join(self.extract_regex[name].format(tpl=tpl))
-                for name in names]
+        return Seq(self.safe_join(self.extract_regex[name].format(tpl=tpl))
+                   for name in names)
     
     
     
@@ -117,8 +110,10 @@ class S1Zip(object):
         filterer = partial(gm.filter_file, namelist=extracted.file_list)
         joiner   = partial(pth.join, extracted.outpath)
         
-        files = \
-        map(";".join, map(filterer, self.extract_templates(names, **kwargs)))
+        files = (self.extract_templates(names, **kwargs)
+                     .map(gm.filter_file, namelist=extracted.file_list)
+                     .join(";")
+                )
         
         files = ";".join(files).split(";")
         
@@ -126,8 +121,8 @@ class S1Zip(object):
     
     
     def iw_info(self, **kwargs):
-        return T(iw_info_from_annot(elem)
-                 for elem in self.use_extracted(("annot",), **kwargs))
+        return Seq(map(IWInfo.from_annot, 
+                       self.use_extracted(("annot",), **kwargs)))
     
     
     def test_zip(self):
@@ -141,39 +136,35 @@ class S1Zip(object):
                           % (testzip, zipfile))
                 return False
         return True
-
+    
+    
+class IWInfo(new_type("IWCorner", "num, rect, bursts")):
+    @classmethod
+    def from_annot(cls, path):
+        iw_num = int(path.split("iw")[1][0])
+        
+        par, TOPS_par = tmp_file(), tmp_file()
+        
+        gp.par_S1_SLC(None, path, None, None, par, None, TOPS_par)
+        
+        info = S1Zip.burst_fun(par, TOPS_par).decode()
+        nburst = int(get_par("number_of_bursts", TOPS_par))
+        
+        numbers = tuple(float(get_par(burst_tpl % (ii + 1), TOPS_par).split()[0])
+                        for ii in range(nburst))
+        
+        
+        _max = gm.Point(x=get_par("Max_Lon", info), 
+                        y=get_par("Max_Lat", info))
+        
+        _min = gm.Point(x=get_par("Min_Lon", info), 
+                        y=get_par("Min_Lat", info))
+        
+        return cls(iw_num,  gm.Rect(max=_max, min=_min), numbers)
 
 
 burst_tpl = "burst_asc_node_%d"
 
-
-def iw_info_from_annot(path):
-    iw_num = int(path.split("iw")[1][0])
-    
-    par, TOPS_par = tmp_file(), tmp_file()
-    
-    gp.par_S1_SLC(None, path, None, None, par, None, TOPS_par)
-    
-    info = S1Zip.burst_fun(par, TOPS_par).decode()
-    nburst = int(get_par("number_of_bursts", TOPS_par))
-    
-    numbers = tuple(float(get_par(burst_tpl % (ii + 1), TOPS_par).split()[0])
-                    for ii in range(nburst))
-    
-    
-    max_lat, min_lat, max_lon, min_lon = \
-    get_par("Max_Lat", info), get_par("Min_Lat", info), \
-    get_par("Max_Lon", info), get_par("Min_Lon", info)
-    
-    return IWInfo(iw_num, 
-                  gm.Rect(float(max_lon), float(min_lon),
-                          float(max_lat), float(min_lat)),
-                  numbers)
-
-
-
-
-    
 
 def point_in_IWs(point, IWs):
     return any(gm.point_in_rect(point, rect=iw.rect) for iw in IWs)
@@ -184,8 +175,8 @@ def points_in_IWs(IWs, points):
     return map(fun, points)
 
 
-# @gm.extend(gm.DataFile, "TOPS_par")
-class S1IW:
+class S1IW(gm.DataFile):
+    __slots__ = ("TOPS_par")
     tpl = gm.settings["templates"]["IW"]
     
     def __init__(self, num, TOPS_parfile=None, **kwargs):
@@ -260,8 +251,8 @@ class S1IW:
 not_none = partial(filter, lambda x: x is not None)
 
 
-#@gm.Struct("IWs", "tab", "slc")
-class S1SLC:
+class S1SLC(object):
+    __slots__ = ("IWs", "tab", "slc")
     __save__ = {"tab",}
     
     
