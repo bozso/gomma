@@ -96,7 +96,7 @@ def make_cmd(command):
     return cmd
 
 
-if 1:
+if 0:
     gamma_commands = {"rashgt", "ScanSAR_burst_corners"}
 
 
@@ -119,13 +119,12 @@ Extract = new_type("Extract", ("comp_file", "files"))
 Extracted = new_type("Extracted", ("outpath", "file_list"))
 
 
-def __extract(self, outpath):
+def extract(self, outpath):
     checker = compose(isfile, partial(pth.join, outpath))
     
     (self.files.filter_false(checker)
                .map(self.comp_file.extract, path=outpath))
 
-Extract.extract = __extract
 
 def filter_file(template, namelist):
     matcher = partial(match, template)

@@ -464,13 +464,11 @@ class Processing(object):
         
         names = ("annot", "quicklook")
         
-        extrs = SLC.omap("make_extract", pol=pol, names=names)
+        extr = SLC.omap("make_extract", pol=pol, names=names)
         
-        
-        ext_files = extr.select("files").join(";").split(";")
-        # ext_files = (";".join(elem.files for elem in extractors)).split(";")
-        
-        extrs.omap("extract", outpath=extracted)
+        ext_files = extr.select("files").chain()
+
+        extr.map(gm.extract, outpath=extracted)
         
         # for ext in extractors:
         #     ext.extract(outpath=extracted)
@@ -485,7 +483,7 @@ class Processing(object):
         
         # SLC = T(filter(selector, SLC))
         
-        pprint(SLC)
+        pprint(SLC.tup())
         exit()
         
         # SLC = SLC.filter(s1.points_in_SLC, points=aoi,

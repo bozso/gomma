@@ -78,7 +78,7 @@ class S1Zip(object):
         return ret
     
     
-    def make_extract(self, *args, **kwargs) -> gm.Extract:
+    def make_extract(self, *args, **kwargs):
         comp_file = ZipFile(self.path, "r")
         namelist = comp_file.namelist()
         filterer = partial(gm.filter_file, namelist=namelist)
@@ -87,11 +87,12 @@ class S1Zip(object):
         
         files = (self.extract_templates(*args, **kwargs)
                      .map(gm.filter_file, namelist=namelist)
-                     .join(";")
+                     .chain()
                 )
         
+        
         return gm.Extract(comp_file=comp_file,
-                          files=";".join(files))
+                          files=files)
     
     
     def extract_templates(self, names: Iterable[str], **kwargs):
@@ -110,14 +111,11 @@ class S1Zip(object):
         filterer = partial(gm.filter_file, namelist=extracted.file_list)
         joiner   = partial(pth.join, extracted.outpath)
         
-        files = (self.extract_templates(names, **kwargs)
+        return (self.extract_templates(names, **kwargs)
                      .map(gm.filter_file, namelist=extracted.file_list)
-                     .join(";")
-                )
-        
-        files = ";".join(files).split(";")
-        
-        return map(joiner, files)
+                     .chain()
+                     .map(pth.join, extracted.outpath)
+               )
     
     
     def iw_info(self, **kwargs):

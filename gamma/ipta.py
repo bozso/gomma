@@ -81,7 +81,7 @@ class Masks(object):
             
 
 class PointData(object):
-    __slots__ = ("root", "data_dir", "plist", "slc", "data", "mask", "mli")
+    __slots__ = ("root", "data_dir", "plist", "slc", "data", "_mask", "mli")
     
     modes = {
         "const": 0,
@@ -105,7 +105,7 @@ class PointData(object):
     }
     
     
-    __save__ = {"root", "data_dir", "slc", "mli", "data", "mask"}
+    __save__ = {"root", "data_dir", "slc", "mli", "data", "_mask"}
     
     
     def __init__(self, slc, mli, root="."):
@@ -114,7 +114,7 @@ class PointData(object):
         gm.mkdir(root)
         gm.mkdir(self.data_dir)
         
-        self.plist, self.slc, self.data, self.mask, self.mli = \
+        self.plist, self.slc, self.data, self._mask, self.mli = \
         pth.join(root, "plist"), slc, {}, Masks(pth.join(root, "mask")), mli
     
     
@@ -135,12 +135,9 @@ class PointData(object):
     
     
     def mask(self, mask):
-        if mask is None:
-            return None
-        else:
-            return self.mask[mask]
-
-
+        return self._mask.get(mask, None)
+    
+    
     def rjoin(self, *path):
         return pth.join(self.root, *path)
 
@@ -232,7 +229,7 @@ class PointData(object):
         
         gm.plot(**kwargs)
     
-    def data(self, datfile, parfile, pdata, rec=None, dtype=None):
+    def data2pt(self, datfile, parfile, pdata, rec=None, dtype=None):
         if dtype is None:
             dtype = datfile.img_fmt()
         
