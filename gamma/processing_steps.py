@@ -19,7 +19,7 @@ except ImportError:
 
 from utils import *
 import gamma as gm
-from gamma.sentinel1 import points_in_IWs
+import gamma.sentinel1 as s1
 
 __all__ = (
     "Processing",
@@ -466,9 +466,12 @@ class Processing(object):
         
         extr = SLC.omap("make_extract", pol=pol, names=names)
         
-        ext_files = extr.select("files").chain()
-
-        extr.map(gm.extract, outpath=extracted)
+        ext_files = extr.select("files").chain().tup()
+        
+        print(extr.tup())
+        exit()
+        
+        extr.map(gm.extract, outpath=extracted).tup()
         
         # for ext in extractors:
         #     ext.extract(outpath=extracted)
@@ -476,14 +479,13 @@ class Processing(object):
         extracted = gm.Extracted(extracted, ext_files)
         
         selector = \
-        lambda x: points_in_IWs(x.iw_info(extracted=extracted, pol=pol),
-                                points=aoi)
+        lambda x: s1.points_in_IWs(s1.iw_info(x, extracted=extracted, pol=pol),
+                                   points=aoi)
         
         SLC = SLC.filter(selector)
         
-        # SLC = T(filter(selector, SLC))
+        pprint(SLC.map(s1.iw_info, extracted=extracted, pol=pol).chain().tup())
         
-        pprint(SLC.tup())
         exit()
         
         # SLC = SLC.filter(s1.points_in_SLC, points=aoi,

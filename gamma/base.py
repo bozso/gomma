@@ -131,7 +131,7 @@ def filter_file(template, namelist):
     return Seq(filter(matcher, namelist))
 
 
-class Point(new_type("Point", ("x", "y")):
+class Point(new_type("Point", "x, y")):
     def in_rect(self, rect):
         return (self.x < rect.max.x and
                 self.x > rect.min.x and
@@ -142,10 +142,7 @@ class Point(new_type("Point", ("x", "y")):
 Rect = new_type("Rect", ("max", "min"))
 
 
-
-
-
-class Date:
+class Date(object):
     __slots__ = ("start", "stop", "center")
     
     def __init__(self, start_date, stop_date, center=None):

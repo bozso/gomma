@@ -1,48 +1,162 @@
-import shutil as sh
-import operator as op
+package gamma;
 
-from math import sqrt, isclose
-from os import path as pth
-from datetime import datetime, timedelta
-from zipfile import ZipFile
-from logging import getLogger
-from re import match
-from functools import partial, reduce
-from typing import Iterable
-from pprint import pprint
-
-import gamma as gm
-
-from utils import *
-
-log = getLogger("gamma.sentinel1")
-
-gp = gm.gp
+import (
+    "fmt";
+    "log";
+    //conv "strconv";
+    str "strings";
+);
 
 
-class S1Zip(object):
-    burst_fun = gm.select_alter("ScanSAR_burst_corners", "SLC_burst_corners")
+
+var (
+    burstCorner CmdFun;
+);
+
+
+const (
+    burstTpl = "burst_asc_node_%d";
+);
+
+
+
+func init() {
+    var ok bool;
     
-    extract_regex = {
-        "file": '{mission}-iw{iw}-slc-{pol}-.*-{obj.abs_orb}-'
-                '{DTID}-[0-9]{{3}}',
-        "tiff":  "measurement/{tpl}.tiff",
-        "annot": "annotation/{tpl}.xml",
-        "calib": "annotation/{tpl}.xml",
-        "noise": "annotation/calibration/noise-{tpl}.xml",
+    if burstCorner, ok = Gamma["ScanSAR_burst_corners"]; !ok {
+        if burstCorner, ok = Gamma["SLC_burst_corners"]; !ok {
+            log.Fatal("No Fun.")
+        }
+    }
+}
+
+
+type (
+    S1Zip struct {
+        path, zip_base, mission, datestr, mode, prod_type, resolution string;
+        level, prod_class, pol, abs_orb, DTID, UID string;
+        date date;
+    };
+    
+    IWInfo struct {
+        num, nburst int;
+        extent rect;
+        bursts [9]float64;
+    };
+    
+    S1IW struct {
+        dataFile;
+        TOPS_par ParamFile;
+    };
+
+
+    S1SLC struct {
+        nIW int;
+        IWs [9]S1IW;
+        tab string;
+    };
+);
+
+
+var extractRegex = map[string]string {
+        "file": "{{mission}}-iw{{iw}}-slc-{{pol}}-.*-{{abs_orb}}-" + 
+                "{{DTID}}-[0-9]{3}",
+        "tiff":  "measurement/%s.tiff",
+        "annot": "annotation/%s.xml",
+        "calib": "annotation/%s.xml",
+        "noise": "annotation/calibration/noise-%s.xml",
         "preview": "preview/product-preview.html",
-        "quicklook": "preview/quick-look.png"
+        "quicklook": "preview/quick-look.png",
+};
+
+
+func (self *S1Zip) extracTemplates(names []string, pol, iw string) []string  {
+    // TODO: finish
+    // tpl = extractRegex["file"]
+    
+    //    tpl = self.extract_regex["file"]\
+    //          .format(obj=self, mission=self.mission.lower(), 
+    //                  DTID=self.DTID.lower(), pol=pol, iw=iw)
+    //    return (Seq(self.extract_regex[name] for name in names)
+    //                .map(str.format, tpl=tpl)
+    //                .map(self.safe_join))
+    
+    return []string{"asd"}
+}
+
+
+func iwInfo(path string) IWInfo {
+    //num, err := conv.Atoi(str.Split(path, "iw")[1][0]);
+    num := int(str.Split(path, "iw")[1][0])
+    // Check(err, "Failed to retreive IW number from %s", path);
+    
+    par, TOPS_par := TmpFile(), TmpFile()
+    
+    info := FromString(Gamma["par_S1_SLC"](nil, path, nil, nil, par, nil, 
+                                           TOPS_par), ":");
+    
+    TOPS := FromFile(TOPS_par, ":");
+    
+    nburst := toInt(TOPS.Par("number_of_bursts"), 0)
+    var numbers [9]float64;
+    
+    for ii := 0; ii < nburst; ii++ {
+         tpl := fmt.Sprintf(burstTpl, ii);
+         numbers[ii] = toFloat(str.Split(TOPS.Par(tpl), " ")[0], 0)
     }
     
+    
+    max := point{x:toFloat(info.Par("Max_Lon"), 0), 
+                 y:toFloat(info.Par("Max_Lat"), 0)};
+ 
+    min := point{x:toFloat(info.Par("Min_Lon"), 0), 
+                 y:toFloat(info.Par("Min_Lat"), 0)};
+
+    return IWInfo{num:num, nburst:nburst, extent:rect{min:min, max:max},
+                  bursts:numbers};
+}
+
+
+
+func (self *point) inIWs(IWs []IWInfo) bool {
+    for _, iw := range IWs {
+        if self.inRect(&iw.extent) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+func pointsInSLC(IWs []IWInfo, points [4]point) bool {
+    sum := 0;
+    
+    for _, point := range points {
+        if point.inIWs(IWs) {
+            sum++;
+        }
+    }
+    return sum == 4;
+}
+
+
+
+/*
+
+def safe(path):
+    return filter(lambda x: ".SAFE" in x, pth.normpath(path).split(pth.sep))
+    
+
+class S1Zip(object):
+    if hasattr(gm, "ScanSAR_burst_corners"):
+        cmd = "ScanSAR_burst_corners"
+    else:
+        # fallback
+        cmd = "SLC_burst_corners"
+    
+    burst_fun = getattr(gp, cmd)
+    
     regex_names = set(extract_regex.keys()) - {"file"}
-    
-    __slots__ = ("path", "mission", "datestr", "date", "burst_nums", "mode",
-                 "prod_type", "resolution", "level", "prod_class", "pol",
-                 "abs_orb", "DTID", "UID", "zip_base", "safe_join")
-    
-    
-    __save__ = ("path", "burst_nums", "mission")
-    
     
     def __init__(self, zippath, extra_info=False):
         zip_base = pth.basename(zippath)
@@ -67,178 +181,65 @@ class S1Zip(object):
                                  zip_base.replace(".zip", ".SAFE"))
     
     
-    @classmethod
-    def from_json(cls, line):
-        ret = cls(line["zip_path"])
-        ret.burst_nums = line["burst_nums"]
-        
-        return ret
-    
-    
-    def make_extract(self, *args, **kwargs):
-        comp_file = ZipFile(self.path, "r")
-        namelist = comp_file.namelist()
-        filterer = partial(gm.filter_file, namelist=namelist)
-        
-        templates = self.extract_templates(*args, **kwargs)
-        
-        files = (self.extract_templates(*args, **kwargs)
-                     .map(gm.filter_file, namelist=namelist)
-                     .chain()
-                )
-        
-        return gm.Extract(comp_file=comp_file, files=files)
-    
-    
-    def extract_templates(self, names, **kwargs):
-        pol, iw = kwargs.get("pol", "vv"), kwargs.get("iw", "[1-3]")
-        
-        tpl = self.extract_regex["file"]\
-              .format(obj=self, mission=self.mission.lower(), 
-                      DTID=self.DTID.lower(), pol=pol, iw=iw)
-        
-        #print(self.safe_join(self.extract_regex[names[0]].format(tpl=tpl)))
-        #exit()
-        
-        return Seq(self.safe_join(self.extract_regex[name].format(tpl=tpl))
-                   for name in names)
-    
-    
-    def use_extracted(self, names, extracted, **kwargs):
-        filterer = partial(gm.filter_file, namelist=extracted.file_list)
-        joiner   = partial(pth.join, extracted.outpath)
-        
-        pprint(extracted)
-        exit()
-        
-        a = (self.extract_templates(names, **kwargs)
-                 .map(gm.filter_file, namelist=extracted.file_list)
-                 .chain()
-            )
-        
-        return (self.extract_templates(names, **kwargs)
-                    .map(gm.filter_file, namelist=extracted.file_list)
-                    .chain()
-                    .map(pth.join, extracted.outpath)
-               )
-    
-    
-    
-    def test_zip(self):
-        with ZipFile(self.zipfile, "r") as slc_zip:
-    
-            testzip = slc_zip.testzip()
-    
-            if testzip:
-                log.error('Bad zipfile detected. First bad file is '
-                          '"%s" in zipfile "%s".'
-                          % (testzip, zipfile))
-                return False
-        return True
-
-
-def iw_info(self, **kwargs):
-    use = partial(self.use_extracted, names=("annot",), **kwargs)
-    
-    tpls = \
-    Seq(map(lambda x: use(iw=x + 1), range(3))).chain()
-    
-    return Seq(IWInfo.from_annot(use()) for ii in range(3))
-
-
-class IWInfo(new_type("IWInfo", "num, rect, bursts")):
-    @classmethod
-    def from_annot(cls, path):
-        print(path.tup())
-        exit()
-        iw_num = int(path.tup()[0].split("iw")[1][0])
-        
-        par, TOPS_par = tmp_file(), tmp_file()
-        
-        gp.par_S1_SLC(None, path, None, None, par, None, TOPS_par)
-        
-        info = S1Zip.burst_fun(par, TOPS_par).decode()
-        nburst = int(get_par("number_of_bursts", TOPS_par))
-        
-        numbers = \
-        Seq(float(get_par(burst_tpl % (ii + 1), TOPS_par).split()[0])
-            for ii in range(nburst))
-        
-        
-        _max = gm.Point(x=get_par("Max_Lon", info), 
-                        y=get_par("Max_Lat", info))
-        
-        _min = gm.Point(x=get_par("Min_Lon", info), 
-                        y=get_par("Min_Lat", info))
-        
-        return cls(iw_num,  gm.Rect(max=_max, min=_min), numbers)
-    
-    
-    @staticmethod
-    def diff_burst(burst1, burst2):
-        dburst = burst1 - burst2
-        diff_sqrt = sqrt(dburst * dburst)
-        
-        return int(dburst + 1.0 + (dburst / (0.001 + diff_sqrt)) * 0.5)
-    
-    
-    @staticmethod
-    def burst_selection_helper(ref_burst_num, other_burst_num):
-        total_slc_bursts = len(other_burst_num)
-        
-        iw_start_burst = other_burst_num[0]
-    
-        diff1, diff2 = \
-        IWInfo.diff_burst(other_burst_num[0], iw_start_burst), \
-        IWInfo.diff_burst(other_burst_num[-1], iw_start_burst)
-        
-        total_slc_bursts = len(slc_burst)
-    
-        if diff2 < 1 or diff1 > total_slc_bursts:
-            return None
-    
-        if diff1 <= 0:
-            diff1 = 1
-    
-        if diff2 > total_slc_bursts:
-            diff2 = total_slc_bursts
-    
-        return tuple((diff1, diff2))
-    
-    
-def isclose(ref, other, **kwargs):
-    diff = (Seq(zip(ref.bursts, other.bursts))
-               .map(lambda x: (x[0] - x[1])**2)
-               .sum()
-           )
-    
-    return isclose(0.0, sqrt(diff), **kwargs)
-    
 
 burst_tpl = "burst_asc_node_%d"
 
 
+def iw_info_from_annot(path):
+    iw_num = int(path.split("iw")[1][0])
+    
+    par, TOPS_par = tmp_file(), tmp_file()
+    
+    gp.par_S1_SLC(None, path, None, None, par, None, TOPS_par)
+    
+    info = S1Zip.burst_fun(par, TOPS_par).decode()
+    nburst = int(get_par("number_of_bursts", TOPS_par))
+    
+    numbers = tuple(float(get_par(burst_tpl % (ii + 1), TOPS_par).split()[0])
+                    for ii in range(nburst))
+    
+    
+    max_lat, min_lat, max_lon, min_lon = \
+    get_par("Max_Lat", info), get_par("Min_Lat", info), \
+    get_par("Max_Lon", info), get_par("Min_Lon", info)
+    
+    return IWInfo(iw_num, 
+                  gm.Rect(float(max_lon), float(min_lon),
+                          float(max_lat), float(min_lat)),
+                  numbers)
+
+
+def use_extracted(self, names, extracted, **kwargs):
+    return (self.extract_templates(names, **kwargs)
+                .map(gm.filter_file, namelist=extracted.file_list)
+                .chain()
+                .map(partial(pth.join, extracted.outpath)))
+
+
+def iw_info(self, **kwargs):
+    return (use_extracted(self, ("annot",), **kwargs)
+            .map(iw_info_from_annot))
+    
+
 def point_in_IWs(point, IWs):
-    return any(point.in_rect(iw.rect) for iw in IWs)
+    return any(gm.point_in_rect(point, rect=iw.rect) for iw in IWs)
 
 
 def points_in_IWs(IWs, points):
-    fun = partial(point_in_IWs, IWs=IWs)
-    return map(fun, points)
+    return points.map(point_in_IWs, IWs=IWs.collect())
 
 
-class S1IW(gm.DataFile):
-    __slots__ = ("TOPS_par")
+@gm.extend(gm.DataFile, "TOPS_par")
+class S1IW:
     tpl = gm.settings["templates"]["IW"]
     
     def __init__(self, num, TOPS_parfile=None, **kwargs):
         
         gm.DataFile.__init__(self, **kwargs)
 
+
         if TOPS_parfile is None:
             TOPS_parfile = self.dat + ".TOPS_par"
-        
-        self.files += (TOPS_parfile,)
         
         self.TOPS_par, self.num = gm.Parfile(parfile=TOPS_parfile), num
 
@@ -250,6 +251,18 @@ class S1IW(gm.DataFile):
         
         self.TOPS_par = gm.Parfile(TOPS_parfile)
     
+    
+    def rm(self):
+        rm(self, "dat", "par", "TOPS_par")
+    
+
+    def __bool__(self):
+        return Files.exist(self, "dat", "par", "TOPS_par")
+
+
+    def __str__(self):
+        return "%s %s %s" % (self.dat, self.par, self.TOPS_par.par)
+
 
     def __getitem__(self, key):
         ret = gm.Parfile.__getitem__(self, key)
@@ -292,8 +305,8 @@ class S1IW(gm.DataFile):
 not_none = partial(filter, lambda x: x is not None)
 
 
-class S1SLC(object):
-    __slots__ = ("IWs", "tab", "slc")
+@gm.Struct("IWs", "tab", "slc")
+class S1SLC:
     __save__ = {"tab",}
     
     
@@ -324,6 +337,8 @@ class S1SLC(object):
     def from_SLC(cls, other, extra):
         
         tabfile = other.tab + extra
+        
+        
         
         IWs = tuple(
                 S1IW(ii, datfile=iw.dat + extra)
@@ -529,9 +544,42 @@ def deramp_slave(mslc, rslc, rslcd, rng_looks=4, azi_looks=1):
     return deramped
 
 
+def diff_burst(burst1, burst2):
+    
+    diff_sqrt = sqrt((burst1 - burst2) * (burst1 - burst2))
+    
+    return int(burst1 - burst2 + 1.0
+               + ((burst1 - burst2) / (0.001 + diff_sqrt)) * 0.5)
+
+
+def burst_selection_helper(ref_burst, slc_burst):
+    if ref_burst is not None:
+        iw_start_burst = slc_burst[0]
+    
+        diff = [diff_burst(ref_burst[0], iw_start_burst),
+                diff_burst(ref_burst[-1], iw_start_burst)]
+        
+        total_slc_bursts = len(slc_burst)
+    
+        if diff[1] < 1 or diff[0] > total_slc_bursts:
+            return None
+    
+        if diff[0] <= 0:
+            diff[0] = 1
+    
+        if diff[1] > total_slc_bursts:
+            diff[1] = total_slc_bursts
+    
+        return tuple((diff[0], diff[1]))
+    else:
+        return None
+
+
 def check_paths(path):
     if len(path) != 1:
         raise Exception("More than one or none file(s) found in the zip that "
                         "corresponds to the regexp. Paths: {}".format(path))
     else:
         return path[0]
+
+*/
