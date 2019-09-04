@@ -131,15 +131,17 @@ def filter_file(template, namelist):
     return Seq(filter(matcher, namelist))
 
 
-Point = new_type("Point", ("x", "y"))
+class Point(new_type("Point", ("x", "y")):
+    def in_rect(self, rect):
+        return (self.x < rect.max.x and
+                self.x > rect.min.x and
+                self.y < rect.max.y and
+                self.y > rect.min.y)
+
+
 Rect = new_type("Rect", ("max", "min"))
 
 
-def point_in_rect(point, rect):
-    return (point.x < rect.max.x and 
-            point.x > rect.min.x and
-            point.y < rect.max.y and
-            point.y > rect.min.y)
 
 
 
@@ -263,14 +265,18 @@ class DataFile(Parfile):
         return cls(dat=datfile, par=parfile, )
     
     
+    def __bool__(self):
+        return  all(map(isfile, self.files))
+    
+    
+    def __str__(self):
+        return " ".join(map(str, self.files))
+    
+    
     @classmethod
     def from_json(cls, line):
         return cls.new(datfile=line["dat"], parfile=line["par"],
                        tabfile=line["tab"])
-    
-    
-    def rm(self):
-        rm(*self.files)
     
     
     def save(self, datfile, parfile=None):
@@ -283,12 +289,10 @@ class DataFile(Parfile):
         self.dat, self.par = datfile, parfile
 
     
-    def __str__(self):
-        return self.datpar
+    def rm(self):
+        rm(*self.files)
 
-    def __bool__(self):
-        return  all(map(isfile, self.files))
-
+    
     def rng(self) -> int:
         return self.int("range_samples")
 

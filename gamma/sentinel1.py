@@ -1,12 +1,13 @@
 import shutil as sh
+import operator as op
 
+from math import sqrt, isclose
 from os import path as pth
 from datetime import datetime, timedelta
 from zipfile import ZipFile
 from logging import getLogger
 from re import match
 from functools import partial, reduce
-import operator as op
 from typing import Iterable
 
 
@@ -18,10 +19,6 @@ log = getLogger("gamma.sentinel1")
 
 gp = gm.gp
 
-
-def safe(path):
-    return filter(lambda x: ".SAFE" in x, pth.normpath(path).split(pth.sep))
-    
 
 class S1Zip(object):
     burst_fun = gm.select_alter("ScanSAR_burst_corners", "SLC_burst_corners")
@@ -135,8 +132,8 @@ class S1Zip(object):
                 return False
         return True
     
-    
-class IWInfo(new_type("IWCorner", "num, rect, bursts")):
+
+class IWInfo(new_type("IWInfo", "num, rect, bursts")):
     @classmethod
     def from_annot(cls, path):
         iw_num = int(path.split("iw")[1][0])
@@ -148,8 +145,9 @@ class IWInfo(new_type("IWCorner", "num, rect, bursts")):
         info = S1Zip.burst_fun(par, TOPS_par).decode()
         nburst = int(get_par("number_of_bursts", TOPS_par))
         
-        numbers = tuple(float(get_par(burst_tpl % (ii + 1), TOPS_par).split()[0])
-                        for ii in range(nburst))
+        numbers = \
+        Seq(float(get_par(burst_tpl % (ii + 1), TOPS_par).split()[0])
+            for ii in range(nburst))
         
         
         _max = gm.Point(x=get_par("Max_Lon", info), 
@@ -159,13 +157,54 @@ class IWInfo(new_type("IWCorner", "num, rect, bursts")):
                         y=get_par("Min_Lat", info))
         
         return cls(iw_num,  gm.Rect(max=_max, min=_min), numbers)
-
+    
+    
+    @staticmethod
+    def diff_burst(burst1, burst2):
+        dburst = burst1 - burst2
+        diff_sqrt = sqrt(dburst * dburst)
+        
+        return int(dburst + 1.0 + (dburst / (0.001 + diff_sqrt)) * 0.5)
+    
+    
+    @staticmethod
+    def burst_selection_helper(ref_burst_num, other_burst_num):
+        total_slc_bursts = len(other_burst_num)
+        
+        iw_start_burst = other_burst_num[0]
+    
+        diff1, diff2 = \
+        IWInfo.diff_burst(other_burst_num[0], iw_start_burst), \
+        IWInfo.diff_burst(other_burst_num[-1], iw_start_burst)
+        
+        total_slc_bursts = len(slc_burst)
+    
+        if diff2 < 1 or diff1 > total_slc_bursts:
+            return None
+    
+        if diff1 <= 0:
+            diff1 = 1
+    
+        if diff2 > total_slc_bursts:
+            diff2 = total_slc_bursts
+    
+        return tuple((diff1, diff2))
+    
+    
+def isclose(ref, other, **kwargs):
+    diff = (Seq(zip(ref.bursts, other.bursts))
+               .map(lambda x: (x[0] - x[1])**2)
+               .sum()
+           )
+    
+    return isclose(0.0, sqrt(diff), **kwargs)
+    
 
 burst_tpl = "burst_asc_node_%d"
 
 
 def point_in_IWs(point, IWs):
-    return any(gm.point_in_rect(point, rect=iw.rect) for iw in IWs)
+    return any(point.in_rect(iw.rect) for iw in IWs)
 
 
 def points_in_IWs(IWs, points):
@@ -181,9 +220,10 @@ class S1IW(gm.DataFile):
         
         gm.DataFile.__init__(self, **kwargs)
 
-
         if TOPS_parfile is None:
             TOPS_parfile = self.dat + ".TOPS_par"
+        
+        self.files += (TOPS_parfile,)
         
         self.TOPS_par, self.num = gm.Parfile(parfile=TOPS_parfile), num
 
@@ -195,18 +235,6 @@ class S1IW(gm.DataFile):
         
         self.TOPS_par = gm.Parfile(TOPS_parfile)
     
-    
-    def rm(self):
-        rm(self, "dat", "par", "TOPS_par")
-    
-
-    def __bool__(self):
-        return Files.exist(self, "dat", "par", "TOPS_par")
-
-
-    def __str__(self):
-        return "%s %s %s" % (self.dat, self.par, self.TOPS_par.par)
-
 
     def __getitem__(self, key):
         ret = gm.Parfile.__getitem__(self, key)
@@ -281,8 +309,6 @@ class S1SLC(object):
     def from_SLC(cls, other, extra):
         
         tabfile = other.tab + extra
-        
-        
         
         IWs = tuple(
                 S1IW(ii, datfile=iw.dat + extra)
@@ -486,37 +512,6 @@ def deramp_slave(mslc, rslc, rslcd, rng_looks=4, azi_looks=1):
     deramped.mosaic(datfile=rslcd, rng_looks=rng_looks, azi_looks=azi_looks)
     
     return deramped
-
-
-def diff_burst(burst1, burst2):
-    
-    diff_sqrt = sqrt((burst1 - burst2) * (burst1 - burst2))
-    
-    return int(burst1 - burst2 + 1.0
-               + ((burst1 - burst2) / (0.001 + diff_sqrt)) * 0.5)
-
-
-def burst_selection_helper(ref_burst, slc_burst):
-    if ref_burst is not None:
-        iw_start_burst = slc_burst[0]
-    
-        diff = [diff_burst(ref_burst[0], iw_start_burst),
-                diff_burst(ref_burst[-1], iw_start_burst)]
-        
-        total_slc_bursts = len(slc_burst)
-    
-        if diff[1] < 1 or diff[0] > total_slc_bursts:
-            return None
-    
-        if diff[0] <= 0:
-            diff[0] = 1
-    
-        if diff[1] > total_slc_bursts:
-            diff[1] = total_slc_bursts
-    
-        return tuple((diff[0], diff[1]))
-    else:
-        return None
 
 
 def check_paths(path):
