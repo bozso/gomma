@@ -1,7 +1,7 @@
 package gamma;
 
 import (
-    //"fmt";
+    "fmt";
     fp "path/filepath";
     "time";
     "os";
@@ -43,11 +43,9 @@ var (
         "SHORT_INT": 1,
         "DOUBLE": 2,
     };
-    
     Gamma = makeGamma();
     Imv = MakeCmd("eog");
 );
-
 
 
 type(
@@ -147,10 +145,13 @@ func makeGamma() map[string]CmdFun {
     
     for _, module := range Settings.modules {
         for _, dir := range [2]string{"bin", "scripts"} {
-            _path := fp.Join(Path, module, dir, "*")
-            glob, err := fp.Glob(_path)
             
-            Check(err, "Glob in %s failed!", _path);
+            _path := fp.Join(Path, module, dir, "*")
+            glob, err := fp.Glob(_path);
+            
+            if err != nil {
+                Fatal(err, "makeGamma: Glob '%s' failed! %w", _path, err);
+            }
             
             for _, path := range glob {
                 result[fp.Base(path)] = MakeCmd(path);
@@ -162,24 +163,31 @@ func makeGamma() map[string]CmdFun {
 }
 
 
-func ParseDate(fmt string, str string) time.Time {
-    ret, err := time.Parse(fmt, str)
-    Check(err, "Failed to parse date: %s", str);
-    return ret;
+func ParseDate(format string, str string) (time.Time, error) {
+    
+    ret, err := time.Parse(format, str);
+    
+    if err != nil {
+        return time.Time{}, 
+               fmt.Errorf("In ParseDate: Failed to parse date: %s!\nError: %w", 
+                           str, err)
+    }
+    
+    return ret, nil;
 }
 
 
-func (self *dataFile) Rng() int {
+func (self *dataFile) Rng() (int, error) {
     return self.Int("range_samples");
 }
 
 
-func (self *dataFile) Azi() int {
+func (self *dataFile) Azi() (int, error) {
     return self.Int("azimuth_samples");
 }
 
 
-func (self *dataFile) imgFormat() string {
+func (self *dataFile) imgFormat() (string, error) {
     return self.Par("image_format");
 }
 
@@ -189,11 +197,16 @@ func (self dataFile) Date() time.Time {
 }
 
 
-func NewExtract(path string, templates []string, root string) Extract {
-    file, err := zip.OpenReader(path);
-    defer file.Close()
+func NewExtract(path string, templates []string, root string) (*Extract, error) {
+    handle := Handler("NewExtract");
     
-    Check(err, "Could not open zipfile: '%s'", path);
+    file, err := zip.OpenReader(path);
+    
+    if err != nil {
+        return nil, handle(err, "Could not open zipfile: '%s'!", path);
+    }
+    
+    defer file.Close()
     
     list := make([]string, BufSize);
     
@@ -204,13 +217,14 @@ func NewExtract(path string, templates []string, root string) Extract {
             if os.IsNotExist(err) {
                 list = append(list, name);
             } else {
-                Check(err, "Stat failed on file : \"%s\"", file);
+                return nil, handle(err, "Stat failed on file : '%s'!", file);
             }
         }
     }
     
-    return Extract{file, list};
+    return &Extract{file, list}, nil;
 }
+
 
 func (self *Extract) Close() {
     self.file.Close();
@@ -228,23 +242,34 @@ func First() string {
 }
 
 
-func ParseDisArgs(d dataFile, args disArgs) disArgs {
+func ParseDisArgs(d dataFile, args disArgs) (*disArgs, error) {
+    var err error;
+    handle := Handler("ParseDisArgs");
     
     if len(args.datfile) == 0 {
         args.datfile = d.dat;
     }
     
+    
     if args.rng == 0 {
-        args.rng = d.Rng();
+        if args.rng, err = d.Rng(); err != nil {
+            return nil, handle(err, "Could not get range_samples!");
+        }
     }
     
+    
     if args.azi == 0 {
-        args.azi = d.Azi();
+        if args.azi, err = d.Azi(); err != nil {
+            return nil, handle(err, "Could not get azimuth_lines!");
+        }
     }
+    
     
     // parts = pth.basename(datfile).split(".")
     if len(args.imgFormat) == 0 {
-        args.imgFormat = d.imgFormat();
+        if args.imgFormat, err = d.imgFormat(); err != nil {
+            return nil, handle(err, "Could not get image_format!");
+        }
     }
     
     // args.flip = -1 if flip else 1
@@ -260,7 +285,7 @@ func ParseDisArgs(d dataFile, args disArgs) disArgs {
                if ext in exts][0]
     */
     
-    return args;
+    return &args, nil;
 }
 
 /*

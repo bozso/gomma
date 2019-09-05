@@ -19,8 +19,13 @@ func (self Al) String() string {
 
 
 func main() {
-    gm.DefaultConfig("gamma.json");
+    gm.MakeDefaultConfig("gamma.json");
     
+    _, err := gm.FromFile("asd", ":");
+    
+    if err != nil {
+        gm.Fatal(err, "A");
+    }
     
     defer gm.RemoveTmp();
     fmt.Println(gm.First());

@@ -1,124 +1,145 @@
 package gamma;
 
 import (
-    "log";
     "os";
     "encoding/json";
 );
 
 
 type (
+    minmax struct {
+        Min, Max float64;
+    }
+
     general struct {
-        Cache_path string `json:"CACHE_PATH,omitempty"`;
-        Slc_data, Output_dir, Pol, Metafile string;
-        Range_looks, Azimuth_looks int;
+        CachePath string `json:"CACHE_PATH,omitempty"`;
+        DataPath, OutputDir, Pol, Metafile string;
+        RangeLooks, AzimuthLooks int;
     };
     
     preselect struct {
-        date_start, date_stop, master_date, lower_left, upper_right string;
-        check_zips bool
+        DateStart, DateStop, MasterDate, LowerLeft, UpperRight string;
+        CheckZips bool
     };
     
     geocoding struct {
-        dem_path string;
-        iter, rng_overlap, azi_overlap, npoly int;
-        dem_lat_ovs, dem_lon_ovs float64;
+        DEMPath string;
+        Iter, RangeOverlap, AzimuthOverlap, NPoly int;
+        DEMLatOversampling, DEMLonOversampling float64;
     };
     
     coreg struct {
-        cc_thresh, fraction_thresh, ph_stdev_thresh float64;
+        CoherenceThresh, FractionThresh, PhaseStdevThresh float64;
     };
     
-    ifg_select struct {
-        bperp_min, bperp_max float64;
-        delta_t_min, delta_t_max int;
+    ifgSelect struct {
+        Bperp minmax;
+        DeltaT minmax;
     };
     
     coherence struct {
-        weight_type string;
-        box_min, box_max, slope_corr_thresh  float64;
-        slope_win int;
+        WeightType string;
+        Box minmax;
+        SlopeCorrelationThresh  float64;
+        SlopeWindow int;
     };
     
     config struct {
         General general;
-        preselect preselect;
-        geocoding geocoding;
-        coreg coreg;
-        ifg_select ifg_select;
-        coherence coherence;
+        Preselect preselect;
+        Geocoding geocoding;
+        Coreg coreg;
+        IFGSelect ifgSelect;
+        Coherence coherence;
     };
 );
 
 
-func ParseConfig(path string) config {
+func ParseConfig(path string) (config, error) {
+    handle := Handler("ParseConfig");
     var ret config;
-    err := json.Unmarshal(ReadFile(path), ret);
-    Check(err, "Failed to parse json file: %v", path);
     
-    return ret;
+    data, err := ReadFile(path);
+    
+    if err != nil {
+        return config{}, handle(err, "Failed to read file:  '%s'!", path);
+    }
+    
+    if err := json.Unmarshal(data, ret); err != nil {
+        return config{}, handle(err, "Failed to parse json data: %s'!", data);
+    }
+    
+    return ret, nil;
 }
 
 
 var defaultConfig = config{
-        general{
-            Cache_path:"/mnt/bozso_i/cache",
+        General: general{
+            CachePath:"/mnt/bozso_i/cache",
             Pol:"vv",
-            Range_looks:1,
-            Azimuth_looks:1,
+            RangeLooks:1,
+            AzimuthLooks:1,
         },
         
-        preselect{
-            master_date: "auto",
-            check_zips: false,
+        Preselect: preselect{
+            MasterDate: "auto",
+            CheckZips: false,
         },
         
-        geocoding{
-            dem_path: "/home/istvan/DEM/srtm.vrt",
-            iter:1,
-            rng_overlap: 100,
-            azi_overlap: 100,
-            npoly: 1,
-            dem_lat_ovs: 1.0,
-            dem_lon_ovs: 1.0,
+        Geocoding: geocoding{
+            DEMPath: "/home/istvan/DEM/srtm.vrt",
+            Iter:1,
+            RangeOverlap: 100,
+            AzimuthOverlap: 100,
+            NPoly: 1,
+            DEMLatOversampling: 1.0,
+            DEMLonOversampling: 1.0,
         },
         
-        coreg{
-            cc_thresh: 0.8,
-            fraction_thresh: 0.01,
-            ph_stdev_thresh: 0.8,
+        Coreg: coreg{
+            CoherenceThresh: 0.8,
+            FractionThresh: 0.01,
+            PhaseStdevThresh: 0.8,
         },
         
-        ifg_select{
-            bperp_min: 0.0,
-            bperp_max: 150.0,
-            delta_t_min: 0,
-            delta_t_max: 15,
+        IFGSelect: ifgSelect{
+            Bperp: minmax{Min: 0.0, Max: 150.0},
+            DeltaT: minmax{Min: 0.0, Max: 15.0},
         },
         
-        coherence{
-            weight_type: "gaussian",
-            box_min: 3.0,
-            box_max: 9.0,
-            slope_corr_thresh: 0.4,
-            slope_win: 5,
+        Coherence: coherence{
+            WeightType: "gaussian",
+            Box: minmax{Min: 3.0, Max: 9.0},
+            SlopeCorrelationThresh: 0.4,
+            SlopeWindow: 5,
         },
 };
 
 
-func DefaultConfig(path string) {
-    log.Println(defaultConfig);
+func MakeDefaultConfig(path string) error {
+    handle := Handler("MakeDefaultConfig");
     
     out, err := json.MarshalIndent(defaultConfig,  "", "    ");
-    Check(err, "Failed to json encode default configuratio!");
+    
+    if err != nil {
+        return handle(err, "Failed to json encode default configuration!");
+    }
+    
     
     
     f, err := os.Create(path);
-    Check(err, "Failed to create file: %v!", path);
+    if err != nil {
+        return handle(err, "Failed to create file: %v!", path);
+    }
     defer f.Close();
     
     _, err = f.Write(out);
-    Check(err, "Failed to write to: %v", path);
+    
+    if err != nil {
+        return handle(err, "Failed to write to file '%v'!", path);
+    }
+    
+    return nil;
 }
 
 

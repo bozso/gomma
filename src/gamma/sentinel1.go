@@ -1,8 +1,8 @@
 package gamma;
 
 import (
-    "fmt";
     "log";
+    "fmt";
     //conv "strconv";
     str "strings";
 );
@@ -25,7 +25,7 @@ func init() {
     
     if burstCorner, ok = Gamma["ScanSAR_burst_corners"]; !ok {
         if burstCorner, ok = Gamma["SLC_burst_corners"]; !ok {
-            log.Fatal("No Fun.")
+            log.Fatalf("No Fun.");
         }
     }
 }
@@ -84,36 +84,99 @@ func (self *S1Zip) extracTemplates(names []string, pol, iw string) []string  {
     return []string{"asd"}
 }
 
+func makePoint(info Params, max bool) (point, error) {
+    handle := Handler("makePoint");
+    
+    var tpl_lon, tpl_lat string;
+    
+    if max {
+        tpl_lon, tpl_lat = "Max_Lon", "Max_Lat";
+    } else {
+        tpl_lon, tpl_lat = "Min_Lon", "Min_Lat";
+    }
+    
+    
+    x, err := info.Float(tpl_lon);
+    
+    if err != nil {
+        return point{}, handle(err, "Could not get Longitude value!");
+    }
+    
+    y, err := info.Float(tpl_lat);
+    
+    if err != nil {
+        return point{}, handle(err, "Could not get Latitude value!");
+    }
+    
+    return point{x:x, y:y}, nil;
+}
 
-func iwInfo(path string) IWInfo {
+
+func iwInfo(path string) (*IWInfo, error) {
+    handle := Handler("iwInfo");
+    
     //num, err := conv.Atoi(str.Split(path, "iw")[1][0]);
     num := int(str.Split(path, "iw")[1][0])
     // Check(err, "Failed to retreive IW number from %s", path);
     
-    par, TOPS_par := TmpFile(), TmpFile()
+    par, err := TmpFile();
     
-    info := FromString(Gamma["par_S1_SLC"](nil, path, nil, nil, par, nil, 
-                                           TOPS_par), ":");
+    if err != nil {
+        return nil, handle(err, "Failed to create tmp file!");
+    }
     
-    TOPS := FromFile(TOPS_par, ":");
+    TOPS_par, err := TmpFile();
     
-    nburst := toInt(TOPS.Par("number_of_bursts"), 0)
+    if err != nil {
+        return nil, handle(err, "Failed to create tmp file!");
+    }
+    
+    _info, err := Gamma["par_S1_SLC"](nil, path, nil, nil, par, nil, TOPS_par);
+    
+    if err != nil {
+        return nil, handle(err, "Failed to parse parameter files!");
+    }
+    
+    info := FromString(_info, ":");
+    TOPS, err := FromFile(TOPS_par, ":");
+    
+    if err != nil {
+        return nil, handle(err, "Could not parse TOPS_par file!");
+    }
+    
+    nburst, err := TOPS.Int("number_of_bursts");
+    
+    if err != nil {
+        return nil, handle(err, "Could not retreive number of bursts!");
+    }
+    
     var numbers [9]float64;
     
     for ii := 0; ii < nburst; ii++ {
          tpl := fmt.Sprintf(burstTpl, ii);
-         numbers[ii] = toFloat(str.Split(TOPS.Par(tpl), " ")[0], 0)
+         
+         numbers[ii], err = TOPS.Float(tpl);
+         
+         if err != nil {
+            return nil, handle(err, "Could not get burst number: '%s'",
+                                     tpl);
+         }
     }
     
+    max, err := makePoint(info, true);
     
-    max := point{x:toFloat(info.Par("Max_Lon"), 0), 
-                 y:toFloat(info.Par("Max_Lat"), 0)};
- 
-    min := point{x:toFloat(info.Par("Min_Lon"), 0), 
-                 y:toFloat(info.Par("Min_Lat"), 0)};
-
-    return IWInfo{num:num, nburst:nburst, extent:rect{min:min, max:max},
-                  bursts:numbers};
+    if err != nil {
+        return nil, handle(err, "Could not create max latlon point!");
+    }
+    
+    min, err := makePoint(info, false);
+    
+    if err != nil {
+        return nil, handle(err, "Could not create min latlon point!");
+    }
+    
+    return &IWInfo{num:num, nburst:nburst, extent:rect{min:min, max:max},
+                   bursts:numbers}, nil;
 }
 
 
