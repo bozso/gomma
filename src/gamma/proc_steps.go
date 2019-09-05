@@ -1,8 +1,10 @@
 package gamma;
 
 import (
+    "fmt";
     "os";
     "encoding/json";
+    str "strings";
 );
 
 
@@ -52,7 +54,25 @@ type (
         IFGSelect ifgSelect;
         Coherence coherence;
     };
+    
+    
 );
+
+
+func center(s string, n int, fill string) string {
+         div := n / 2
+         return str.Repeat(fill, div) + s + str.Repeat(fill, div);
+}
+
+const width = 40;
+
+func Delim(msg, sym string) {
+    msg = fmt.Sprintf("%s %s %s", sym, msg, sym);
+    syms := center(str.Repeat(sym, len(msg)), width, " ");
+    msg = center(msg, width, " ");
+    
+    fmt.Printf("%s\n%s\n%s\n", syms, msg, syms);
+}
 
 
 func ParseConfig(path string) (config, error) {
@@ -141,6 +161,8 @@ func MakeDefaultConfig(path string) error {
     
     return nil;
 }
+
+
 
 
 

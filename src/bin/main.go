@@ -19,6 +19,7 @@ func (self Al) String() string {
 
 
 func main() {
+    
     gm.MakeDefaultConfig("gamma.json");
     
     _, err := gm.FromFile("asd", ":");
