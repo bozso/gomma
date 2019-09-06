@@ -43,9 +43,16 @@ func Fatal(err error, format string, args ...interface{}) {
 
 
 func Handler(name string) handlerFun {
+    name = fmt.Sprintf("In %s", name);
+    
     return func(err error, format string, args ...interface{}) error {
         str := fmt.Sprintf(format, args...);
-        return fmt.Errorf("In %s: %s\nError: %w", name, str, err);
+        
+        if err == nil {
+            return fmt.Errorf("%s: %s\n", name, str);
+        } else {
+            return fmt.Errorf("%s: %s\nError: %w", name, str, err);
+        }
     }
 }
 
