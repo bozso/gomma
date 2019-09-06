@@ -15,16 +15,14 @@ const (
     BufSize = 50;
     DateShort = "20060102";
     DateLong = "20060102T150405";
-)
-
-
-type pol int;
-
-const (
+    
     VV pol = iota;
     HH;
     HV;
     VH;
+    
+    long dateFormat = iota;
+    short;
 );
 
 
@@ -45,10 +43,23 @@ var (
     };
     Gamma = makeGamma();
     Imv = MakeCmd("eog");
+    
+    Settings = settings{
+        RasExt: "bmp",
+        path: versions[useVersion],
+        modules: []string{"DIFF", "DISP", "ISP", "LAT", "IPTA"},
+        Templates: templates{
+            IW: "{{date}}_iw{{iw}}.{{pol}}.slc",
+            Tab: "{{date}}.{{pol}}.SLC_tab",
+        },
+    };
 );
 
 
 type(
+    pol int;
+    dateFormat int;
+    
     templates struct {
         IW string;
         Tab string;
@@ -127,16 +138,6 @@ type(
 );
 
 
-var Settings = settings{
-    RasExt: "bmp",
-    path: versions[useVersion],
-    modules: []string{"DIFF", "DISP", "ISP", "LAT", "IPTA"},
-    Templates: templates{
-        IW: "{{date}}_iw{{iw}}.{{pol}}.slc",
-        Tab: "{{date}}.{{pol}}.SLC_tab",
-    },
-};
-
 
 func makeGamma() map[string]CmdFun {
     Path := Settings.path;
@@ -163,9 +164,19 @@ func makeGamma() map[string]CmdFun {
 }
 
 
-func ParseDate(format string, str string) (time.Time, error) {
+func ParseDate(format dateFormat, str string) (time.Time, error) {
+    var form string;
     
-    ret, err := time.Parse(format, str);
+    switch format {
+        case long:
+            form = DateLong;
+        case short:
+            form = DateShort;
+        default:
+            break;
+    } 
+    
+    ret, err := time.Parse(form, str);
     
     if err != nil {
         return time.Time{}, 
@@ -174,6 +185,32 @@ func ParseDate(format string, str string) (time.Time, error) {
     }
     
     return ret, nil;
+}
+
+
+
+func NewDate(format dateFormat, start, stop string) (date, error) {
+    self := date{};
+    handle := Handler("NewDate");
+    
+    _start, err := ParseDate(format, start);
+    if err != nil {
+        return self, handle(err, "Could not parse date: '%s'", start);
+    }
+    
+    _stop, err := ParseDate(format, stop);
+    if err != nil {
+        return self, handle(err, "Could not parse date: '%s'", start);
+    }
+    
+    // TODO: Optional check duration, is it max or min
+    delta := _start.Sub(_stop) / 2.0;
+    self.center = _stop.Add(delta);
+    
+    self.start = _start;
+    self.stop = _stop;
+    
+    return self, nil;
 }
 
 

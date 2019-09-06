@@ -82,3 +82,45 @@ func TestGetParameter(t *test.T) {
         t.Errorf("Expected %v for image_format got %v", img_fmt, gots);
     }
 }
+
+func TestS1Zip(t *test.T) {
+    const (
+        str = "/mnt/Dszekcso/ASC/S1A_IW_SLC__1SDV_20160702T163342_20160702T163409_011972_012763_24E2.zip";
+        zip = "S1A_IW_SLC__1SDV_20160702T163342_20160702T163409_011972_012763_24E2.zip";
+        mission = "S1A";
+        dateStr = "20160702T163342_20160702T163409";
+        mode = "IW";
+        productType = "SLC";
+        resolution = "_";
+        level = "1";
+        productClass = "S";
+        pol = "DV";
+        absoluteOrbit = "011972";
+        DTID = "012763";
+        UID = "24E2";
+    );
+    
+    
+    s1zip := gm.NewS1Zip(str);
+    
+    if s1zip.path != str {
+        t.Errorf("Expected S1Zip.path to be '%s' got '%s'", str, s1zip.path);
+    }
+    
+    
+    if s1zip.zipBase != zip {
+        t.Errorf("Expected S1Zip.zip to be '%s' got '%s'", zip, s1zip.zipBase);
+    }
+    
+    if s1zip.mission != "S1A" {
+    
+    }
+    
+    if s1zip.dateStr != 
+    
+        path, zipBase, mission, dateStr, mode, productType, resolution string;
+        level, productClass, pol, absoluteOrbit, DTID, UID string;
+        date date;
+    
+}
+

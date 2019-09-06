@@ -15,6 +15,8 @@ import (
 type (
     CmdFun func(args ...interface{}) (string, error);
     handlerFun func(err error, format string, args ...interface{}) error;
+    Joiner func(args ...string) string;
+    
     
     Params struct {
         par, sep string;
@@ -25,6 +27,11 @@ type (
         files []string;
     };
     
+    
+    Path struct {
+        path string;
+        parts []string;
+    };
 );
 
 

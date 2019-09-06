@@ -7,6 +7,8 @@ import (
     str "strings";
     ref "reflect";
     fl "flag";
+    fp "path/filepath";
+    conv "strconv";
 );
 
 
@@ -50,7 +52,7 @@ type (
     
     config struct {
         General general;
-        Preselect preselect;
+        PreSelect preselect;
         Geocoding geocoding;
         Coreg coreg;
         IFGSelect ifgSelect;
@@ -84,7 +86,7 @@ var (
             AzimuthLooks:1,
         },
         
-        Preselect: preselect{
+        PreSelect: preselect{
             MasterDate: "auto",
             CheckZips: false,
         },
@@ -95,8 +97,8 @@ var (
             RangeOverlap: 100,
             AzimuthOverlap: 100,
             NPoly: 1,
-            DEMLatOversampling: 1.0,
-            DEMLonOversampling: 1.0,
+            DEMLatOversampling: 2.0,
+            DEMLonOversampling: 2.0,
         },
         
         Coreg: coreg{
@@ -222,7 +224,7 @@ func (self *cliConfig) Parse() (config, int, int, error) {
         }
     } else {
         istart = istep;
-        istop = istep;
+        istop = istep + 1;
     }
     
     path := self.Conf;
@@ -252,10 +254,14 @@ func (self *config) RunSteps(start, stop int) error {
         name := stepList[ii];
         step, _ := steps[name];
         
+        delim(fmt.Sprintf("START: %s", name), "*");
+        
         if err := step(self); err != nil {
-            return handle(err, "Something went wrong while running step: '%s'", 
+            return handle(err, "Error while running step: '%s'", 
                           name);
         }
+        
+        delim(fmt.Sprintf("END: %s", name), "*");
     }
     return nil;
 }
@@ -285,7 +291,76 @@ func MakeDefaultConfig(path string) error {
     return nil;
 }
 
-func stepPreselect(conf *config) error {
+
+func stepPreselect(self *config) error {
+    handle := Handler("stepSelect");
+    
+    dataPath := self.General.DataPath
+    
+    if len(dataPath) == 0 {
+        return fmt.Errorf("DataPath needs to be specified!");
+    }
+    
+    masterDate := self.PreSelect.MasterDate;
+    
+    ll, ur := self.PreSelect.LowerLeft, self.PreSelect.UpperRight
+    
+    if len(ll) == 0 || len(ur) == 0 {
+        return fmt.Errorf("LowerLeft and UpperRight points need to be specified!")
+    }
+    
+    lowerLeft, upperRight := str.Split(ll, ","), str.Split(ur, ",");
+    
+    llLat, err := conv.ParseFloat(lowerLeft[0], 64);
+    if err != nil {
+        return handle(err, "Could not parse lower left latitude coordinate!");
+    }
+    
+    llLon, err := conv.ParseFloat(lowerLeft[0], 64);
+    if err != nil {
+        return handle(err, "Could not parse lower left longitude coordinate!");
+    }
+    
+    urLat, err := conv.ParseFloat(upperRight[0], 64);
+    if err != nil {
+        return handle(err, "Could not parse upper right latitude coordinate!");
+    }
+    
+    urLon, err := conv.ParseFloat(upperRight[0], 64);
+    if err != nil {
+        return handle(err, "Could not parse upper right latitude coordinate!");
+    }
+    
+    aoi := [4]point{
+        point{x: llLon, y:llLat}, point{x:llLon, y:urLat},
+        point{x: urLon, y:urLat}, point{x:urLon, y:llLat},
+    };
+    
+    
+    //date_start, date_stop, check_zips = \
+    //select.get("date_start"), select.get("date_stop"), \
+    //select.bool("check_zips", False)
+    
+    zipfiles, err := fp.Glob(fp.Join(dataPath, "S1*_IW_SLC*.zip"));
+    
+    if err != nil {
+        return handle(err, "Glob to find zipfiles failed!");
+    }
+    
+    S1Zips := make([]S1Zip, len(zipfiles));
+    
+    for ii, zip := range zipfiles {
+        if S1Zips[ii], err = NewS1Zip(zip); err != nil {
+            return handle(err, "Failed to parse S1Zip data from '%s'", zip);
+        }
+    }
+    
+    fmt.Println(S1Zips[0])
+    fmt.Println(S1Zips[0].date.start.Format(DateLong), 
+    S1Zips[0].date.center.Format(DateLong), 
+    S1Zips[0].date.stop.Format(DateLong), 
+    aoi, masterDate);
+    
     return nil;
 }
 

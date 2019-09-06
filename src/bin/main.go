@@ -10,6 +10,8 @@ import (
 
 
 func main() {
+    defer gm.RemoveTmp();
+    
     proc := fl.NewFlagSet("proc", fl.ExitOnError);
     
     conf := gm.NewConfig(proc);
@@ -34,8 +36,6 @@ func main() {
             err = procConf.RunSteps(start, stop);
             gm.Fatal(err, "Error occurred while running processing steps!");
             
-            
-            
         case "init":
             init.Parse(os.Args[2:]);
             
@@ -48,7 +48,5 @@ func main() {
     }
     
     
-    
-    defer gm.RemoveTmp();
     fmt.Println(gm.First());
 }

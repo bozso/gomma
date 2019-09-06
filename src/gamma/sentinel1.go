@@ -3,10 +3,36 @@ package gamma;
 import (
     "log";
     "fmt";
-    //conv "strconv";
+    // conv "strconv";
     str "strings";
+    fp "path/filepath";
 );
 
+
+type (
+    S1Zip struct {
+        path, zipBase, mission, dateStr, mode, productType, resolution string;
+        level, productClass, pol, absoluteOrbit, DTID, UID string;
+        date date;
+    };
+    
+    IWInfo struct {
+        num, nburst int;
+        extent rect;
+        bursts [9]float64;
+    };
+    
+    S1IW struct {
+        dataFile;
+        TOPS_par ParamFile;
+    };
+
+    S1SLC struct {
+        nIW int;
+        IWs [9]S1IW;
+        tab string;
+    };
+);
 
 
 var (
@@ -31,33 +57,6 @@ func init() {
 }
 
 
-type (
-    S1Zip struct {
-        path, zip_base, mission, datestr, mode, prod_type, resolution string;
-        level, prod_class, pol, abs_orb, DTID, UID string;
-        date date;
-    };
-    
-    IWInfo struct {
-        num, nburst int;
-        extent rect;
-        bursts [9]float64;
-    };
-    
-    S1IW struct {
-        dataFile;
-        TOPS_par ParamFile;
-    };
-
-
-    S1SLC struct {
-        nIW int;
-        IWs [9]S1IW;
-        tab string;
-    };
-);
-
-
 var extractRegex = map[string]string {
         "file": "{{mission}}-iw{{iw}}-slc-{{pol}}-.*-{{abs_orb}}-" + 
                 "{{DTID}}-[0-9]{3}",
@@ -69,6 +68,39 @@ var extractRegex = map[string]string {
         "quicklook": "preview/quick-look.png",
 };
 
+
+func NewS1Zip(zipPath string) (S1Zip, error) {
+    var err error;
+    self := S1Zip{};
+    handle := Handler("NewS1Zip");
+    
+    zipBase := fp.Base(zipPath);
+    self.path, self.zipBase = zipPath, zipBase;
+    
+    self.mission = zipBase[:3];
+    self.dateStr = zipBase[17:48];
+    
+    start, stop := zipBase[17:32], zipBase[33:48]
+    
+    if self.date, err = NewDate(long, start, stop); err != nil {
+        return self, 
+               handle(err, 
+                      "Could not create new date from strings: '%s' '%s'",
+                       start, stop);
+    }
+    
+    self.mode = zipBase[4:6]
+    self.productType = zipBase[7:10]
+    self.resolution = string(zipBase[10])
+    self.level = string(zipBase[12])
+    self.productClass = string(zipBase[13])
+    self.pol = zipBase[14:16]
+    self.absoluteOrbit = zipBase[49:55]
+    self.DTID = zipBase[56:62]
+    self.UID = zipBase[63:67]
+    
+    return self, nil;
+}
 
 func (self *S1Zip) extracTemplates(names []string, pol, iw string) []string  {
     // TODO: finish
