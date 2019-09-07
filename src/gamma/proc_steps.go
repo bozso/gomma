@@ -296,6 +296,7 @@ func stepPreselect(self *config) error {
     handle := Handler("stepSelect");
     
     dataPath := self.General.DataPath
+    cache := self.General.CachePath;
     
     if len(dataPath) == 0 {
         return fmt.Errorf("DataPath needs to be specified!");
@@ -336,18 +337,20 @@ func stepPreselect(self *config) error {
         point{x: urLon, y:urLat}, point{x:urLon, y:llLat},
     };
     
+    pol := self.General.Pol;
     
     //date_start, date_stop, check_zips = \
     //select.get("date_start"), select.get("date_stop"), \
     //select.bool("check_zips", False)
     
     zipfiles, err := fp.Glob(fp.Join(dataPath, "S1*_IW_SLC*.zip"));
-    
     if err != nil {
         return handle(err, "Glob to find zipfiles failed!");
     }
     
-    S1Zips := make([]S1Zip, len(zipfiles));
+    nzips := len(zipfiles);
+    
+    S1Zips := make([]S1Zip, nzips);
     
     for ii, zip := range zipfiles {
         if S1Zips[ii], err = NewS1Zip(zip); err != nil {
@@ -355,11 +358,24 @@ func stepPreselect(self *config) error {
         }
     }
     
-    fmt.Println(S1Zips[0])
-    fmt.Println(S1Zips[0].date.start.Format(DateLong), 
-    S1Zips[0].date.center.Format(DateLong), 
-    S1Zips[0].date.stop.Format(DateLong), 
-    aoi, masterDate);
+    
+    extracted := make([]string, BufSize);
+    
+    names := []string{"annot", "quicklook"};
+    root := fp.Join(cache, "extract");
+    
+    for _, s1zip := range S1Zips {
+        extFiles, err := s1zip.Extract(names, pol, IWDefault, root);
+        
+        if err != nil {
+            return handle(err, "Could not extract file(s) from '%s'",
+                                s1zip.path);
+        }
+        
+        extracted := append(extracted, extFiles...);
+    }
+    
+    fmt.Println(S1Zips[0], aoi, masterDate, extracted);
     
     return nil;
 }

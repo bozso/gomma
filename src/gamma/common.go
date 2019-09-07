@@ -4,8 +4,7 @@ import (
     "fmt";
     fp "path/filepath";
     "time";
-    "os";
-    zip "archive/zip";
+    // "os";
     set "github.com/deckarep/golang-set"
 );
 
@@ -98,18 +97,6 @@ type(
 
     ParamFile struct {
         par string;
-    };
-    
-    
-    Extract struct {
-        file *zip.ReadCloser;
-        fileList []string;
-    };
-    
-    
-    Extracted struct {
-        fileSet set.Set;
-        root string;
     };
     
     
@@ -231,40 +218,6 @@ func (self *dataFile) imgFormat() (string, error) {
 
 func (self dataFile) Date() time.Time {
     return self.center;
-}
-
-
-func NewExtract(path string, templates []string, root string) (*Extract, error) {
-    handle := Handler("NewExtract");
-    
-    file, err := zip.OpenReader(path);
-    
-    if err != nil {
-        return nil, handle(err, "Could not open zipfile: '%s'!", path);
-    }
-    
-    defer file.Close()
-    
-    list := make([]string, BufSize);
-    
-    for _, file := range file.File {
-        name := file.Name;
-        if _, err := os.Stat(fp.Join(root, name)); err == nil {
-            // TODO: Check if matches templates.
-            if os.IsNotExist(err) {
-                list = append(list, name);
-            } else {
-                return nil, handle(err, "Stat failed on file : '%s'!", file);
-            }
-        }
-    }
-    
-    return &Extract{file, list}, nil;
-}
-
-
-func (self *Extract) Close() {
-    self.file.Close();
 }
 
 

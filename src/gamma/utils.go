@@ -8,6 +8,7 @@ import (
     io "io/ioutil";
     str "strings";
     conv "strconv";
+    fp "path/filepath";
 );
 
 
@@ -28,7 +29,7 @@ type (
     };
     
     
-    Path struct {
+    path struct {
         path string;
         parts []string;
     };
@@ -85,6 +86,41 @@ func MakeCmd(cmd string) CmdFun {
         
         return result, nil;
     };
+}
+
+
+func NewPath(args ...string) path {
+    return path{fp.Join(args...), args};
+}
+
+
+func (self *path) Join(args ...string) path {
+    newpath := append(self.parts, args...);
+    return path{fp.Join(newpath...), newpath};
+}
+
+
+func (self *path) Glob() ([]string, error) {
+    ret, err := fp.Glob(self.path);
+    
+    if err != nil {
+        return ret,
+               fmt.Errorf("In path.Glob: Could not get Glob of: '%s'",
+                          self.path);
+    }
+    return ret, nil;
+}
+
+
+func (self *path) Info () (os.FileInfo, error) {
+    ret, err := os.Stat(self.path);
+    
+    if err != nil {
+        return ret,
+               fmt.Errorf("In path.Info: Could not get FileInfo of: '%s'",
+                          self.path);
+    }
+    return ret, nil;
 }
 
 

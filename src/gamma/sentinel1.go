@@ -42,6 +42,7 @@ var (
 
 const (
     burstTpl = "burst_asc_node_%d";
+    IWDefault = "[1-3]";
 );
 
 
@@ -102,7 +103,8 @@ func NewS1Zip(zipPath string) (S1Zip, error) {
     return self, nil;
 }
 
-func (self *S1Zip) extracTemplates(names []string, pol, iw string) []string  {
+
+func (self *S1Zip) extractTemplates(names []string, pol, iw string) []string  {
     // TODO: finish
     // tpl = extractRegex["file"]
     
@@ -115,6 +117,22 @@ func (self *S1Zip) extracTemplates(names []string, pol, iw string) []string  {
     
     return []string{"asd"}
 }
+
+
+func (self *S1Zip) Extract(names []string, pol, iw, root string) ([]string, error) {
+    templates := self.extractTemplates(names, pol, iw);
+    
+    ret, err := extract(self.path, root, templates);
+    
+    if err != nil {
+        return nil, fmt.Errorf(
+        "In S1Zip.Extract: extraction of requested files failed!\nError: %w", 
+        err);
+    }
+    
+    return ret, nil;
+}
+
 
 func makePoint(info Params, max bool) (point, error) {
     handle := Handler("makePoint");
