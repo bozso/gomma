@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-    "sort"
-	fl "flag"
+	"sort"
+    "log"
 	fp "path/filepath"
+	fl "flag"
 	ref "reflect"
 	conv "strconv"
 	str "strings"
@@ -147,7 +148,7 @@ func NewConfig(flag *fl.FlagSet) *cliConfig {
 	conf := cliConfig{}
 
 	flag.StringVar(&conf.Conf, "config", "gamma.json",
-        "Processing configuration file")
+		"Processing configuration file")
 
 	flag.StringVar(&conf.Step, "step", "",
 		"Single processing step to be executed.")
@@ -169,7 +170,6 @@ func NewConfig(flag *fl.FlagSet) *cliConfig {
 	return &conf
 }
 
-
 func stepIndex(step string) int {
 	for ii, _step := range stepList {
 		if step == _step {
@@ -179,11 +179,9 @@ func stepIndex(step string) int {
 	return -1
 }
 
-
 func listSteps() {
 	fmt.Println("Available processing steps: ", stepList)
 }
-
 
 func (self *cliConfig) Parse() (config, int, int, error) {
 	handle := Handler("CLIConfig.Parse")
@@ -238,7 +236,6 @@ func (self *cliConfig) Parse() (config, int, int, error) {
 	return ret, istart, istop, nil
 }
 
-
 func (self *config) RunSteps(start, stop int) error {
 	handle := Handler("RunSteps")
 
@@ -257,7 +254,6 @@ func (self *config) RunSteps(start, stop int) error {
 	}
 	return nil
 }
-
 
 func MakeDefaultConfig(path string) error {
 	handle := Handler("MakeDefaultConfig")
@@ -281,9 +277,8 @@ func MakeDefaultConfig(path string) error {
 	return nil
 }
 
-
 func stepPreselect(self *config) error {
-	handle := Handler("stepSelect")
+	handle := Handler("stepPreselect")
 
 	dataPath := self.General.DataPath
 	cache := self.General.CachePath
@@ -326,10 +321,9 @@ func stepPreselect(self *config) error {
 		point{x: llLon, y: llLat}, point{x: llLon, y: urLat},
 		point{x: urLon, y: urLat}, point{x: urLon, y: llLat},
 	}
-    
-    
-    extInfo := extractInfo{pol:self.General.Pol, iw:IWAll,
-        root:fp.Join(cache, "extract")}
+
+	extInfo := extractInfo{pol: self.General.Pol,
+        root: fp.Join(cache, "extracted")}
 
 	//date_start, date_stop, check_zips = \
 	//select.get("date_start"), select.get("date_stop"), \
@@ -340,58 +334,84 @@ func stepPreselect(self *config) error {
 		return handle(err, "Glob to find zipfiles failed!")
 	}
 
-	nzip := len(zipfiles)
-    
-    // TODO: use []*S1Zip instead to avoid needles copying?
-	S1Zips := make([]S1Zip, nzip)
+	// nzip := len(zipfiles)
 
-	for ii, zip := range zipfiles {
-		if S1Zips[ii], err = NewS1Zip(zip); err != nil {
+	// TODO: use []*S1Zip instead to avoid needles copying?
+	S1Zips := make([]S1Zip, BufSize)
+
+	for _, zip := range zipfiles {
+        s1zip, err := NewS1Zip(zip)
+		if err != nil {
 			return handle(err, "Failed to parse S1Zip data from '%s'", zip)
 		}
+        
+        IWs, err := s1zip.IWInfo(extInfo)
+        
+        if err != nil {
+            return handle(err,
+                "Failed to parse IW information for zip '%s'", s1zip.path)
+        }
+        
+        log.Fatalf("%v\n", IWs)
+        
+        if pointsInSLC(IWs, aoi) {
+            log.Printf("%v\n", s1zip)
+            S1Zips = append(S1Zips, s1zip)
+        }
 	}
-
-	extracted := make([]string, BufSize)
-
-	names := []tplType{annot, quicklook}
-
-	for _, s1zip := range S1Zips {
-		extFiles, err := s1zip.Extract(names, extInfo)
-
-		if err != nil {
-			return handle(err, "Could not extract file(s) from '%s'",
-				s1zip.path)
+    
+    os.Exit(0)
+    
+	var (
+        master S1Zip
+        idx int
+    )
+    
+    log.Fatalf("%v", S1Zips)
+    
+	if masterDate == "auto" {
+		sort.Sort(ByDate(S1Zips))
+		master = S1Zips[0]
+    	masterDate = date2string(master, short)
+        idx = 0
+	} else {
+		for ii, s1zip := range S1Zips {
+			if date2string(s1zip, short) == masterDate {
+				master = s1zip
+                idx = ii
+			}
 		}
-
-		extracted = append(extracted, extFiles...)
 	}
     
-    extInfo.Extracted = extracted
+    log.Fatalf("master: %v", master)
     
-    
-    iwInfos := make([]IWInfos, nzip)
-    for ii, s1zip := range S1Zips {
-        if iwInfos[ii], err = s1zip.IWInfo(extInfo); err != nil {
-            return handle(err, "Could not retreive IW information!")
-        }
+    masterIW, err := master.IWInfo(extInfo)
+    if err != nil {
+        return handle(err, "Failed to parse S1Zip data from master '%s'",
+            master.path)
     }
     
-    var master S1Zip
-    
-    if masterDate == "auto" {
-        sort.Sort(ByDate(S1Zips))
-        master = S1Zips[0]
-        masterDate = date2string(master, short)
-    } else {
-        for _, s1zip := range S1Zips {
-            if date2string(s1zip, short) == masterDate {
-                master = s1zip
-            }
+    for _, s1zip := range S1Zips {
+        iw, err := s1zip.IWInfo(extInfo)
+        if err != nil {
+            return handle(err, "Failed to parse S1Zip data from '%s'",
+                s1zip.path)
         }
+        
+        diff, err := IWAbsDiff(masterIW, iw)
+        
+        
+        if err != nil {
+            return handle(err,
+            "Failed to calculate burst number differences between " +
+            "master and '%s'", s1zip.path)
+        }
+        
+        fmt.Printf("AbsDiff: %v", diff)
     }
-	
     
-    fmt.Println(S1Zips[0], aoi, masterDate, extracted)
+    
+	fmt.Println(S1Zips[0], aoi, masterDate, idx)
 
 	return nil
 }

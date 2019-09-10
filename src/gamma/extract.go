@@ -3,21 +3,23 @@ package gamma
 import (
 	"io"
 	"os"
-	rex "regexp"
+    //"log"
+    //"fmt"
     zip "archive/zip"
 	fp "path/filepath"
+	rex "regexp"
 )
 
 type (
-    extractInfo struct {
-        pol, iw, root string
-        Extracted     []string
-    }
+	extractInfo struct {
+		pol, root string
+		Extracted     []string
+	}
 )
 
 func extractFile(src *zip.File, dst string) error {
 	handle := Handler("extractFile")
-
+    
 	srcName := src.Name
 
 	in, err := src.Open()
@@ -25,7 +27,14 @@ func extractFile(src *zip.File, dst string) error {
 		return handle(err, "Could not open file '%s'!", srcName)
 	}
 	defer in.Close()
-
+    
+    dir := fp.Dir(dst)
+    err = os.MkdirAll(dir, os.ModePerm)
+    
+    if err != nil {
+        return handle(err, "Failed to create directory: %s!", dir)
+    }
+    
 	out, err := os.Create(dst)
 	if err != nil {
 		return handle(err, "Could not create file '%s'!", dst)
@@ -41,90 +50,61 @@ func extractFile(src *zip.File, dst string) error {
 	return nil
 }
 
-func matches(candidate string, templates []string) (bool, error) {
-    handle := Handler("matches")
-    
-    for _, tpl := range templates {
-        matched, err := rex.MatchString(tpl, candidate)
-        if err != nil {
-            return false, handle(err, "rex.MatchString failed!")
-        }
-        
-        if matched {
-            return true, nil
-        }
+func matches(candidate string, template string) (bool, error) {
+	handle := Handler("matches")
+
+    matched, err := rex.MatchString(template, candidate)
+    if err != nil {
+        return false, handle(err, "MatchString failed!")
     }
 
-    return false, nil
+	return matched, nil
 }
 
-
-func extract(path, root string, templates []string) ([]string, error) {
-	handle := Handler("extract")
-
-	file, err := zip.OpenReader(path)
-
-	if err != nil {
-		return nil, handle(err, "Could not open zipfile: '%s'!", path)
-	}
-
-	defer file.Close()
-
-	ret := make([]string, BufSize)
-
+func (self *extractInfo) extract(file *zip.ReadCloser, template string) (string, error) {
+	handle := Handler("extractInfo.extract")
+    
+    
 	// go through files in the zipfile
 	for _, zipfile := range file.File {
-		srcName := zipfile.Name
-		dst := fp.Join(root, srcName)
-
-        name := zipfile.Name
-        matched, err := matches(name, templates)
+		name := zipfile.Name
+		dst := fp.Join(self.root, name)
         
-        if err != nil {
-            return nil, handle(err,
-                "Failed to check wether zipped file '%s' matches templates!",
-                name)
+		matched, err := matches(name, template)
+        
+        
+		if err != nil {
+			return "", handle(err,
+				"Failed to check whether zipped file '%s' matches templates!",
+				name)
+		}
+        
+        //fmt.Printf("\n\nCurrent: %s\nTemplate: %s\nMatched: %v\n",
+        //    name, template, matched)
+        
+		if !matched {
+            continue
+		}
+        
+        
+        // TODO: clean up program logic
+        _, err = os.Stat(dst)
+        
+        if err != nil && os.IsNotExist(err) {
+            err = extractFile(zipfile, dst)
+
+            if err != nil {
+                return "", handle(err, "Failed to extract file : '%s'!", name)
+            }
+            
+            return dst, nil
+        } else {
+            return dst, nil
         }
         
-        if matched {
-            ret = append(ret, dst)
-            _, err := os.Stat(dst);
-            
-            if err != nil {
-                return nil, handle(err, "Stat failed on file : '%s'!", file)
-            }
-            
-            if os.IsNotExist(err) {
-                err := extractFile(zipfile, dst)
-
-                if err != nil {
-                    return nil, handle(err,
-                        "Failed to extract file : '%s' from zip '%v'!",
-                        srcName, file)
-                }
-            }
+        if err != nil {
+            return "", handle(err, "Stat failed on file : '%s'!", name)
         }
 	}
-	
-    return ret, nil
-}
-
-func (self *extractInfo) filterFiles(templates []string) ([]string, error) {
-    handle := Handler("extractInfo.filterFiles")
-    ret := make([]string, BufSize)
-    
-    for _, file := range self.Extracted {
-        matched, err := matches(file, templates)
-        
-        if err != nil {
-            return nil, handle(err,
-                "Failed to check wether extracted file '%s' matches templates!",
-                file)
-        }
-        
-        if matched {
-            ret = append(ret, file)
-        }
-    }
-    return ret, nil
+    return "", nil
 }

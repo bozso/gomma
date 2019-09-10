@@ -2,10 +2,10 @@ package gamma
 
 import (
 	"time"
-    //"fmt"
-	fp "path/filepath"
+	//"fmt"
 	//"os";
 	set "github.com/deckarep/golang-set"
+	fp "path/filepath"
 )
 
 type (
@@ -72,7 +72,6 @@ const (
 	VH
 )
 
-
 var (
 	versions = map[string]string{
 		"20181130": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
@@ -101,7 +100,6 @@ var (
 		},
 	}
 )
-
 
 func makeGamma() map[string]CmdFun {
 	Path := Settings.path
@@ -142,7 +140,6 @@ func (self *dataFile) imgFormat() (string, error) {
 func (self *dataFile) Date() time.Time {
 	return self.center
 }
-
 
 func (self *point) inRect(r *rect) bool {
 	return (self.x < r.max.x && self.x > r.min.x &&

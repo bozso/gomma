@@ -2,15 +2,14 @@ package gamma
 
 import (
 	"fmt"
+	io "io/ioutil"
 	"log"
 	"os"
 	"os/exec"
-	io "io/ioutil"
 	fp "path/filepath"
 	conv "strconv"
 	str "strings"
 )
-
 
 type (
 	CmdFun     func(args ...interface{}) (string, error)
@@ -32,14 +31,11 @@ type (
 	}
 )
 
-
 const cmdErr = `Command '%v' failed!
 Output of command is: %v
 %w`
 
-
 var tmp = Tmp{}
-
 
 func Fatal(err error, format string, args ...interface{}) {
 	if err != nil {
@@ -205,7 +201,6 @@ func (self *Params) Float(name string) (float64, error) {
 
 	return toFloat(data, 0)
 }
-
 
 func TmpFile() (string, error) {
 	file, err := io.TempFile("", "*")

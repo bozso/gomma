@@ -2,10 +2,10 @@ package gamma
 
 import (
 	"fmt"
-    "time"
+	"time"
 )
 
-type(
+type (
 	date struct {
 		start, stop, center time.Time
 	}
@@ -13,17 +13,16 @@ type(
 	Date interface {
 		Date() time.Time
 	}
-    dateFormat int
+	dateFormat int
 )
 
-const(
-	DateShort  = "20060102"
-	DateLong   = "20060102T150405"
-	
-    long dateFormat = iota
+const (
+	DateShort = "20060102"
+	DateLong  = "20060102T150405"
+
+	long dateFormat = iota
 	short
 )
-
 
 func ParseDate(format dateFormat, str string) (time.Time, error) {
 	var form string
@@ -73,12 +72,12 @@ func NewDate(format dateFormat, start, stop string) (date, error) {
 }
 
 func Before(one, two Date) bool {
-    return one.Date().Before(two.Date())
+	return one.Date().Before(two.Date())
 }
 
 func date2string(date Date, format dateFormat) string {
-    var layout string
-    
+	var layout string
+
 	switch format {
 	case long:
 		layout = DateLong
@@ -87,6 +86,6 @@ func date2string(date Date, format dateFormat) string {
 	default:
 		break
 	}
-    
-    return date.Date().Format(layout)
+
+	return date.Date().Format(layout)
 }
