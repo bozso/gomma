@@ -24,8 +24,8 @@ type (
 
 	IWInfo struct {
 		nburst int
-		extent      rect
-		bursts      [9]float64
+		extent      Rect
+		bursts      [nMaxBurst]float64
 	}
 
 	S1IW struct {
@@ -43,7 +43,9 @@ type (
 const (
 	burstTpl = "burst_asc_node_%d"
 	IWAll    = "[1-3]"
-
+    
+    nMaxBurst = 10
+    
 	tiff tplType = iota
 	annot
 	calib
@@ -54,8 +56,6 @@ const (
 
 var (
 	burstCorner  CmdFun
-	s1exTemplate = "{{mission}}-iw{{iw}}-slc-{{pol}}-.*-{{abs_orb}}-" +
-		"{{DTID}}-[0-9]{3}"
 
 	s1templates = []string{
 		tiff:      "measurement/%s.tiff",
@@ -65,6 +65,9 @@ var (
 		preview:   "preview/product-preview.html",
 		quicklook: "preview/quick-look.png",
 	}
+    
+    burstCorners = Gamma.selectFun("ScanSAR_burst_corners",
+                                   "SLC_burst_corners")
 )
 
 func init() {
@@ -106,7 +109,7 @@ func NewS1Zip(zipPath string) (S1Zip, error) {
 	self.productClass = string(zipBase[13])
 	self.pol = zipBase[14:16]
 	self.absoluteOrbit = zipBase[49:55]
-	self.DTID = zipBase[56:62]
+	self.DTID = str.ToLower(zipBase[56:62])
 	self.UID = zipBase[63:67]
 
 	return self, nil
@@ -163,12 +166,12 @@ func (self S1Zip) Date() time.Time {
 	return self.date.center
 }
 
-func makePoint(info Params, max bool) (point, error) {
+func makePoint(info Params, max bool) (Point, error) {
 	handle := Handler("makePoint")
 
 	var (
         tpl_lon, tpl_lat string
-        ret point
+        ret Point
         err error
     )
 
@@ -178,16 +181,17 @@ func makePoint(info Params, max bool) (point, error) {
 		tpl_lon, tpl_lat = "Min_Lon", "Min_Lat"
 	}
 
-	if ret.x, err = info.Float(tpl_lon); err != nil {
+	if ret.X, err = info.Float(tpl_lon); err != nil {
 		return ret, handle(err, "Could not get Longitude value!")
 	}
 
-	if ret.y, err = info.Float(tpl_lat); err != nil {
+	if ret.Y, err = info.Float(tpl_lat); err != nil {
 		return ret, handle(err, "Could not get Latitude value!")
 	}
 
 	return ret, nil
 }
+
 
 func iwInfo(path string) (IWInfo, error) {
 	handle := Handler("iwInfo")
@@ -214,16 +218,21 @@ func iwInfo(path string) (IWInfo, error) {
 		return ret, handle(err, "Failed to create tmp file!")
 	}
 
-	_info, err := Gamma["par_S1_SLC"](nil, path, nil, nil, par, nil, TOPS_par)
-    log.Fatalf("info: %s", _info)
+	_, err = Gamma["par_S1_SLC"](nil, path, nil, nil, par, nil, TOPS_par)
+    
+	if err != nil {
+		return ret, handle(err, "Could not import parameter files from '%s'!",
+            path)
+	}
+    
+    _info, err := burstCorners(par, TOPS_par)
     
 	if err != nil {
 		return ret, handle(err, "Failed to parse parameter files!")
 	}
-
+    
 	info := FromString(_info, ":")
 	TOPS, err := FromFile(TOPS_par, ":")
-    
 
 	if err != nil {
 		return ret, handle(err, "Could not parse TOPS_par file!")
@@ -235,11 +244,12 @@ func iwInfo(path string) (IWInfo, error) {
 		return ret, handle(err, "Could not retreive number of bursts!")
 	}
 
-	var numbers [9]float64
-
+	var numbers [nMaxBurst]float64
+    
+    
 	for ii := 1; ii < nburst + 1; ii++ {
 		tpl := fmt.Sprintf(burstTpl, ii)
-
+        
 		numbers[ii - 1], err = TOPS.Float(tpl)
 
 		if err != nil {
@@ -260,24 +270,26 @@ func iwInfo(path string) (IWInfo, error) {
 		return ret, handle(err, "Could not create min latlon point!")
 	}
 
-	return IWInfo{nburst: nburst, extent: rect{min: min, max: max},
+	return IWInfo{nburst: nburst, extent: Rect{Min: min, Max: max},
 		bursts: numbers}, nil
 }
 
 
-func (self *point) inIWs(IWs IWInfos) bool {
+func (self *Point) inIWs(IWs IWInfos) bool {
 	for _, iw := range IWs {
-		if self.inRect(&iw.extent) {
-			return true
+		if self.InRect(&iw.extent) {
+			//log.Printf("%v in %v", *self, iw.extent)
+            return true
 		}
+        //log.Printf("%v not in %v", *self, iw.extent)
 	}
 	return false
 }
 
-func pointsInSLC(IWs IWInfos, points [4]point) bool {
+func (self *AOI) InSLC(IWs IWInfos) bool {
 	sum := 0
-
-	for _, point := range points {
+    
+	for _, point := range self {
 		if point.inIWs(IWs) {
 			sum++
 		}

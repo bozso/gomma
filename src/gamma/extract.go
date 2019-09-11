@@ -3,7 +3,7 @@ package gamma
 import (
 	"io"
 	"os"
-    //"log"
+    "log"
     //"fmt"
     zip "archive/zip"
 	fp "path/filepath"
@@ -40,7 +40,8 @@ func extractFile(src *zip.File, dst string) error {
 		return handle(err, "Could not create file '%s'!", dst)
 	}
 	defer out.Close()
-
+    
+    log.Printf("Extracting '%s' into '%s'", srcName, dst)
 	_, err = io.Copy(out, in)
 	if err != nil {
 		return handle(err, "Could not copy contents of '%s' into '%s'!",

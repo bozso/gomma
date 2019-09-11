@@ -9,7 +9,7 @@ import (
 	fp "path/filepath"
 	fl "flag"
 	ref "reflect"
-	conv "strconv"
+	//conv "strconv"
 	str "strings"
 )
 
@@ -17,7 +17,11 @@ type (
 	minmax struct {
 		Min, Max float64
 	}
-
+    
+    latLon struct {
+        Lat, Lon float64
+    }
+    
 	general struct {
 		CachePath                          string `json:"CACHE_PATH,omitempty"`
 		DataPath, OutputDir, Pol, Metafile string
@@ -25,8 +29,9 @@ type (
 	}
 
 	preselect struct {
-		DateStart, DateStop, MasterDate, LowerLeft, UpperRight string
-		CheckZips                                              bool
+		DateStart, DateStop, MasterDate string
+        LowerLeft, UpperRight           latLon
+		CheckZips                       bool
 	}
 
 	geocoding struct {
@@ -291,37 +296,11 @@ func stepPreselect(self *config) error {
 
 	ll, ur := self.PreSelect.LowerLeft, self.PreSelect.UpperRight
 
-	if len(ll) == 0 || len(ur) == 0 {
-		return fmt.Errorf("LowerLeft and UpperRight points need to be specified!")
+	aoi := AOI{
+		Point{X: ll.Lon, Y: ll.Lat}, Point{X: ll.Lon, Y: ur.Lat},
+		Point{X: ur.Lon, Y: ur.Lat}, Point{X: ur.Lon, Y: ll.Lat},
 	}
-
-	lowerLeft, upperRight := str.Split(ll, ","), str.Split(ur, ",")
-
-	llLat, err := conv.ParseFloat(lowerLeft[0], 64)
-	if err != nil {
-		return handle(err, "Could not parse lower left latitude coordinate!")
-	}
-
-	llLon, err := conv.ParseFloat(lowerLeft[0], 64)
-	if err != nil {
-		return handle(err, "Could not parse lower left longitude coordinate!")
-	}
-
-	urLat, err := conv.ParseFloat(upperRight[0], 64)
-	if err != nil {
-		return handle(err, "Could not parse upper right latitude coordinate!")
-	}
-
-	urLon, err := conv.ParseFloat(upperRight[0], 64)
-	if err != nil {
-		return handle(err, "Could not parse upper right latitude coordinate!")
-	}
-
-	aoi := [4]point{
-		point{x: llLon, y: llLat}, point{x: llLon, y: urLat},
-		point{x: urLon, y: urLat}, point{x: urLon, y: llLat},
-	}
-
+    
 	extInfo := extractInfo{pol: self.General.Pol,
         root: fp.Join(cache, "extracted")}
 
@@ -337,7 +316,7 @@ func stepPreselect(self *config) error {
 	// nzip := len(zipfiles)
 
 	// TODO: use []*S1Zip instead to avoid needles copying?
-	S1Zips := make([]S1Zip, BufSize)
+	S1Zips := []S1Zip{}
 
 	for _, zip := range zipfiles {
         s1zip, err := NewS1Zip(zip)
@@ -345,6 +324,8 @@ func stepPreselect(self *config) error {
 			return handle(err, "Failed to parse S1Zip data from '%s'", zip)
 		}
         
+        
+        log.Printf("Parsing IW Information for S1 zipfile '%s'", s1zip.path)
         IWs, err := s1zip.IWInfo(extInfo)
         
         if err != nil {
@@ -352,25 +333,19 @@ func stepPreselect(self *config) error {
                 "Failed to parse IW information for zip '%s'", s1zip.path)
         }
         
-        log.Fatalf("%v\n", IWs)
-        
-        if pointsInSLC(IWs, aoi) {
-            log.Printf("%v\n", s1zip)
+        if aoi.InSLC(IWs) {
             S1Zips = append(S1Zips, s1zip)
         }
 	}
-    
-    os.Exit(0)
     
 	var (
         master S1Zip
         idx int
     )
     
-    log.Fatalf("%v", S1Zips)
-    
 	if masterDate == "auto" {
 		sort.Sort(ByDate(S1Zips))
+        log.Printf("Sorted: %v", S1Zips)
 		master = S1Zips[0]
     	masterDate = date2string(master, short)
         idx = 0
