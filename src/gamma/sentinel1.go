@@ -11,15 +11,28 @@ import (
 )
 
 type (
-	ByDate []S1Zip
+    S1Zips []*S1Zip
+	ByDate S1Zips
 
 	tplType int
 	IWInfos [3]IWInfo
 
 	S1Zip struct {
-		path, zipBase, mission, dateStr, mode, productType, resolution string
-		safe, level, productClass, pol, absoluteOrbit, DTID, UID       string
-		date                                                           date
+		Path           string `json:"path"`
+        zipBase        string `json:"-"`
+        mission        string `json:"-"`
+        dateStr        string `json:"-"`
+        mode           string `json:"-"`
+        productType    string `json:"-"`
+        resolution     string `json:"-"` 
+		Safe           string `json:"safe"`
+        level          string `json:"-"`
+        productClass   string `json:"-"`
+        pol            string `json:"-"`
+        absoluteOrbit  string `json:"-"`
+        DTID           string `json:"-"`
+        UID            string `json:"-"`
+		Dates          date   `json:"date"`
 	}
 
 	IWInfo struct {
@@ -80,29 +93,27 @@ func init() {
 	}
 }
 
-func NewS1Zip(zipPath string) (S1Zip, error) {
-
+func NewS1Zip(zipPath string) (*S1Zip, error) {
 	var err error
-	self := S1Zip{}
 	handle := Handler("NewS1Zip")
 
 	zipBase := fp.Base(zipPath)
-	self.path, self.zipBase = zipPath, zipBase
+	self := S1Zip{Path: zipPath, zipBase: zipBase}
 
 	self.mission = str.ToLower(zipBase[:3])
 	self.dateStr = zipBase[17:48]
 
 	start, stop := zipBase[17:32], zipBase[33:48]
 
-	if self.date, err = NewDate(long, start, stop); err != nil {
-		return self,
+	if self.Dates, err = NewDate(long, start, stop); err != nil {
+		return nil,
 			handle(err,
 				"Could not create new date from strings: '%s' '%s'",
 				start, stop)
 	}
 
 	self.mode = zipBase[4:6]
-    self.safe = str.ReplaceAll(zipBase, ".zip", ".SAFE")
+    self.Safe = str.ReplaceAll(zipBase, ".zip", ".SAFE")
 	self.productType = zipBase[7:10]
 	self.resolution = string(zipBase[10])
 	self.level = string(zipBase[12])
@@ -112,7 +123,7 @@ func NewS1Zip(zipPath string) (S1Zip, error) {
 	self.DTID = str.ToLower(zipBase[56:62])
 	self.UID = zipBase[63:67]
 
-	return self, nil
+	return &self, nil
 }
 
 func (self *S1Zip) mainTemplate(pol, iw string) string {
@@ -126,7 +137,7 @@ func (self *S1Zip) template(mode tplType, pol, iw string) string {
 	// TODO: test
 	tpl := self.mainTemplate(pol, iw)
 
-	return fp.Join(self.safe, fmt.Sprintf(s1templates[mode], tpl))
+	return fp.Join(self.Safe, fmt.Sprintf(s1templates[mode], tpl))
 }
 
 
@@ -134,7 +145,7 @@ func (self *S1Zip) IWInfo(ext extractInfo) (IWInfos, error) {
 	handle := Handler("S1Zip.IWInfo")
 	var ret IWInfos
     
-    pol, path := ext.pol, self.path
+    pol, path := ext.pol, self.Path
     zip, err := zip.OpenReader(path)
     
     if err != nil {
@@ -163,7 +174,7 @@ func (self *S1Zip) IWInfo(ext extractInfo) (IWInfos, error) {
 }
 
 func (self S1Zip) Date() time.Time {
-	return self.date.center
+	return self.Dates.center
 }
 
 func makePoint(info Params, max bool) (Point, error) {
@@ -304,16 +315,25 @@ func diffBurstNum(burst1, burst2 float64) int {
     return int(dburst + 1.0 + (dburst / (0.001 + diffSqrt)) * 0.5)    
 }
 
-func IWAbsDiff(one IWInfos, two IWInfos) (float64, error) {
+func checkBurstNum(one, two IWInfos) bool {
+    for ii := 0; ii < 3; ii++ {
+        if one[ii].nburst != two[ii].nburst {
+            return true
+        }
+    }
+    return false
+}
+
+func IWAbsDiff(one, two IWInfos) (float64, error) {
     sum := 0.0
     
     for ii := 0; ii < 3; ii++ {
         nburst1, nburst2 := one[ii].nburst, two[ii].nburst
         if nburst1 != nburst2 {
             return 0.0, fmt.Errorf(
-            "In: IWInfos.AbsDiff: number of burst in first IW%d (%d) " +
-            "is not equal to the number of burst in the second IW%d (%d)",
-            nburst1, ii, nburst2, ii)
+            "In: IWInfos.AbsDiff: number of burst in first SLC IW%d (%d) " +
+            "is not equal to the number of burst in the second SLC IW%d (%d)",
+            ii + 1, nburst1, ii + 1, nburst2)
         }
         
         for jj := 0; jj < nburst1; jj++ {
@@ -330,5 +350,5 @@ func (self ByDate) Len() int      { return len(self) }
 func (self ByDate) Swap(i, j int) { self[i], self[j] = self[j], self[i] }
 
 func (self ByDate) Less(i, j int) bool {
-	return Before(&self[i], &self[j])
+	return Before(self[i], self[j])
 }

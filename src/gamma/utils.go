@@ -220,11 +220,11 @@ func TmpFile() (string, error) {
 	return name, nil
 }
 
-func RemoveTmp() error {
+func RemoveTmp() {
+    log.Printf("Removing temporary files...\n")
 	for _, file := range tmp.files {
 		if err := os.Remove(file); err != nil {
 			log.Printf("Failed to remove temporary file '%s': %w\n", file, err)
 		}
 	}
-	return nil
 }
