@@ -13,7 +13,6 @@ import (
 type (
 	extractInfo struct {
 		pol, root string
-		Extracted     []string
 	}
 )
 

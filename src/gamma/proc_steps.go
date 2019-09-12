@@ -39,7 +39,7 @@ func stepPreselect(self *config) error {
 	handle := Handler("stepPreselect")
 
 	dataPath := self.General.DataPath
-	cache := self.General.CachePath
+	cache := self.CachePath
     Select := self.PreSelect
     
 	if len(dataPath) == 0 {

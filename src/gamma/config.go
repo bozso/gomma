@@ -20,7 +20,6 @@ type (
     }
     
 	general struct {
-		CachePath                          string `json:"CACHE_PATH,omitempty"`
 		DataPath, OutputDir, Pol, Metafile string
 		RangeLooks, AzimuthLooks           int
 	}
@@ -54,6 +53,7 @@ type (
 	}
 
 	config struct {
+        CachePath string    `json:"-"`
 		General   general
 		PreSelect preselect
 		Geocoding geocoding
@@ -63,8 +63,8 @@ type (
 	}
 
 	cliConfig struct {
-		Conf, Step, Start, Stop, Log string
-		Skip, Show                   bool
+		Conf, Step, Start, Stop, Log, CachePath string
+		Skip, Show                              bool
 	}
     
     S1ProcData struct {
@@ -75,6 +75,9 @@ type (
 	stepFun func(*config) error
 )
 
+const (
+    DefaultCachePath = "/mnt/bozso_i/cache"
+)
 
 var (
 	steps = map[string]stepFun{
@@ -86,7 +89,6 @@ var (
 
 	defaultConfig = config{
 		General: general{
-			CachePath:    "/mnt/bozso_i/cache",
 			Pol:          "vv",
 			RangeLooks:   1,
 			AzimuthLooks: 1,
@@ -170,6 +172,9 @@ func NewConfig(flag *fl.FlagSet) *cliConfig {
 
 	flag.StringVar(&conf.Log, "logfile", "gamma.log",
 		"Log messages will be saved here.")
+	
+    flag.StringVar(&conf.CachePath, "cache", DefaultCachePath,
+		"Path to cached files.")
 
 	flag.BoolVar(&conf.Skip, "skip_optional", false,
 		"If set the proccessing will skip optional steps.")
@@ -194,13 +199,15 @@ func listSteps() {
 
 func (self *cliConfig) Parse() (config, int, int, error) {
 	handle := Handler("CLIConfig.Parse")
-
+	var ret config
+    
 	if self.Show {
 		listSteps()
 		os.Exit(0)
 	}
 
-	istep, istart, istop := stepIndex(self.Step), stepIndex(self.Start),
+	ret.CachePath = self.CachePath
+    istep, istart, istop := stepIndex(self.Step), stepIndex(self.Start),
 		stepIndex(self.Stop)
 
 	if istep == -1 {
@@ -228,7 +235,6 @@ func (self *cliConfig) Parse() (config, int, int, error) {
 
 	path := self.Conf
 
-	var ret config
 
 	data, err := ReadFile(path)
 

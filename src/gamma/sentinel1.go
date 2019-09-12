@@ -155,7 +155,6 @@ func (self *S1Zip) IWInfo(ext extractInfo) (IWInfos, error) {
     for ii := 1; ii < 4; ii++ {
         template := self.template(annot, pol, fmt.Sprintf("%d", ii))
         extracted, err := ext.extract(zip, template)
-        // log.Fatalf("%s", extracted)
 
         if err != nil {
             return ret, handle(err,
@@ -171,6 +170,28 @@ func (self *S1Zip) IWInfo(ext extractInfo) (IWInfos, error) {
         
     }
 	return ret, nil
+}
+
+func (self *S1Zip) Quicklook(ext extractInfo) (string, error) {
+	const quicklook = "preview/quick-look.png"
+    handle := Handler("S1Zip.Quicklook")
+    
+    path := self.Path
+    zip, err := zip.OpenReader(path)
+    
+    if err != nil {
+        return "", handle(err, "Could not open zipfile: '%s'!", path)
+    }
+    
+    template := fp.Join(self.Safe, quicklook)
+    extracted, err := ext.extract(zip, template)
+
+    if err != nil {
+        return "", handle(err,
+            "Failed to extract annotation file from '%s'!", path)
+    }
+    
+    return extracted, nil
 }
 
 func (self S1Zip) Date() time.Time {

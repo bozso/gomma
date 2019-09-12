@@ -21,6 +21,7 @@ func main() {
 	
     quick  := fl.NewFlagSet("quicklook", fl.ExitOnError)
 	mpath  := quick.String("meta", "meta.json", "Processing metadata file.")
+    cache  := quick.String("cache", gm.DefaultCachePath, "Path to cached files.")
 
 	if len(os.Args) < 2 {
 		fmt.Println("Expected 'proc' or 'init' subcommands!")
@@ -65,7 +66,7 @@ func main() {
             return
         }
         
-        err = meta.Quicklook()
+        err = meta.Quicklook(*cache)
         if err != nil {
             log.Printf("Quicklook failed!\nError: %w", err)
             return
