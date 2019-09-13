@@ -1,10 +1,10 @@
 package gamma
 
 import (
-    "log"
+    //"log"
     "fmt"
     fp "path/filepath"
-    str "strings"
+    //str "strings"
 )
 
 var (
@@ -12,19 +12,17 @@ var (
 )
 
 func (self *S1ProcData) Quicklook(root string) error {
-    var err error
+    handle := Handler("S1ProcData.Quicklook")
     zips, info := self.Zipfiles, extractInfo{root:fp.Join(root, "extracted")}
-    images := make([]string, len(zips))
     
-    for ii, zip := range zips {
-        if images[ii], err = zip.Quicklook(info); err != nil {
-            return fmt.Errorf("In S1ProcData.Quicklook: Failed to retreive " +
-                "quicklook file in zip '%s'!", zip.Path)
+    for _, zip := range zips {
+        image, err := zip.Quicklook(info)
+        if err != nil {
+            return handle(err, "Failed to retreive quicklook file in zip '%s'!",
+                zip.Path)
         }
+        fmt.Println(image)
     } 
-    
-    
-    imv(str.Join(images, " "))
     
     return nil
 }

@@ -11,27 +11,38 @@ import (
 )
 
 type(
+    SARInfo interface {
+        contains(*AOI) bool
+    }
+    
+    SARImage interface {
+        Info(*ExtractOpt) (SARInfo, error)
+        SLC(*ExtractOpt) (SLC, error)
+    }
+    
     checkerFun func(*S1Zip) bool
 )
 
 
-func parseS1(zip string, extInfo extractInfo) (*S1Zip, IWInfos, error) {
+func parseS1(zip string, ext *extractInfo) (zip *S1Zip, IWs IWInfos, err error) {
     handle := Handler("proc_steps.parseS1")
-    IWs := IWInfos{}
-    s1zip, err := NewS1Zip(zip)
+    s1zip, err = NewS1Zip(zip)
     
     if err != nil {
-        return nil, IWs, handle(err,
-            "Failed to parse S1Zip data from '%s'", zip)
+        err = handle(err, "Failed to parse S1Zip data from '%s'", zip)
+        return
     }
 
     log.Printf("Parsing IW Information for S1 zipfile '%s'", s1zip.Path)
     
-    IWs, err = s1zip.IWInfo(extInfo)
+    IWs, err = s1zip.Info(extInfo)
+    
     if err != nil {
-        return nil, IWs, handle(err,
-            "Failed to parse IW information for zip '%s'", s1zip.Path)
+        err = handle(err, "Failed to parse IW information for zip '%s'",
+            s1zip.Path)
+        return
     }
+    
     return s1zip, IWs, nil
 }
 
@@ -55,8 +66,8 @@ func stepPreselect(self *config) error {
 		Point{X: ur.Lon, Y: ur.Lat}, Point{X: ur.Lon, Y: ll.Lat},
 	}
     
-	extInfo := extractInfo{pol: self.General.Pol,
-        root: fp.Join(cache, "extracted")}
+	extInfo := &extractInfo{pol: self.General.Pol,
+        root: fp.Join(cache, "sentinel1")}
     
     dateStart, dateStop := Select.DateStart, Select.DateStop
 
@@ -120,7 +131,6 @@ func stepPreselect(self *config) error {
     
 	// nzip := len(zipfiles)
 
-	// TODO: use []*S1Zip instead to avoid needles copying?
 	zips := S1Zips{}
     
     if check {

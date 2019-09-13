@@ -19,6 +19,7 @@ type (
 
 	S1Zip struct {
 		Path           string `json:"path"`
+        root           string `json:"root"`
         zipBase        string `json:"-"`
         mission        string `json:"-"`
         dateStr        string `json:"-"`
@@ -34,7 +35,13 @@ type (
         UID            string `json:"-"`
 		Dates          date   `json:"date"`
 	}
-
+    
+    S1Extractor struct {
+        ExtractOpt
+        template string
+        zip *zip.ReaderCloser
+    }
+    
 	IWInfo struct {
 		nburst int
 		extent      Rect
@@ -47,8 +54,8 @@ type (
 	}
 
 	S1SLC struct {
-		nIW int
-		IWs [9]S1IW
+		// nIW int
+		IWs [3]S1IW
 		tab string
 	}
 )
@@ -93,12 +100,11 @@ func init() {
 	}
 }
 
-func NewS1Zip(zipPath string) (*S1Zip, error) {
-	var err error
+func NewS1Zip(zipPath string) (self *S1Zip, err error) {
 	handle := Handler("NewS1Zip")
 
 	zipBase := fp.Base(zipPath)
-	self := S1Zip{Path: zipPath, zipBase: zipBase}
+	self = &S1Zip{Path: zipPath, zipBase: zipBase}
 
 	self.mission = str.ToLower(zipBase[:3])
 	self.dateStr = zipBase[17:48]
@@ -106,14 +112,14 @@ func NewS1Zip(zipPath string) (*S1Zip, error) {
 	start, stop := zipBase[17:32], zipBase[33:48]
 
 	if self.Dates, err = NewDate(long, start, stop); err != nil {
-		return nil,
-			handle(err,
-				"Could not create new date from strings: '%s' '%s'",
-				start, stop)
+		err = handle(err, "Could not create new date from strings: '%s' '%s'",
+            start, stop)
+        return
 	}
 
 	self.mode = zipBase[4:6]
     self.Safe = str.ReplaceAll(zipBase, ".zip", ".SAFE")
+    self.root = fp.join(root, self.Safe)
 	self.productType = zipBase[7:10]
 	self.resolution = string(zipBase[10])
 	self.level = string(zipBase[12])
@@ -126,53 +132,165 @@ func NewS1Zip(zipPath string) (*S1Zip, error) {
 	return &self, nil
 }
 
-func (self *S1Zip) mainTemplate(pol, iw string) string {
+func (self *S1Zip) template(mode tplType, pol, iw string) string {
 	const rexTemplate = "%s-iw%s-slc-%s-.*-%s-%s-[0-9]{3}"
 
-	return fmt.Sprintf(rexTemplate, self.mission, iw, pol, self.absoluteOrbit,
+	tpl := fmt.Sprintf(rexTemplate, self.mission, iw, pol, self.absoluteOrbit,
 		self.DTID)
-}
-
-func (self *S1Zip) template(mode tplType, pol, iw string) string {
-	// TODO: test
-	tpl := self.mainTemplate(pol, iw)
 
 	return fp.Join(self.Safe, fmt.Sprintf(s1templates[mode], tpl))
 }
 
 
-func (self *S1Zip) IWInfo(ext extractInfo) (IWInfos, error) {
-	handle := Handler("S1Zip.IWInfo")
-	var ret IWInfos
+func (self *S1Zip) newExtractor(ext *ExtractOpt) (S1Extractor, error) {
+	handle := Handler("S1Zip.extractor")
+    const rexTemplate = "%s-iw%%d-slc-%%s-.*-%s-%s-[0-9]{3}"
+    var err error
+    ret := S1Extractor{}
     
-    pol, path := ext.pol, self.Path
-    zip, err := zip.OpenReader(path)
+    path := self.Path
     
+    tpl := fmt.Sprintf(rexTemplate, self.mission, self.absoluteOrbit,
+        self.DTID)
+    
+    ret.template = fp.Join(self.Safe, tpl)
+    ret.pol      = ext.pol
+    ret.root     = ext.root
+    ret.zip, err = zip.OpenReader(path)
+
     if err != nil {
         return ret, handle(err, "Could not open zipfile: '%s'!", path)
     }
     
-    for ii := 1; ii < 4; ii++ {
-        template := self.template(annot, pol, fmt.Sprintf("%d", ii))
-        extracted, err := ext.extract(zip, template)
+    return ret, nil
+}
 
+func (self *S1Extractor) extract(mode tplType, iw int) (string, error) {
+    handle := Handler("S1Extractor.extract")
+    tpl := fmt.Sprintf(self.template, iw, self.pol)
+    tpl = fmt.Sprintf(s1templates[mode], tpl)
+    
+    ret, err := extract(self.zip, tpl, self.root)
+    
+    if err != nil {
+        return "", handle(err, "Error occurred while extracting!")
+    }
+    
+    return ret, nil
+}
+
+func (self *S1Extractor) Close() {
+    self.zip.Close()
+}
+
+func (self *S1Zip) Info(exto *ExtractOpt) (ret IWInfos, err error) {
+	handle := Handler("S1Zip.IWInfo")
+    ext, err := self.newExtractor(exto)
+    
+    if err != nil {
+        err = handle(err, "Failed to create new S1Extractor!")
+        return 
+    }
+    
+    defer ext.Close()
+    
+    for ii := 1; ii < 4; ii++ {
+        annot, err = ext.extract(annot, ii)
+        
         if err != nil {
-            return ret, handle(err,
-                "Failed to extract annotation file from '%s'!", path)
+            err = handle(err, "Failed to extract annotation file from '%s'!",
+                self.Path)
+            return
         }
         
-        if ret[ii - 1], err = iwInfo(extracted); err != nil {
-            return ret, handle(err,
+        if ret[ii - 1], err = iwInfo(annot); err != nil {
+            err = handle(err,
                 "Parsing of IW information of annotation file '%s' failed!",
                 extracted)
-            
+            return
         }
         
     }
 	return ret, nil
 }
 
-func (self *S1Zip) Quicklook(ext extractInfo) (string, error) {
+func (self *S1Zip) SLC(exto *ExtractOpt) (ret S1SLC, err error) {
+	handle := Handler("S1Zip.SLC")
+    ext, err = self.newExtractor(exto)
+    
+    if err != nil {
+        err = handle(err, "Failed to create new S1Extractor!")
+        return
+    }
+    
+    defer ext.Close()
+    
+    for ii := 1; ii < 4; ii++ {
+        _annot, err = ext.extract(annot, ii)
+        
+        if err != nil {
+            err = handle(err, "Failed to extract annotation file from '%s'!",
+                path)
+            return
+        }
+        
+        _calib, err = ext.extract(calibration, ii)
+        
+        if err != nil {
+            err = handle(err, "Failed to extract calibration file from '%s'!",
+                path)
+            return
+        }
+        
+        _tiff, err = ext.extract(tiff, ii)
+        
+        if err != nil {
+            err = handle(err, "Failed to extract tiff file from '%s'!",
+                path)
+            return
+        }
+        
+        _noise, err = ext.extract(noise, ii)
+        
+        if err != nil {
+            err = handle(err, "Failed to extract noise file from '%s'!",
+                path)
+            return
+        }
+        
+        curr := &ret.IWs[ii - 1]
+        
+        slcPath := fp.Join(self.root, "slc")
+        
+        err = os.MkdirAll(slcPath, os.ModePerm)
+        
+        if err != nil {
+            err = handle(err, "Failed to create directory: %s!", dir)
+            return
+        }
+        
+        SLC      := fp.Join(slcPath, "iw%d_pol.slc")
+        par      := fp.Join(slcPath, "iw%d_pol.slc.par")
+        TOPS_par := fp.Join(slcPath, "iw%d_pol.slc.TOPS_par")
+        
+        
+        curr.dat      = SLC
+        curr.par      = par
+        curr.TOPS_par = TOPS_par
+        
+        _, err = Gamma["par_S1_SLC"](_tiff, _annot, _calib, _noise, par, SLC,
+            TOPS_par)
+        
+        if err != nil {
+            err = handle(err, "Failed to import datafiles into gamma format!")
+            return
+        }
+        
+    }
+	return ret, nil
+}
+
+func (self *S1Zip) Quicklook(ext extractInfo) (ret string, err error) {
 	const quicklook = "preview/quick-look.png"
     handle := Handler("S1Zip.Quicklook")
     
@@ -180,15 +298,17 @@ func (self *S1Zip) Quicklook(ext extractInfo) (string, error) {
     zip, err := zip.OpenReader(path)
     
     if err != nil {
-        return "", handle(err, "Could not open zipfile: '%s'!", path)
+        err = handle(err, "Could not open zipfile: '%s'!", path)
+        return
     }
     
     template := fp.Join(self.Safe, quicklook)
     extracted, err := ext.extract(zip, template)
 
     if err != nil {
-        return "", handle(err,
-            "Failed to extract annotation file from '%s'!", path)
+        err = handle(err, "Failed to extract annotation file from '%s'!",
+            path)
+        return
     }
     
     return extracted, nil
@@ -198,14 +318,10 @@ func (self S1Zip) Date() time.Time {
 	return self.Dates.center
 }
 
-func makePoint(info Params, max bool) (Point, error) {
+func makePoint(info Params, max bool) (ret Point, err error) {
 	handle := Handler("makePoint")
 
-	var (
-        tpl_lon, tpl_lat string
-        ret Point
-        err error
-    )
+	var tpl_lon, tpl_lat string
 
 	if max {
 		tpl_lon, tpl_lat = "Max_Lon", "Max_Lat"
@@ -214,26 +330,30 @@ func makePoint(info Params, max bool) (Point, error) {
 	}
 
 	if ret.X, err = info.Float(tpl_lon); err != nil {
-		return ret, handle(err, "Could not get Longitude value!")
+		err = handle(err, "Could not get Longitude value!")
+        return
 	}
 
 	if ret.Y, err = info.Float(tpl_lat); err != nil {
-		return ret, handle(err, "Could not get Latitude value!")
+		err = handle(err, "Could not get Latitude value!")
+        return
 	}
 
 	return ret, nil
 }
 
 
-func iwInfo(path string) (IWInfo, error) {
+
+
+func iwInfo(path string) (ret IWInfo, err error) {
 	handle := Handler("iwInfo")
-	var ret IWInfo
     
     // num, err := conv.Atoi(str.Split(path, "iw")[1][0]);
     
     if len(path) == 0 {
-        return ret, handle(nil,
-            "path to annotation file is an empty string: '%s'", path)
+        err = handle(nil, "path to annotation file is an empty string: '%s'",
+            path)
+        return
     }
     
 	// Check(err, "Failed to retreive IW number from %s", path);
@@ -241,43 +361,48 @@ func iwInfo(path string) (IWInfo, error) {
 	par, err := TmpFile()
 
 	if err != nil {
-		return ret, handle(err, "Failed to create tmp file!")
+		err = handle(err, "Failed to create tmp file!")
+        return
 	}
 
 	TOPS_par, err := TmpFile()
 
 	if err != nil {
-		return ret, handle(err, "Failed to create tmp file!")
+		err = handle(err, "Failed to create tmp file!")
+        return
 	}
 
 	_, err = Gamma["par_S1_SLC"](nil, path, nil, nil, par, nil, TOPS_par)
     
 	if err != nil {
-		return ret, handle(err, "Could not import parameter files from '%s'!",
+		err = handle(err, "Could not import parameter files from '%s'!",
             path)
+        return
 	}
     
     _info, err := burstCorners(par, TOPS_par)
     
 	if err != nil {
-		return ret, handle(err, "Failed to parse parameter files!")
+		err = handle(err, "Failed to parse parameter files!")
+        return
 	}
     
 	info := FromString(_info, ":")
 	TOPS, err := FromFile(TOPS_par, ":")
 
 	if err != nil {
-		return ret, handle(err, "Could not parse TOPS_par file!")
+		err = handle(err, "Could not parse TOPS_par file!")
+        return
 	}
 
 	nburst, err := TOPS.Int("number_of_bursts")
 
 	if err != nil {
-		return ret, handle(err, "Could not retreive number of bursts!")
+		err = handle(err, "Could not retreive number of bursts!")
+        return
 	}
 
 	var numbers [nMaxBurst]float64
-    
     
 	for ii := 1; ii < nburst + 1; ii++ {
 		tpl := fmt.Sprintf(burstTpl, ii)
@@ -285,21 +410,23 @@ func iwInfo(path string) (IWInfo, error) {
 		numbers[ii - 1], err = TOPS.Float(tpl)
 
 		if err != nil {
-			return ret, handle(err, "Could not get burst number: '%s'",
-				tpl)
+			err = handle(err, "Could not get burst number: '%s'", tpl)
+            return
 		}
 	}
 
 	max, err := makePoint(info, true)
 
 	if err != nil {
-		return ret, handle(err, "Could not create max latlon point!")
+		err = handle(err, "Could not create max latlon point!")
+        return
 	}
 
 	min, err := makePoint(info, false)
 
 	if err != nil {
-		return ret, handle(err, "Could not create min latlon point!")
+		err = handle(err, "Could not create min latlon point!")
+        return
 	}
 
 	return IWInfo{nburst: nburst, extent: Rect{Min: min, Max: max},
@@ -318,11 +445,11 @@ func (self *Point) inIWs(IWs IWInfos) bool {
 	return false
 }
 
-func (self *AOI) InSLC(IWs IWInfos) bool {
+func (self IWInfos) contains(aoi *AOI) bool {
 	sum := 0
     
-	for _, point := range self {
-		if point.inIWs(IWs) {
+	for _, point := range aoi {
+		if point.inIWs(self) {
 			sum++
 		}
 	}

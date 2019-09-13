@@ -172,8 +172,7 @@ func First() string {
 	return "First"
 }
 
-func ParseDisArgs(d dataFile, args disArgs) (*disArgs, error) {
-	var err error
+func ParseDisArgs(d dataFile, args disArgs) (ret *disArgs, err error) {
 	handle := Handler("ParseDisArgs")
 
 	if len(args.datfile) == 0 {
@@ -182,20 +181,23 @@ func ParseDisArgs(d dataFile, args disArgs) (*disArgs, error) {
 
 	if args.rng == 0 {
 		if args.rng, err = d.Rng(); err != nil {
-			return nil, handle(err, "Could not get range_samples!")
+			err = handle(err, "Could not get range_samples!")
+            return
 		}
 	}
 
 	if args.azi == 0 {
 		if args.azi, err = d.Azi(); err != nil {
-			return nil, handle(err, "Could not get azimuth_lines!")
+			err = handle(err, "Could not get azimuth_lines!")
+            return
 		}
 	}
 
 	// parts = pth.basename(datfile).split(".")
 	if len(args.imgFormat) == 0 {
 		if args.imgFormat, err = d.imgFormat(); err != nil {
-			return nil, handle(err, "Could not get image_format!")
+			err = handle(err, "Could not get image_format!")
+            ret
 		}
 	}
 

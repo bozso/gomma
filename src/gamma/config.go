@@ -197,9 +197,8 @@ func listSteps() {
 	fmt.Println("Available processing steps: ", stepList)
 }
 
-func (self *cliConfig) Parse() (config, int, int, error) {
+func (self *cliConfig) Parse() (ret config, istart int, istop int, err error) {
 	handle := Handler("CLIConfig.Parse")
-	var ret config
     
 	if self.Show {
 		listSteps()
@@ -213,20 +212,18 @@ func (self *cliConfig) Parse() (config, int, int, error) {
 	if istep == -1 {
 		if istart == -1 {
 			listSteps()
-			return config{}, 0, 0,
-				handle(nil,
-					"Starting step '%s' is not in list of available steps!",
-					self.Start)
-
+            err = handle(nil,
+                "Starting step '%s' is not in list of available steps!",
+                self.Start)
+            return
 		}
 
 		if istop == -1 {
 			listSteps()
-			return config{}, 0, 0,
-				handle(nil,
-					"Stopping step '%s' is not in list of available steps!",
-					self.Stop)
-
+            err = handle(nil,
+                "Stopping step '%s' is not in list of available steps!",
+                self.Stop)
+			return
 		}
 	} else {
 		istart = istep
@@ -239,13 +236,13 @@ func (self *cliConfig) Parse() (config, int, int, error) {
 	data, err := ReadFile(path)
 
 	if err != nil {
-		return config{}, 0, 0, handle(err, "Failed to read file:  '%s'!",
-			path)
+		err = handle(err, "Failed to read file:  '%s'!", path)
+        return
 	}
 
-	if err := json.Unmarshal(data, &ret); err != nil {
-		return config{}, 0, 0, handle(err, "Failed to parse json data: %s'!",
-			data)
+	if err = json.Unmarshal(data, &ret); err != nil {
+		err = handle(err, "Failed to parse json data: %s'!", data)
+        return
 	}
 
 	return ret, istart, istop, nil

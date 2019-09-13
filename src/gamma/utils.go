@@ -220,6 +220,24 @@ func TmpFile() (string, error) {
 	return name, nil
 }
 
+func TmpFileExt(ext string) (string, error) {
+	file, err := io.TempFile("", "*." + ext)
+
+	if err != nil {
+		return "", fmt.Errorf(
+            "In TmpFileExt: Failed to create a temporary file!\nError: %w",
+            err)
+	}
+
+	defer file.Close()
+
+	name := file.Name()
+
+	tmp.files = append(tmp.files, name)
+
+	return name, nil
+}
+
 func RemoveTmp() {
     log.Printf("Removing temporary files...\n")
 	for _, file := range tmp.files {

@@ -11,7 +11,7 @@ import (
 )
 
 type (
-	extractInfo struct {
+	ExtractOpt struct {
 		pol, root string
 	}
 )
@@ -61,14 +61,13 @@ func matches(candidate string, template string) (bool, error) {
 	return matched, nil
 }
 
-func (self *extractInfo) extract(file *zip.ReadCloser, template string) (string, error) {
-	handle := Handler("extractInfo.extract")
-    
+func extract(file *zip.ReadCloser, template, root string) (string, error) {
+	handle := Handler("extract")
     
 	// go through files in the zipfile
 	for _, zipfile := range file.File {
 		name := zipfile.Name
-		dst := fp.Join(self.root, name)
+		dst := fp.Join(root, name)
         
 		matched, err := matches(name, template)
         
