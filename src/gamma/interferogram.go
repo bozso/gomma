@@ -16,24 +16,27 @@ type (
         slc1, slc2 SLC
     }
     
+    Coherence struct {
+        dataFile
+    }
+    
     ifgOpt struct {
-        Looks RangeAzimuth
+        Looks RngAzi
         interact bool
         hgt string
         algo OffsetAlgo
     }
     
     AdaptFiltOpt struct {
-        Offset               RangeAzimuth
-        alpha, step, Frac    float64
-        FFTWindow, CohWindow int
+        offset               RngAzi
+        alpha, step, frac    float64
+        FFTWindow, cohWindow int
     }
+    
+    CoherenceOpt coherence
 )
 
 const (
-    Constant CohWeight = iota
-    Gaussian
-
     IntensityCoherence OffsetAlgo = iota
     FingeVisibility
 )
@@ -42,6 +45,14 @@ var (
     createOffset  = Gamma.must("create_offset")
     phaseSimOrb   = Gamma.must("phase_sim_orb")
     slcDiffIntf   = Gamma.must("SLC_diff_intf")
+    adf           = Gamma.must("adf")
+    phaseSlope    = Gamma.must("phase_slope")
+    CCAdaptive    = Gamma.must("cc_ad")
+
+    CoherenceWeight = map[string]int {
+        "constant": 0,
+        "gaussian": 1,
+    }
 )
 
 func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
@@ -70,8 +81,8 @@ func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
         simUnw = base + ".sim_unw"
     }
     
-    self.qual, self.diffPar, self.qual, self.simUnw = 
-    parfile, diffPar, quality, simUnw
+    self.qual, self.diffPar, self.simUnw = 
+    quality, diffPar, simUnw
     
     return ret, nil
 }
@@ -168,64 +179,87 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
     return ret, nil
 }
 
-func (self *IFG) AdaptFilt() (ret IFG, err error) {
-    def adf(self, filt=None,, loff=0, nlines=0, wfrac=0.7):
-
-    if step is None:
-        step = fftwin / 8
+func (self *IFG) AdaptFilt() (ret IFG, cc Coherence, err error) {
+    handle := Handler("IFG.AdaptFilt")
+    step := opt.FFTWin / 8.0
     
+    if opt.step > 0.0 {
+        step = opt.step
+    }
+    
+    filt = NewIFG(self.dat + ".filt")
+    cc = NewDataFile()
     if filt is None:
-        filt = self.datfile + ".filt"
+        filt = 
 
     if cc is None:
         cc = self.datfile + ".cc"
 
-    self.filt, self.cc = filt, cc
+    rng, err := self.Rng()
     
-    rng = self.rng()
+    if err != nil {
+        err = handle(err, "Could not retreive range samples!")
+        return
+    }
     
-    gp.adf(self.dat, self.filt, self.cc, rng, alpha, fftwin, ccwin,
-           step, loff, nlines, wfrac)
-
-
-def coherence(self, slope_win=5, weight_type="gaussian", corr_thresh=0.4,
-              box_lims=(3.0,9.0)):
-    wgt_flag = IFG.cc_weights[weight_type]
+    _, err := adf(self.dat, filt, cc, rng, opt.alpha, opt.FFTWindow,
+                  opt.cohWindow, step, opt.offset.Azi, opt.offset.Rng,
+                  opt.frac)
     
-    #log.info("CALCULATING COHERENCE AND CREATING QUICKLOOK IMAGES.")
-    #log.info('Weight type is "%s"'.format(weight_type))
+    if err != nil {
+        err = handle(err, "Adaptive filtering failed!")
+        return
+    }
+}
+
+func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
+    weightFlag := CoherenceWeight[opt.WeightType]
     
-    width = ifg.rng()
+    //log.info("CALCULATING COHERENCE AND CREATING QUICKLOOK IMAGES.")
+    //log.info('Weight type is "%s"'.format(weight_type))
     
-    log.info("Estimating phase slope.", end=" ")
-    gp.phase_slope(ifg.dat, slope, width, slope_win, corr_thresh)
-
-    log.info("Calculating coherence.", end=" ")
-    gp.cc_ad(ifg.dat, mli1, mli2, slope, None, ifg.cc, width, box_lims[0],
-             box_lims[1], wgt_flag)
-
+    width = self.Rng()
+		WeightType             string
+		Box                    minmax
+		SlopeCorrelationThresh float64
+		SlopeWindow            int
     
-    def raster(self, start_cpx=1, start_pwr=1, start_cc=1, cc_min=0.2,
-               **kwargs):
-        mli = kwargs.pop("mli")
-        
-        args = DataFile.parse_ras_args(self, **kwargs)
-        
-        if self.cc is None:
-            gp.rasmph_pwr24(args["datfile"], mli.dat, args["rng"],
-                            start_cpx, start_pwr, args["nlines"],
-                            args["arng"], args["aazi"], args["scale"],
-                            args["exp"], args["LR"], args["raster"])
-        else:
-            gp.rasmph_pwr24(args["datfile"], mli.dat, args["rng"],
-                            start_cpx, start_pwr, args["nlines"],
-                            args["arng"], args["aazi"], args["scale"],
-                            args["exp"], args["LR"], args["raster"],
-                            self.cc, start_cc, cc_min)
-
+    log.Printf("Estimating phase slope. ")
     
-    def rascc(self):
-        pass
+    // TODO: figure out name
+    slope := ".cpx"
+    
+    // parameters: xmin, xmax, ymin, ymax not yet given
+    _, err = phaseSlope(self.dat, slope, opt.SlopeWindow,
+                        opt.SlopeCorrelationThresh)
+
+    log.Printf("Calculating coherence. ")
+    _, err = CCAdaptive(self.dat, mli1, mli2, slope, nil, ret.dat, width,
+                        opt.Box.min, opt.Box.max, weightFlag)
+
+/*
+func (self *IFG) raster(args RasArgs) {
+    args = parseRasArgs(args)
+    
+    
+}
+def raster(self, start_cpx=1, start_pwr=1, start_cc=1, cc_min=0.2,
+           **kwargs):
+    mli = kwargs.pop("mli")
+    
+    args = DataFile.parse_ras_args(self, **kwargs)
+    
+    if self.cc is None:
+        gp.rasmph_pwr24(args["datfile"], mli.dat, args["rng"],
+                        start_cpx, start_pwr, args["nlines"],
+                        args["arng"], args["aazi"], args["scale"],
+                        args["exp"], args["LR"], args["raster"])
+    else:
+        gp.rasmph_pwr24(args["datfile"], mli.dat, args["rng"],
+                        start_cpx, start_pwr, args["nlines"],
+                        args["arng"], args["aazi"], args["scale"],
+                        args["exp"], args["LR"], args["raster"],
+                        self.cc, start_cc, cc_min)
 
 
-
+*/

@@ -19,13 +19,13 @@ type (
         Lat, Lon float64
     }
     
-    RangeAzimuth {
-        Range, Azimuth int
+    RngAzi struct {
+        Rng, Azi int
     }
     
 	general struct {
 		DataPath, OutputDir, Pol, Metafile string
-		Looks                              RangeAzimuth
+		Looks                              RngAzi
 	}
 
 	preselect struct {
@@ -37,7 +37,7 @@ type (
 	geocoding struct {
 		DEMPath      string
 		Iter, NPoly  int
-        Overlap      RangeAzimuth
+        Overlap      RngAzi
         OverSampling LatLon
 	}
 
