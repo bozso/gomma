@@ -1,7 +1,8 @@
 package gamma
 
 import (
-	"fmt"
+	"os"
+    "fmt"
 	"log"
 	"time"
     "math"
@@ -39,7 +40,7 @@ type (
     S1Extractor struct {
         ExtractOpt
         template string
-        zip *zip.ReaderCloser
+        zip *zip.ReadCloser
     }
     
 	IWInfo struct {
@@ -100,7 +101,7 @@ func init() {
 	}
 }
 
-func NewS1Zip(zipPath string) (self *S1Zip, err error) {
+func NewS1Zip(zipPath, root string) (self *S1Zip, err error) {
 	handle := Handler("NewS1Zip")
 
 	zipBase := fp.Base(zipPath)
@@ -119,7 +120,7 @@ func NewS1Zip(zipPath string) (self *S1Zip, err error) {
 
 	self.mode = zipBase[4:6]
     self.Safe = str.ReplaceAll(zipBase, ".zip", ".SAFE")
-    self.root = fp.join(root, self.Safe)
+    self.root = fp.Join(root, self.Safe)
 	self.productType = zipBase[7:10]
 	self.resolution = string(zipBase[10])
 	self.level = string(zipBase[12])
@@ -129,7 +130,7 @@ func NewS1Zip(zipPath string) (self *S1Zip, err error) {
 	self.DTID = str.ToLower(zipBase[56:62])
 	self.UID = zipBase[63:67]
 
-	return &self, nil
+	return self, nil
 }
 
 func (self *S1Zip) template(mode tplType, pol, iw string) string {
@@ -195,7 +196,8 @@ func (self *S1Zip) Info(exto *ExtractOpt) (ret IWInfos, err error) {
     defer ext.Close()
     
     for ii := 1; ii < 4; ii++ {
-        annot, err = ext.extract(annot, ii)
+        var _annot string
+        _annot, err = ext.extract(annot, ii)
         
         if err != nil {
             err = handle(err, "Failed to extract annotation file from '%s'!",
@@ -203,10 +205,10 @@ func (self *S1Zip) Info(exto *ExtractOpt) (ret IWInfos, err error) {
             return
         }
         
-        if ret[ii - 1], err = iwInfo(annot); err != nil {
+        if ret[ii - 1], err = iwInfo(_annot); err != nil {
             err = handle(err,
                 "Parsing of IW information of annotation file '%s' failed!",
-                extracted)
+                _annot)
             return
         }
         
@@ -216,6 +218,7 @@ func (self *S1Zip) Info(exto *ExtractOpt) (ret IWInfos, err error) {
 
 func (self *S1Zip) SLC(exto *ExtractOpt) (ret S1SLC, err error) {
 	handle := Handler("S1Zip.SLC")
+    var ext S1Extractor
     ext, err = self.newExtractor(exto)
     
     if err != nil {
@@ -225,7 +228,10 @@ func (self *S1Zip) SLC(exto *ExtractOpt) (ret S1SLC, err error) {
     
     defer ext.Close()
     
+    path := self.Path
+    
     for ii := 1; ii < 4; ii++ {
+        var _annot, _calib, _tiff, _noise string
         _annot, err = ext.extract(annot, ii)
         
         if err != nil {
@@ -234,7 +240,7 @@ func (self *S1Zip) SLC(exto *ExtractOpt) (ret S1SLC, err error) {
             return
         }
         
-        _calib, err = ext.extract(calibration, ii)
+        _calib, err = ext.extract(calib, ii)
         
         if err != nil {
             err = handle(err, "Failed to extract calibration file from '%s'!",
@@ -265,7 +271,7 @@ func (self *S1Zip) SLC(exto *ExtractOpt) (ret S1SLC, err error) {
         err = os.MkdirAll(slcPath, os.ModePerm)
         
         if err != nil {
-            err = handle(err, "Failed to create directory: %s!", dir)
+            err = handle(err, "Failed to create directory: %s!", slcPath)
             return
         }
         
@@ -290,28 +296,30 @@ func (self *S1Zip) SLC(exto *ExtractOpt) (ret S1SLC, err error) {
 	return ret, nil
 }
 
-func (self *S1Zip) Quicklook(ext extractInfo) (ret string, err error) {
-	const quicklook = "preview/quick-look.png"
+func (self *S1Zip) Quicklook(exto *ExtractOpt) (ret string, err error) {
     handle := Handler("S1Zip.Quicklook")
     
-    path := self.Path
-    zip, err := zip.OpenReader(path)
+    var ext S1Extractor
+    ext, err = self.newExtractor(exto)
     
     if err != nil {
-        err = handle(err, "Could not open zipfile: '%s'!", path)
+        err = handle(err, "Failed to create new S1Extractor!")
         return
     }
     
-    template := fp.Join(self.Safe, quicklook)
-    extracted, err := ext.extract(zip, template)
-
+    defer ext.Close()
+    
+    path := self.Path
+    
+    ret, err = ext.extract(quicklook, 0)
+    
     if err != nil {
         err = handle(err, "Failed to extract annotation file from '%s'!",
             path)
         return
     }
     
-    return extracted, nil
+    return ret, nil
 }
 
 func (self S1Zip) Date() time.Time {
@@ -445,7 +453,7 @@ func (self *Point) inIWs(IWs IWInfos) bool {
 	return false
 }
 
-func (self IWInfos) contains(aoi *AOI) bool {
+func (self IWInfos) contains(aoi AOI) bool {
 	sum := 0
     
 	for _, point := range aoi {

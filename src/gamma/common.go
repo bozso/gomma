@@ -197,7 +197,7 @@ func ParseDisArgs(d dataFile, args disArgs) (ret *disArgs, err error) {
 	if len(args.imgFormat) == 0 {
 		if args.imgFormat, err = d.imgFormat(); err != nil {
 			err = handle(err, "Could not get image_format!")
-            ret
+            return
 		}
 	}
 

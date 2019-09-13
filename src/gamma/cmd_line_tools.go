@@ -13,7 +13,7 @@ var (
 
 func (self *S1ProcData) Quicklook(root string) error {
     handle := Handler("S1ProcData.Quicklook")
-    zips, info := self.Zipfiles, extractInfo{root:fp.Join(root, "extracted")}
+    zips, info := self.Zipfiles, &ExtractOpt{root:fp.Join(root, "sentinel1")}
     
     for _, zip := range zips {
         image, err := zip.Quicklook(info)

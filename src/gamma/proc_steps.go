@@ -15,6 +15,10 @@ type(
         contains(*AOI) bool
     }
     
+    SLC interface {
+        DataFile
+    }
+    
     SARImage interface {
         Info(*ExtractOpt) (SARInfo, error)
         SLC(*ExtractOpt) (SLC, error)
@@ -24,26 +28,26 @@ type(
 )
 
 
-func parseS1(zip string, ext *extractInfo) (zip *S1Zip, IWs IWInfos, err error) {
+func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err error) {
     handle := Handler("proc_steps.parseS1")
-    s1zip, err = NewS1Zip(zip)
+    s1, err = NewS1Zip(zip, root)
     
     if err != nil {
         err = handle(err, "Failed to parse S1Zip data from '%s'", zip)
         return
     }
 
-    log.Printf("Parsing IW Information for S1 zipfile '%s'", s1zip.Path)
+    log.Printf("Parsing IW Information for S1 zipfile '%s'", s1.Path)
     
-    IWs, err = s1zip.Info(extInfo)
+    IWs, err = s1.Info(ext)
     
     if err != nil {
         err = handle(err, "Failed to parse IW information for zip '%s'",
-            s1zip.Path)
+            s1.Path)
         return
     }
     
-    return s1zip, IWs, nil
+    return s1, IWs, nil
 }
 
 func stepPreselect(self *config) error {
@@ -66,8 +70,8 @@ func stepPreselect(self *config) error {
 		Point{X: ur.Lon, Y: ur.Lat}, Point{X: ur.Lon, Y: ll.Lat},
 	}
     
-	extInfo := &extractInfo{pol: self.General.Pol,
-        root: fp.Join(cache, "sentinel1")}
+    root := fp.Join(cache, "sentinel1")
+	extInfo := &ExtractOpt{pol: self.General.Pol, root: root}
     
     dateStart, dateStop := Select.DateStart, Select.DateStop
 
@@ -135,25 +139,25 @@ func stepPreselect(self *config) error {
     
     if check {
         for _, zip := range zipfiles {
-            s1zip, IWs, err := parseS1(zip, extInfo)
+            s1zip, IWs, err := parseS1(zip, root, extInfo)
             if err != nil {
                 return handle(err,
                     "Failed to import S1Zip data from '%s'", zip)
             }
             
-            if aoi.InSLC(IWs) && checker(s1zip) {
+            if IWs.contains(aoi) && checker(s1zip) {
                 zips = append(zips, s1zip)
             }
         }
 	} else {
         for _, zip := range zipfiles {
-            s1zip, IWs, err := parseS1(zip, extInfo)
+            s1zip, IWs, err := parseS1(zip, root, extInfo)
             if err != nil {
                 return handle(err,
                     "Failed to import S1Zip data from '%s'", zip)
             }
             
-            if aoi.InSLC(IWs) {
+            if IWs.contains(aoi) {
                 zips = append(zips, s1zip)
             }
         }
@@ -178,7 +182,7 @@ func stepPreselect(self *config) error {
 		}
 	}
     
-    masterIW, err := master.IWInfo(extInfo)
+    masterIW, err := master.Info(extInfo)
     if err != nil {
         return handle(err, "Failed to parse S1Zip data from master '%s'",
             master.Path)
@@ -188,7 +192,7 @@ func stepPreselect(self *config) error {
     toSave := S1Zips{}
     
     for _, s1zip := range zips {
-        iw, err := s1zip.IWInfo(extInfo)
+        iw, err := s1zip.Info(extInfo)
         if err != nil {
             return handle(err, "Failed to parse S1Zip data from '%s'",
                 s1zip.Path)
