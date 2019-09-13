@@ -2,10 +2,10 @@ package gamma
 
 import (
 	"fmt"
-	io "io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	io "io/ioutil"
 	fp "path/filepath"
 	conv "strconv"
 	str "strings"

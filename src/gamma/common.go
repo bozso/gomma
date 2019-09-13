@@ -7,34 +7,16 @@ import (
 	//"os";
 	set "github.com/deckarep/golang-set"
 	fp "path/filepath"
+    pt "path"
 )
 
 type (
-	pol int
     GammaFun map[string]CmdFun
 
 	settings struct {
 		RasExt    string
 		path      string
 		modules   []string
-	}
-
-	dataFile struct {
-		dat string
-		Params
-		date
-	}
-
-	DataFile interface {
-		Rng() int
-		Azi() int
-		IntPar() int
-		FloatPar() float32
-		Param() string
-	}
-
-	ParamFile struct {
-		par string
 	}
 
 	Point struct {
@@ -63,11 +45,6 @@ type (
 const (
 	useVersion = "20181130"
 	BufSize    = 50
-
-	VV pol = iota
-	HH
-	HV
-	VH
 )
 
 var (
@@ -136,47 +113,20 @@ func (self GammaFun) selectFun(name1, name2 string) CmdFun {
     return ret
 }
 
-func NewGammaParam(path string) (Params, error) {
-    return FromFile(path, ":")
-}
-
-func NewDataFile(dat, par string) (ret dataFile, err error) {
-    handle := Handler("NewDatfile")
-    ret.dat = dat
+func (self GammaFun) must(name, string) ret CmdFun {
+    ret, ok := self[name1]
     
-    if len(dat) == 0 {
-        err = handle(err, "'dat' should not be an empty string: '%s'", dat)
+    if !ok {
+        log.Fatalf("Gamma executable '%s' does not exist!", name)
     }
-    
-    if len(par) == 0 {
-        par = dat + ".par"
-    }
-    
-    ret.Params, err = NewGammaParam(par)
-    
-    if err != nil {
-        err = handle(err, "Failed to parse gamma parameter file: '%s'", par)
-        return
-    }
-    
-    return ret, nil
+    return
 }
 
-func (self *dataFile) Rng() (int, error) {
-	return self.Int("range_samples")
+
+func NoExt(path string) string {
+    str.TrimSuffix(path, pt.Ext(path))
 }
 
-func (self *dataFile) Azi() (int, error) {
-	return self.Int("azimuth_samples")
-}
-
-func (self *dataFile) imgFormat() (string, error) {
-	return self.Par("image_format")
-}
-
-func (self *dataFile) Date() time.Time {
-	return self.center
-}
 
 func (self *Point) InRect(r *Rect) bool {
 	return (self.X < r.Max.X && self.X > r.Min.X &&
@@ -230,4 +180,8 @@ func ParseDisArgs(d dataFile, args disArgs) (ret *disArgs, err error) {
 	*/
 
 	return &args, nil
+}
+
+func isclose(num1, num2 float64) bool {
+    return math.RoundToEven(math.abs(num1 - num2)) > 0.0
 }

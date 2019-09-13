@@ -15,25 +15,30 @@ type (
 		Min, Max float64
 	}
     
-    latLon struct {
+    LatLon struct {
         Lat, Lon float64
+    }
+    
+    RangeAzimuth {
+        Range, Azimuth int
     }
     
 	general struct {
 		DataPath, OutputDir, Pol, Metafile string
-		RangeLooks, AzimuthLooks           int
+		Looks                              RangeAzimuth
 	}
 
 	preselect struct {
 		DateStart, DateStop, MasterDate string
-        LowerLeft, UpperRight           latLon
+        LowerLeft, UpperRight           LatLon
 		CheckZips                       bool
 	}
 
 	geocoding struct {
-		DEMPath                                   string
-		Iter, RangeOverlap, AzimuthOverlap, NPoly int
-		DEMLatOversampling, DEMLonOversampling    float64
+		DEMPath      string
+		Iter, NPoly  int
+        Overlap      RangeAzimuth
+        OverSampling LatLon
 	}
 
 	coreg struct {

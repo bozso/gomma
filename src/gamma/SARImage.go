@@ -331,8 +331,9 @@ func (self ByDate) Less(i, j int) bool {
 
 var _coreg = Gamma["S1_coreg_TOPS"]
 
-func Coreg(master, slc, rslc, rslcRef *S1SLC, opt CoregOpt) error {
-	cleaning, flag1 := 0, 0
+func S1Coreg(master, slc, rslc, rslcRef *S1SLC, opt CoregOpt) (ret IFG, err error) {
+	handle := Handler("S1Coreg")
+    cleaning, flag1 := 0, 0
 	
 	if opt.clean {
 		cleaning = 1
@@ -356,6 +357,10 @@ func Coreg(master, slc, rslc, rslcRef *S1SLC, opt CoregOpt) error {
 				             opt.RangeLooks, opt.AzimuthLooks, opt.poly1,
 							 opt.poly2, opt.CoherenceThresh, opt.FractionThresh,
 				             opt.PhaseStdevThresh, cleaning, flag1)
+            if err != nil {
+                err = handle("Coregistration failed!")
+                return
+            }
 		} else {
             rslcRefTab, rslcRefID := rslcRef.tab, date2str(rslcRef, short)
 			log.Printf("Coregistering: '%s'. Reference: '%s'", slc2Tab,
@@ -366,22 +371,28 @@ func Coreg(master, slc, rslc, rslcRef *S1SLC, opt CoregOpt) error {
 							 opt.poly2, opt.CoherenceThresh, opt.FractionThresh,
 							 opt.PhaseStdevThresh, cleaning, flag1,
 							 rslcRefTab, rslcRefID)
+            if err != nil {
+                err = handle("Coregistration failed!")
+                return
+            }
 		}
 	}
     
 	ID := fmt.Sprintf("%s_%s", slc1ID, slc2ID)
     
-	//ifg := NewIFG(ID + ".diff", parfile=ID + ".off", diff_par=ID + ".diff_par",
-    //              quality=ID + ".coreg_quality")
+	ret, err := NewIFG(ID + ".diff", ID + ".off", "", ID + ".diff_par",
+        ID + ".coreg_quality")
+    
+    if err != nil {
+        err = handle
+    }
     
     //with open("coreg.output", "wb") as f:
     //    f.write(out)
 
-    if ifg.CheckQuality() {
+    if ret.CheckQuality() {
         return handle(err,"Coregistration of '%s' failed!", slc2Tab)
     }
-	
-	
 	
     //ifg.move(("dat", "par", "diff_par", "qual"), diff_dir)
     //ifg.raster(mli=master["MLI"])
