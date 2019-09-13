@@ -14,6 +14,12 @@ type (
 	ExtractOpt struct {
 		pol, root string
 	}
+    
+    S1Extractor struct {
+        ExtractOpt
+		templates templates
+        zip 	  *zip.ReadCloser
+    }
 )
 
 func extractFile(src *zip.File, dst string) error {
@@ -106,4 +112,38 @@ func extract(file *zip.ReadCloser, template, root string) (string, error) {
         }
 	}
     return "", nil
+}
+
+func (self *S1Zip) newExtractor(ext *ExtractOpt) (ret S1Extractor, err error) {
+	handle := Handler("S1Zip.newExtractor")
+    path := self.Path
+    
+    ret.templates = self.Templates
+    ret.pol       = ext.pol
+    ret.root      = ext.root
+    ret.zip, err  = zip.OpenReader(path)
+
+    if err != nil {
+        err = handle(err, "Could not open zipfile: '%s'!", path)
+		return
+    }
+    
+    return ret, nil
+}
+
+func (self *S1Extractor) extract(mode tplType, iw int) (string, error) {
+    handle := Handler("S1Extractor.extract")
+	tpl := fmt.Sprintf(self.templates[mode], iw, self.pol)
+    
+    ret, err := extract(self.zip, tpl, self.root)
+    
+    if err != nil {
+        return "", handle(err, "Error occurred while extracting!")
+    }
+    
+    return ret, nil
+}
+
+func (self *S1Extractor) Close() {
+    self.zip.Close()
 }

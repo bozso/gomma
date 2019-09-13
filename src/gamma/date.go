@@ -71,11 +71,23 @@ func NewDate(format dateFormat, start, stop string) (date, error) {
 	return self, nil
 }
 
-func Before(one, two Date) bool {
-	return one.Date().Before(two.Date())
+func (self *date) Start() time.Time {
+    return self.start
 }
 
-func date2string(date Date, format dateFormat) string {
+func (self *date) Date() time.Time {
+    return self.center
+}
+
+func (self *date) Stop() time.Time {
+    return self.stop
+}
+
+func Before(one, two Date) bool {
+	return one.Start().Before(two.Start())
+}
+
+func date2str(date Date, format dateFormat) string {
 	var layout string
 
 	switch format {
@@ -87,5 +99,5 @@ func date2string(date Date, format dateFormat) string {
 		break
 	}
 
-	return date.Date().Format(layout)
+	return date.Center().Format(layout)
 }

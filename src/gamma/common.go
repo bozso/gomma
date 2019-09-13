@@ -13,16 +13,10 @@ type (
 	pol int
     GammaFun map[string]CmdFun
 
-	templates struct {
-		IW  string
-		Tab string
-	}
-
 	settings struct {
 		RasExt    string
 		path      string
 		modules   []string
-		Templates templates
 	}
 
 	dataFile struct {
@@ -98,10 +92,6 @@ var (
 		RasExt:  "bmp",
 		path:    versions[useVersion],
 		modules: []string{"DIFF", "DISP", "ISP", "LAT", "IPTA"},
-		Templates: templates{
-			IW:  "{{date}}_iw{{iw}}.{{pol}}.slc",
-			Tab: "{{date}}.{{pol}}.SLC_tab",
-		},
 	}
 )
 
