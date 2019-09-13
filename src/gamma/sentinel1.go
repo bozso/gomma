@@ -51,7 +51,7 @@ type (
 
 	S1IW struct {
 		dataFile
-		TOPS_par ParamFile
+		TOPS_par Params
 	}
 
 	S1SLC struct {
@@ -228,7 +228,7 @@ func (self *S1Zip) SLC(exto *ExtractOpt) (ret S1SLC, err error) {
     
     defer ext.Close()
     
-    path := self.Path
+    path, pol := self.Path, exto.pol
     
     for ii := 1; ii < 4; ii++ {
         var _annot, _calib, _tiff, _noise string
@@ -264,7 +264,6 @@ func (self *S1Zip) SLC(exto *ExtractOpt) (ret S1SLC, err error) {
             return
         }
         
-        curr := &ret.IWs[ii - 1]
         
         slcPath := fp.Join(self.root, "slc")
         
@@ -275,17 +274,19 @@ func (self *S1Zip) SLC(exto *ExtractOpt) (ret S1SLC, err error) {
             return
         }
         
-        SLC      := fp.Join(slcPath, "iw%d_pol.slc")
-        par      := fp.Join(slcPath, "iw%d_pol.slc.par")
-        TOPS_par := fp.Join(slcPath, "iw%d_pol.slc.TOPS_par")
+        dat      := fp.Join(slcPath, fmt.Sprintf("iw%d_%s.slc", ii, pol))
+        par      := dat + ".par"
+        TOPS_par := dat + "TOPS_par"
         
-        
-        curr.dat      = SLC
-        curr.par      = par
-        curr.TOPS_par = TOPS_par
-        
-        _, err = Gamma["par_S1_SLC"](_tiff, _annot, _calib, _noise, par, SLC,
+        _, err = Gamma["par_S1_SLC"](_tiff, _annot, _calib, _noise, par, dat,
             TOPS_par)
+        
+        ret.IWs[ii - 1], err = NewS1SLC(dat, par, TOPS_par)
+        
+        if err != nil {
+            err = handle(err, "Could not create new S1SLC!")
+            return
+        }
         
         if err != nil {
             err = handle(err, "Failed to import datafiles into gamma format!")
@@ -294,6 +295,32 @@ func (self *S1Zip) SLC(exto *ExtractOpt) (ret S1SLC, err error) {
         
     }
 	return ret, nil
+}
+
+func NewS1SLC(dat, par, TOPS_par string) (self S1IW, err error) {
+    handle := Handler("NewS1SLC")
+    
+    self.dataFile, err = NewDataFile(dat, par)
+    
+    if err != nil {
+        err = handle(err,
+            "Failed to create DataFile with dat: '%s' and par '%s'!",
+            dat, par)
+        return
+    }
+    
+    if len(TOPS_par) == 0 {
+        TOPS_par = dat + ".TOPS_par"
+    }
+    
+    self.TOPS_par, err = NewGammaParam(TOPS_par)
+    
+    if err != nil {
+        err = handle(err, "Failed to parse TOPS_parfile: '%s'!", TOPS_par)
+        return
+    }
+    
+    return self, nil
 }
 
 func (self *S1Zip) Quicklook(exto *ExtractOpt) (ret string, err error) {

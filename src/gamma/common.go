@@ -129,6 +129,49 @@ func makeGamma() GammaFun {
 	return result
 }
 
+func (self GammaFun) selectFun(name1, name2 string) CmdFun {
+    ret, ok := self[name1]
+    
+    if ok {
+        return ret
+    }
+    
+    ret, ok = self[name2]
+    
+    if !ok {
+        log.Fatalf("Either '%s' ot '%s' must be an available executable!",
+            name1, name2)
+        return nil
+    }
+    return ret
+}
+
+func NewGammaParam(path string) (Params, error) {
+    return FromFile(path, ":")
+}
+
+func NewDataFile(dat, par string) (ret dataFile, err error) {
+    handle := Handler("NewDatfile")
+    ret.dat = dat
+    
+    if len(dat) == 0 {
+        err = handle(err, "'dat' should not be an empty string: '%s'", dat)
+    }
+    
+    if len(par) == 0 {
+        par = dat + ".par"
+    }
+    
+    ret.Params, err = NewGammaParam(par)
+    
+    if err != nil {
+        err = handle(err, "Failed to parse gamma parameter file: '%s'", par)
+        return
+    }
+    
+    return ret, nil
+}
+
 func (self *dataFile) Rng() (int, error) {
 	return self.Int("range_samples")
 }
@@ -148,24 +191,6 @@ func (self *dataFile) Date() time.Time {
 func (self *Point) InRect(r *Rect) bool {
 	return (self.X < r.Max.X && self.X > r.Min.X &&
             self.Y < r.Max.Y && self.Y > r.Min.Y)
-}
-
-
-func (self GammaFun) selectFun(name1, name2 string) CmdFun {
-    ret, ok := self[name1]
-    
-    if ok {
-        return ret
-    }
-    
-    ret, ok = self[name2]
-    
-    if !ok {
-        log.Fatalf("Either '%s' ot '%s' must be an available executable!",
-            name1, name2)
-        return nil
-    }
-    return ret
 }
 
 func First() string {

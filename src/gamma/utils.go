@@ -130,13 +130,13 @@ func ReadFile(path string) ([]byte, error) {
 	return contents, nil
 }
 
-func FromFile(path, sep string) (Params, error) {
+func FromFile(path, sep string) (self Params, err error) {
 	data, err := ReadFile(path)
 
 	if err != nil {
-		return Params{},
-			fmt.Errorf("In FromFile: Failed to read file: '%s'!\nError: %w",
-				path, err)
+        err = fmt.Errorf("In FromFile: Failed to read file: '%s'!\nError: %w",
+            path, err)
+        return
 	}
 
 	return Params{par: path, sep: sep,
