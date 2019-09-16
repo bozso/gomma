@@ -37,8 +37,8 @@ type (
 	geocoding struct {
 		DEMPath      string
 		Iter, NPoly  int
-        Overlap      RngAzi
-        OverSampling LatLon
+        DEMOverlap      RngAzi
+        DEMOverSampling LatLon
 	}
 
 	coreg struct {
@@ -94,9 +94,11 @@ var (
 
 	defaultConfig = config{
 		General: general{
-			Pol:          "vv",
-			RangeLooks:   1,
-			AzimuthLooks: 1,
+			Pol: "vv",
+			Looks: RngAzi{
+                Rng: 1,
+                Azi: 1,
+            },
 		},
 
 		PreSelect: preselect{
@@ -106,12 +108,16 @@ var (
 
 		Geocoding: geocoding{
 			DEMPath:            "/home/istvan/DEM/srtm.vrt",
-			Iter:               1,
-			RangeOverlap:       100,
-			AzimuthOverlap:     100,
-			NPoly:              1,
-			DEMLatOversampling: 2.0,
-			DEMLonOversampling: 2.0,
+			Iter: 1,
+			DEMOverlap: RngAzi{
+                Rng: 100,
+                Azi: 100,
+            },
+			NPoly: 1,
+			DEMOverSampling: LatLon{
+                Lat: 2.0,
+                Lon: 2.0,
+            },
 		},
 
 		Coreg: coreg{

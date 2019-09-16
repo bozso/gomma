@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
     "log"
-	gm "../gamma"
+    gm "../gamma"
 	fl "flag"
 )
 

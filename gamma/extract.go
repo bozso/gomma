@@ -4,7 +4,7 @@ import (
 	"io"
 	"os"
     "log"
-    //"fmt"
+    "fmt"
     zip "archive/zip"
 	fp "path/filepath"
 	rex "regexp"

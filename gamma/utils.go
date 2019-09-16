@@ -44,6 +44,10 @@ func Fatal(err error, format string, args ...interface{}) {
 	}
 }
 
+func Empty(str string) bool {
+    return len(str) == 0
+}
+
 func Handler(name string) handlerFun {
 	name = fmt.Sprintf("In %s", name)
 
@@ -147,15 +151,16 @@ func FromString(contents, sep string) Params {
 	return Params{sep: sep, contents: str.Split(contents, "\n")}
 }
 
-func (self *Params) Par(name string) (string, error) {
+func (self *Params) Par(name string) (ret string, err error) {
 	for _, line := range self.contents {
 		if str.Contains(line, name) {
 			return str.Trim(str.Split(line, self.sep)[1], " "), nil
 		}
 	}
 
-	return "", fmt.Errorf("In Par: Could not find parameter '%s' in %v",
+	err = fmt.Errorf("In Par: Could not find parameter '%s' in %v",
 		name, self.par)
+    return
 }
 
 func toInt(par string, idx int) (int, error) {
@@ -202,13 +207,13 @@ func (self *Params) Float(name string) (float64, error) {
 	return toFloat(data, 0)
 }
 
-func TmpFile() (string, error) {
+func TmpFile() (ret string, err error) {
 	file, err := io.TempFile("", "*")
 
 	if err != nil {
-		return "",
-			fmt.Errorf("In TmpFile: Failed to create a temporary file!\nError: %w",
-				err)
+		err = fmt.Errorf(
+            "In TmpFile: Failed to create a temporary file!\nError: %w", err)
+        return
 	}
 
 	defer file.Close()

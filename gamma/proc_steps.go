@@ -17,6 +17,7 @@ type(
     
     SLC interface {
         DataFile
+        Date
     }
     
     SARImage interface {

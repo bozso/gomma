@@ -1,6 +1,7 @@
 package gamma
 
 import (
+    "time"
     bio "bufio"
 )
 
@@ -66,11 +67,11 @@ func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
     
     base := NoExt(dat)
     
-    if length(par) == 0 {
+    if len(par) == 0 {
         par = base + ".off"
     }
     
-    self.Params, err = NewGammaParams(par)
+    self.Params, err = NewGammaParam(par)
     
     if err != nil {
         err = handle(err, "Could no parse parameter file: '%s'!", par)
@@ -81,42 +82,60 @@ func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
         simUnw = base + ".sim_unw"
     }
     
-    self.qual, self.diffPar, self.simUnw = 
-    quality, diffPar, simUnw
+    self.qual, self.simUnwrap = quality, simUnw
     
-    return ret, nil
+    self.diffPar, err = NewGammaParam(diffPar)
+    
+    if err != nil {
+        err = handle(err, "Could no parse parameter file: '%s'!", diffPar)
+        return
+    }
+    
+    return self, nil
 }
     
     
-func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (self IGF, err error) {
+func FromSLC(slc1, slc2, ref SLC, opt ifgOpt) (ret IFG, err error) {
+    handle := Handler("FromSLC")
     inter := 0
     
     if opt.interact {
         inter = 1
     }
     
-    rng, azi := opt.Looks.Range, opt.Looks.Azimuth
+    rng, azi := opt.Looks.Rng, opt.Looks.Azi
     
     // TODO: figure out where IFGs will be placed
-    off = "%s.off"
-    sim_unw = "%s.sim_unw"
-    diff = "%s.diff"
+    off := "%s.off"
+    simUnw := "%s.sim_unw"
+    diff := "%s.diff"
     
-    _, err = createOffset(slc1.par, slc2.par, off, opt.algo, rng, azi, inter)
+    par1, par2 := slc1.Parfile(), slc2.Parfile()
+    
+    _, err = createOffset(par1, par2, off, opt.algo, rng, azi, inter)
     
     slcRefPar := ""
     
     if ref != nil {
-        slcRefPar = ref.par
+        slcRefPar = ref.Parfile()
     }
-    _, err = phaseSimOrb(slc1.par, slc2.par, off, opt.hgt, simUnw, slcRefPar,
+    
+    _, err = phaseSimOrb(par1, par2, off, opt.hgt, simUnw, slcRefPar,
                          nil, nil, 1)
     
-    _, err = slcDiffIntf(slc1.dat, slc2.dat, slc1.par, slc2.par, off,
+    dat1, dat2 := slc1.Datfile(), slc2.Datfile()
+    _, err = slcDiffIntf(dat1, dat2, par1, par2, off,
                          simUnw, diff, rng, azi, 0, 0)
     
-    ret = NewIFG(diff, off)
-    ret.dat, ret.slc1, ret.slc2, ret.deltaT = diff, slc1, slc2
+    ret, err = NewIFG(diff, off, "", "", "")
+    
+    if err != nil {
+        err = handle(err, "Could not create new interferogram struct!")
+        return
+    }
+    
+    
+    ret.slc1, ret.slc2, ret.deltaT = slc1, slc2, slc1.Center().Sub(slc2.Center())
     
     return ret, nil
 }
@@ -157,7 +176,7 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
         if str.HasPrefix(line, "azimuth_pixel_offset") {
             split := str.Split(line, " ")[1]
             
-            diff, err := str.ParseFloat(split, 64)
+            diff, err = str.ParseFloat(split, 64)
             
             if err != nil {
                 err = handle(err, "Could no parse: '%s' into float64!", split)
@@ -168,7 +187,7 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
         }
     }
     
-    log.Printf("Sum of azimuth offsets in %s is %f pixel." qual, offs)
+    log.Printf("Sum of azimuth offsets in %s is %f pixel.", qual, offs)
     
     if isclose(offs, 0.0) {
         ret = true
@@ -187,14 +206,18 @@ func (self *IFG) AdaptFilt() (ret IFG, cc Coherence, err error) {
         step = opt.step
     }
     
+    // TODO: figure out the name of the output files
     filt = NewIFG(self.dat + ".filt")
     cc = NewDataFile()
-    if filt is None:
+    
+    /*
+    if Empty(filt):
         filt = 
-
-    if cc is None:
+    
+    if empty(cc is None:
         cc = self.datfile + ".cc"
-
+    */
+    
     rng, err := self.Rng()
     
     if err != nil {
@@ -202,9 +225,9 @@ func (self *IFG) AdaptFilt() (ret IFG, cc Coherence, err error) {
         return
     }
     
-    _, err := adf(self.dat, filt, cc, rng, opt.alpha, opt.FFTWindow,
-                  opt.cohWindow, step, opt.offset.Azi, opt.offset.Rng,
-                  opt.frac)
+    _, err = adf(self.dat, filt, cc, rng, opt.alpha, opt.FFTWindow,
+                 opt.cohWindow, step, opt.offset.Azi, opt.offset.Rng,
+                 opt.frac)
     
     if err != nil {
         err = handle(err, "Adaptive filtering failed!")
@@ -219,10 +242,6 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
     //log.info('Weight type is "%s"'.format(weight_type))
     
     width = self.Rng()
-		WeightType             string
-		Box                    minmax
-		SlopeCorrelationThresh float64
-		SlopeWindow            int
     
     log.Printf("Estimating phase slope. ")
     
@@ -236,6 +255,7 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
     log.Printf("Calculating coherence. ")
     _, err = CCAdaptive(self.dat, mli1, mli2, slope, nil, ret.dat, width,
                         opt.Box.min, opt.Box.max, weightFlag)
+}
 
 /*
 func (self *IFG) raster(args RasArgs) {

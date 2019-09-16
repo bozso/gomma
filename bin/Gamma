@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+
+main() {
+    local root="/home/istvan/progs/gamma"
+    local main="${root}/gamma.go"
+    #local gamma="${root}/Gamma"
+    
+    go run "${main}"
+    # go build -o "${gamma}" "${main}" && ${gamma} $*
+}
+
+main $*

@@ -1,24 +1,50 @@
 package gamma
 
-
 import (
-    "math"
+    fp "path/filepath"
+)
+
+const(
+    nMaxBurst = 10
+    nIW = 3
+	burstTpl = "burst_asc_node_%d"
+)
+
+const (
+	tiff tplType = iota
+	annot
+	calib
+	noise
+	preview
+	quicklook
 )
 
 type(
-	dataFile struct {
-		dat string
-		Params
-		date
+	tplType int
+	templates [6]string
+	
+	S1Zip struct {
+		Path           string    `json:"path"`
+        Root           string    `json:"root"`
+        zipBase        string    `json:"-"`
+        mission        string    `json:"-"`
+        dateStr        string    `json:"-"`
+        mode           string    `json:"-"`
+        productType    string    `json:"-"`
+        resolution     string    `json:"-"` 
+		Safe           string    `json:"safe"`
+        level          string    `json:"-"`
+        productClass   string    `json:"-"`
+        pol            string    `json:"-"`
+        absoluteOrbit  string    `json:"-"`
+        DTID           string    `json:"-"`
+        UID            string    `json:"-"`
+		Templates      templates `json:templates`
+		date                     `json:"date"`
 	}
-
-    DataFile interface {
-		Rng() int
-		Azi() int
-		Int() int
-		Float() float64
-		Param() string
-	}
+    
+    S1Zips []*S1Zip
+	ByDate S1Zips
     
     IWInfo struct {
 		nburst int
@@ -42,11 +68,23 @@ type(
 	}
 )
 
-const (
-    nMaxBurst = 10
-    nIW = 3
+var (
+	burstCorner  CmdFun
+
+    burstCorners = Gamma.selectFun("ScanSAR_burst_corners",
+                                   "SLC_burst_corners")
+	calibPath = fp.Join("annotation", "calibration")
 )
 
+func init() {
+	var ok bool
+	
+	if burstCorner, ok = Gamma["ScanSAR_burst_corners"]; !ok {
+		if burstCorner, ok = Gamma["SLC_burst_corners"]; !ok {
+			log.Fatalf("No Fun.")
+		}
+	}
+}
 
 func NewIW(dat, par, TOPS_par string) (self S1IW, err error) {
     handle := Handler("NewS1SLC")
@@ -245,45 +283,27 @@ func IWAbsDiff(one, two IWInfos) (float64, error) {
     return math.Sqrt(sum), nil
 }
 
-
-func NewGammaParam(path string) (Params, error) {
-    return FromFile(path, ":")
-}
-
-func NewDataFile(dat, par string) (ret dataFile, err error) {
-    handle := Handler("NewDatfile")
-    ret.dat = dat
+func (self *S1Zip) Quicklook(exto *ExtractOpt) (ret string, err error) {
+    handle := Handler("S1Zip.Quicklook")
     
-    if len(dat) == 0 {
-        err = handle(err, "'dat' should not be an empty string: '%s'", dat)
-    }
-    
-    if len(par) == 0 {
-        par = dat + ".par"
-    }
-    
-    ret.Params, err = NewGammaParam(par)
+    ext, err := self.newExtractor(exto)
     
     if err != nil {
-        err = handle(err, "Failed to parse gamma parameter file: '%s'", par)
+        err = handle(err, "Failed to create new S1Extractor!")
+        return
+    }
+    
+    defer ext.Close()
+    
+    path := self.Path
+    
+    ret, err = ext.extract(quicklook, 0)
+    
+    if err != nil {
+        err = handle(err, "Failed to extract annotation file from '%s'!",
+            path)
         return
     }
     
     return ret, nil
-}
-
-func (self *dataFile) Rng() (int, error) {
-	return self.Int("range_samples")
-}
-
-func (self *dataFile) Azi() (int, error) {
-	return self.Int("azimuth_samples")
-}
-
-func (self *dataFile) imgFormat() (string, error) {
-	return self.Par("image_format")
-}
-
-func (self *dataFile) Date() time.Time {
-	return self.center
 }

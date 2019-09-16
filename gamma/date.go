@@ -11,7 +11,9 @@ type (
 	}
 
 	Date interface {
-		Date() time.Time
+		Start() time.Time
+		Stop() time.Time
+		Center() time.Time
 	}
 	dateFormat int
 )
@@ -75,7 +77,7 @@ func (self *date) Start() time.Time {
     return self.start
 }
 
-func (self *date) Date() time.Time {
+func (self *date) Center() time.Time {
     return self.center
 }
 
