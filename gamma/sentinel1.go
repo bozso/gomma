@@ -1,6 +1,7 @@
 package gamma
 
 import (
+    "os"
     "log"
     "fmt"
     "math"
@@ -21,11 +22,13 @@ const (
 	noise
 	preview
 	quicklook
+    
+    nTemplate = 6
 )
 
 type(
 	tplType int
-	templates [6]string
+	templates [nTemplate]string
 	
 	S1Zip struct {
 		Path           string    `json:"path"`
@@ -78,6 +81,15 @@ var (
     burstCorners = Gamma.selectFun("ScanSAR_burst_corners",
                                    "SLC_burst_corners")
 	calibPath = fp.Join("annotation", "calibration")
+    
+    fmtNeeded = [nTemplate]bool {
+        tiff:       true,
+        annot:      true,
+        calib:      true,
+        noise:      true,
+        preview:    false,
+        quicklook:  false,
+    }
 )
 
 func init() {
@@ -191,6 +203,22 @@ func NewIW(dat, par, TOPS_par string) (self S1IW, err error) {
     }
     
     return self, nil
+}
+
+func (self *S1SLC) Exist() (ret bool, err error) {
+    for _, iw := range self.IWs {
+        exist, err = iw.Exist()
+        
+        if err != nil {
+            err = fmt.Errorf("Could not determine whether IW datafile exists!")
+            return
+        }
+        
+        if !exist {
+            return false, nil
+        }
+    }
+    return true, nil
 }
 
 func makePoint(info Params, max bool) (ret Point, err error) {
@@ -362,6 +390,205 @@ func IWAbsDiff(one, two IWInfos) (float64, error) {
     }
     
     return math.Sqrt(sum), nil
+}
+
+func (self *S1Zip) SLC(pol string) (ret S1SLC, err error) {
+    const mode = "slc"
+    tab := self.tab(mode, pol)
+    
+    exist, err = Exist(tab)
+    
+    if err != nil {
+        return
+    }
+    
+    if !exist {
+        err = fmt.Errorf("In SLC: tabfile '%s' does not exist!", tab)
+        return
+    }
+    
+    for ii := 0; ii < 4; ii++ {
+        dat, par, TOPS_par := self.SLCNames(mode, pol, ii)
+        ret.IWs[ii - 1], err = NewIW(dat, par, TOPS_par)
+        
+        if err != nil {
+            err = handle(err, "Could not create new IW!")
+            return
+        }
+    }
+    
+    ret.tab = tab
+    
+    return ret, nil
+}
+
+func (self *S1Zip) RSLC(pol string) (ret S1SLC, err error) {
+    const mode = "rslc"
+    tab := self.tab(mode, pol)
+    
+    exist, err = Exist(tab)
+    
+    if err != nil {
+        return
+    }
+    
+    if !exist {
+        err = fmt.Errorf("In SLC: tabfile '%s' does not exist!", tab)
+        return
+    }
+    
+    for ii := 0; ii < 4; ii++ {
+        dat, par, TOPS_par := self.SLCNames(mode, pol, ii)
+        ret.IWs[ii - 1], err = NewIW(dat, par, TOPS_par)
+        
+        if err != nil {
+            err = handle(err, "Could not create new IW!")
+            return
+        }
+    }
+    
+    ret.tab = tab
+    
+    return ret, nil
+}
+
+func (self *S1Zip) SLCNames(mode, pol string, ii int) (dat, par, TOPS string) {
+    slcPath := fp.Join(self.Root, mode)
+    
+    dat  := fp.Join(slcPath, fmt.Sprintf("iw%d_%s.slc", ii, pol))
+    par  := dat + ".par"
+    TOPS := dat + "TOPS_par"
+    
+    return
+}
+
+
+func (self *S1Zip) tabName(mode, pol, string) string {
+    return fp.Join(self.Root, mode, fmt.Sprintf("%s.tab", pol))
+}
+
+func (self *S1Zip) ImportSLC(exto *ExtractOpt) (ret S1SLC, err error) {
+    handle := Handler("S1Zip.SLC")
+    var _annot, _calib, _tiff, _noise string
+    ext, err := self.newExtractor(exto)
+    
+    if err != nil {
+        err = handle(err, "Failed to create new S1Extractor!")
+        return
+    }
+    
+    defer ext.Close()
+    
+    path, pol := self.Path, exto.pol
+    
+    slcPath := fp.Join(self.Root, "slc")
+    tab := self.tabName("slc", pol)
+    file, err := os.Create(tab)
+    
+    if err != nil {
+        err = handle(err, "Failed to open file: '%s'!", tab)
+        return
+    }
+    
+    defer file.Close()
+    
+    for ii := 1; ii < 4; ii++ {
+        _annot, err = ext.extract(annot, ii)
+        
+        if err != nil {
+            err = handle(err, "Failed to extract annotation file from '%s'!",
+                path)
+            return
+        }
+        
+        _calib, err = ext.extract(calib, ii)
+        
+        if err != nil {
+            err = handle(err, "Failed to extract calibration file from '%s'!",
+                path)
+            return
+        }
+        
+        _tiff, err = ext.extract(tiff, ii)
+        
+        if err != nil {
+            err = handle(err, "Failed to extract tiff file from '%s'!",
+                path)
+            return
+        }
+        
+        _noise, err = ext.extract(noise, ii)
+        
+        if err != nil {
+            err = handle(err, "Failed to extract noise file from '%s'!",
+                path)
+            return
+        }
+        
+        err = os.MkdirAll(slcPath, os.ModePerm)
+        
+        if err != nil {
+            err = handle(err, "Failed to create directory: %s!", slcPath)
+            return
+        }
+        
+        dat, par, TOPS_par := self.SLCNames("slc", pol, ii)
+        
+        _, err = Gamma["par_S1_SLC"](_tiff, _annot, _calib, _noise, par, dat,
+            TOPS_par)
+        if err != nil {
+            err = handle(err, "Failed to import datafiles into gamma format!")
+            return
+        }
+        
+        ret.IWs[ii - 1], err = NewIW(dat, par, TOPS_par)
+        if err != nil {
+            err = handle(err, "Could not create new S1SLC!")
+            return
+        }
+        
+        line := fmt.Sprintf("%s %s %s\n", dat, par, TOPS_par)
+        
+        _, err = file.WriteString(line)
+        
+        if err != nil {
+            err = handle(err, "Failed to write line '%s' to file'%s'!",
+                line, tab)
+            return
+        }
+    }
+    
+    ret.tab = tab
+    
+    return ret, nil
+}
+
+
+func (self *S1Zip) RSLC(pol string) (tab string, exist bool) {
+    tab = self.tab("rslc", pol)
+    
+    
+    
+    file, err := os.Create(tab)
+    if err != nil {
+        err = handle(err, "Failed to open file: '%s'!", tab)
+        return
+    }
+    defer file.Close()
+    
+    for ii = 1; ii < 4; ii++ {
+        dat, par TOPS_par := self.SLC("rslc", pol, ii)
+        line := fmt.Sprintf("%s %s %s\n", dat, par, TOPS_par)
+        
+        _, err = file.WriteString(line)
+        
+        if err != nil {
+            err = handle(err, "Failed to write line '%s' to file'%s'!",
+                line, tab)
+            return
+        }
+    }
+    return tab, true
 }
 
 func (self *S1Zip) Quicklook(exto *ExtractOpt) (ret string, err error) {

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	fl "flag"
 	ref "reflect"
 	//conv "strconv"
 	str "strings"
@@ -25,6 +24,7 @@ type (
     
 	general struct {
 		DataPath, OutputDir, Pol, Metafile string
+        CachePath                          string `json:"CACHE_PATH"`
 		Looks                              RngAzi
 	}
 
@@ -58,7 +58,6 @@ type (
 	}
 
 	config struct {
-        CachePath string    `json:"-"`
 		General   general
 		PreSelect preselect
 		Geocoding geocoding
@@ -67,16 +66,6 @@ type (
 		Coherence coherence
 	}
 
-	cliConfig struct {
-		Conf, Step, Start, Stop, Log, CachePath string
-		Skip, Show                              bool
-	}
-    
-    S1ProcData struct {
-        MasterDate string
-        Zipfiles   []string
-    }
-    
 	stepFun func(*config) error
 )
 
@@ -86,8 +75,8 @@ const (
 
 var (
 	steps = map[string]stepFun{
-		"preselect": stepPreselect,
-		"coreg":     stepCoreg,
+		"select": stepPreselect,
+        "coreg":  stepCoreg,
 	}
 
 	stepList []string
@@ -95,6 +84,7 @@ var (
 	defaultConfig = config{
 		General: general{
 			Pol: "vv",
+            Metafile: "meta.json",
 			Looks: RngAzi{
                 Rng: 1,
                 Azi: 1,
@@ -153,7 +143,8 @@ func init() {
 
 func center(s string, n int, fill string) string {
 	div := n / 2
-	return str.Repeat(fill, div) + s + str.Repeat(fill, div)
+    rep := str.Repeat(fill, div)
+	return rep + s + rep
 }
 
 const width = 40
@@ -166,117 +157,6 @@ func delim(msg, sym string) {
 	fmt.Printf("%s\n%s\n%s\n", syms, msg, syms)
 }
 
-func NewConfig(flag *fl.FlagSet) *cliConfig {
-	conf := cliConfig{}
-
-	flag.StringVar(&conf.Conf, "config", "gamma.json",
-		"Processing configuration file")
-
-	flag.StringVar(&conf.Step, "step", "",
-		"Single processing step to be executed.")
-
-	flag.StringVar(&conf.Start, "start", "",
-		"Starting processing step.")
-
-	flag.StringVar(&conf.Stop, "stop", "",
-		"Last processing step to be executed.")
-
-	flag.StringVar(&conf.Log, "logfile", "gamma.log",
-		"Log messages will be saved here.")
-	
-    flag.StringVar(&conf.CachePath, "cache", DefaultCachePath,
-		"Path to cached files.")
-
-	flag.BoolVar(&conf.Skip, "skip_optional", false,
-		"If set the proccessing will skip optional steps.")
-	flag.BoolVar(&conf.Show, "show_steps", false,
-		"If set, prints the processing steps.")
-
-	return &conf
-}
-
-func stepIndex(step string) int {
-	for ii, _step := range stepList {
-		if step == _step {
-			return ii
-		}
-	}
-	return -1
-}
-
-func listSteps() {
-	fmt.Println("Available processing steps: ", stepList)
-}
-
-func (self *cliConfig) Parse() (ret config, istart int, istop int, err error) {
-	handle := Handler("CLIConfig.Parse")
-    
-	if self.Show {
-		listSteps()
-		os.Exit(0)
-	}
-
-	ret.CachePath = self.CachePath
-    istep, istart, istop := stepIndex(self.Step), stepIndex(self.Start),
-		stepIndex(self.Stop)
-
-	if istep == -1 {
-		if istart == -1 {
-			listSteps()
-            err = handle(nil,
-                "Starting step '%s' is not in list of available steps!",
-                self.Start)
-            return
-		}
-
-		if istop == -1 {
-			listSteps()
-            err = handle(nil,
-                "Stopping step '%s' is not in list of available steps!",
-                self.Stop)
-			return
-		}
-	} else {
-		istart = istep
-		istop = istep + 1
-	}
-
-	path := self.Conf
-
-
-	data, err := ReadFile(path)
-
-	if err != nil {
-		err = handle(err, "Failed to read file:  '%s'!", path)
-        return
-	}
-
-	if err = json.Unmarshal(data, &ret); err != nil {
-		err = handle(err, "Failed to parse json data: %s'!", data)
-        return
-	}
-
-	return ret, istart, istop, nil
-}
-
-func (self *config) RunSteps(start, stop int) error {
-	handle := Handler("RunSteps")
-
-	for ii := start; ii < stop; ii++ {
-		name := stepList[ii]
-		step, _ := steps[name]
-
-		delim(fmt.Sprintf("START: %s", name), "*")
-
-		if err := step(self); err != nil {
-			return handle(err, "Error while running step: '%s'",
-				name)
-		}
-
-		delim(fmt.Sprintf("END: %s", name), "*")
-	}
-	return nil
-}
 
 func MakeDefaultConfig(path string) error {
 	handle := Handler("MakeDefaultConfig")

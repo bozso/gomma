@@ -1,14 +1,12 @@
 package gamma
 
-//go:generate cpp -P -nostfinc -nostfinc++ -Wunused-macros
-#include "utils.h"
 
 import (
 	"fmt"
 	"sort"
     "log"
     "math"
-    "time"
+    //"time"
 	fp "path/filepath"
 	//conv "strconv"
 	//str "strings"
@@ -32,9 +30,6 @@ type(
     checkerFun func(*S1Zip) bool
 )
 
-func After(image Date, date time.Time) bool {
-    return image.Stop().Before(date)
-}
 
 func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err error) {
     handle := Handler("proc_steps.parseS1")
@@ -58,11 +53,16 @@ func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err err
     return s1, IWs, nil
 }
 
+func (self *config) extOpt(satellite string) *ExtractOpt {
+    return &ExtractOpt{pol: self.General.Pol, 
+        root: fp.Join(self.General.CachePath, satellite)}
+}
+
+
 func stepPreselect(self *config) error {
 	handle := Handler("stepPreselect")
 
 	dataPath := self.General.DataPath
-	cache := self.CachePath
     Select := self.PreSelect
     
 	if len(dataPath) == 0 {
@@ -78,8 +78,8 @@ func stepPreselect(self *config) error {
 		Point{X: ur.Lon, Y: ur.Lat}, Point{X: ur.Lon, Y: ll.Lat},
 	}
     
-    root := fp.Join(cache, "sentinel1")
-	extInfo := &ExtractOpt{pol: self.General.Pol, root: root}
+	extInfo := self.extOpt("sentinel1")
+    root := extInfo.root
     
     dateStart, dateStop := Select.DateStart, Select.DateStop
 
@@ -222,25 +222,69 @@ func stepPreselect(self *config) error {
         }
         
         if !(math.RoundToEven(diff) > 0.0) {
-            fmt.Printf("Selected %v\n", s1zip)
+            s1zip.ImportSLC(extInfo)
             toSave = append(toSave, s1zip.Path)
         }
         
     }
     
-    conf := S1ProcData{MasterDate: masterDate, Zipfiles: toSave}
+    path := self.General.Metafile
+    conf := Meta{MasterDate: masterDate, Zipfiles: toSave, MasterIdx:idx}
     
-    SaveJson("meta.json", conf)
+    err = SaveJson(path, conf)
     
-	fmt.Println(idx)
-
+    if err != nil {
+        return handle(err, "Failed to write metadata to: '%s'!", path)
+    }
+    
 	return nil
 }
 
-func stepImport(conf *config) error {
-}
-
-func stepCoreg(conf *config) error {
+func stepCoreg(self *config) error {
+	handle := Handler("stepCoreg")
+    path := self.General.Metafile
+	
+    extInfo := self.extOpt("sentinel1")
+    root, meta := extInfo.root, Meta{}
+    midx := meta.MasterIdx
+    
+    
+    err := LoadJson(path, &meta)
+    
+    if err != nil {
+        return handle(err, "Failed to read metadata from: '%s'!", path)
+    }
+    
+    s1zips, coregistered := S1Zips{}, []S1SLC{}
+    
+    for _, zip := range meta.Zipfiles {
+        s1, err := NewS1Zip(zip, root)
+        
+        if err != nil {
+            return handle(err, "Failed to parse S1Zip data from '%s'",
+                s1.Path)
+        }
+        
+        s1zips := append(s1, s1zips)
+    }
+    
+    
+    master := s1zips[midx]
+    
+    mslc, err := master.ImportSLC(extInfo)
+    
+    if err != nil {
+        return handle(err, "Failed to import master SLC data!")
+    }
+    
+    for ii, s1 := range s1zips {
+        if ii == midx {
+            continue
+        }
+        
+        
+    }
+    
 	return nil
 }
 

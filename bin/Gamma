@@ -2,10 +2,10 @@
 
 main() {
     local root="/home/istvan/progs/gamma"
-    local main="${root}/gamma.go"
+    local main="${root}/bin/main.go"
     #local gamma="${root}/Gamma"
     
-    go run "${main}"
+    go run "${main}" $*
     # go build -o "${gamma}" "${main}" && ${gamma} $*
 }
 

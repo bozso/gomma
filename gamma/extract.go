@@ -67,49 +67,50 @@ func matches(candidate string, template string) (bool, error) {
 	return matched, nil
 }
 
-func extract(file *zip.ReadCloser, template, root string) (string, error) {
+func extract(file *zip.ReadCloser, template, root string) (ret string, err error) {
 	handle := Handler("extract")
+    
+    //log.Fatalf("%s %s", root, template)
     
 	// go through files in the zipfile
 	for _, zipfile := range file.File {
 		name := zipfile.Name
-		dst := fp.Join(root, name)
         
 		matched, err := matches(name, template)
         
-        
 		if err != nil {
-			return "", handle(err,
+			err = handle(err,
 				"Failed to check whether zipped file '%s' matches templates!",
 				name)
+            return
 		}
-        
-        //fmt.Printf("\n\nCurrent: %s\nTemplate: %s\nMatched: %v\n",
-        //    name, template, matched)
+		
+        ret := fp.Join(root, name)
         
 		if !matched {
             continue
 		}
         
+        //fmt.Printf("Matched: %s\n", dst)
+        //fmt.Printf("\n\nCurrent: %s\nTemplate: %s\nMatched: %v\n",
+        //    name, template, matched)
         
-        // TODO: clean up program logic
-        _, err = os.Stat(dst)
-        
-        if err != nil && os.IsNotExist(err) {
-            err = extractFile(zipfile, dst)
-
-            if err != nil {
-                return "", handle(err, "Failed to extract file : '%s'!", name)
-            }
-            
-            return dst, nil
-        } else {
-            return dst, nil
-        }
+        exist, err = Exist(ret)
         
         if err != nil {
-            return "", handle(err, "Stat failed on file : '%s'!", name)
+            err = handle(err, "Stat failed on file : '%s'!", name)
+            return
         }
+        
+        if !exist {
+            err = extractFile(zipfile, ret)
+
+            if err != nil {
+                err = handle(err, "Failed to extract file : '%s'!", name)
+                return
+            }
+        }
+        return ret, nil
 	}
     return "", nil
 }
@@ -133,7 +134,15 @@ func (self *S1Zip) newExtractor(ext *ExtractOpt) (ret S1Extractor, err error) {
 
 func (self *S1Extractor) extract(mode tplType, iw int) (string, error) {
     handle := Handler("S1Extractor.extract")
-	tpl := fmt.Sprintf(self.templates[mode], iw, self.pol)
+	
+    var tpl string
+    
+    if fmtNeeded[mode] {
+        tpl = fmt.Sprintf(self.templates[mode], iw, self.pol)
+    } else {
+        tpl = self.templates[mode]
+    }
+    
     
     ret, err := extract(self.zip, tpl, self.root)
     

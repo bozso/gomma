@@ -9,6 +9,7 @@ type(
 		dat string
 		Params
 		date
+        files []string
 	}
 
     DataFile interface {
@@ -44,7 +45,26 @@ func NewDataFile(dat, par string) (ret dataFile, err error) {
         return
     }
     
+    ret.files = []string{dat, par}
+    
     return ret, nil
+}
+
+func (self *dataFile) Exist() (ret bool, err error) {
+    for _, file := range self.files {
+        exist, err = Exist(file)
+        
+        if err != nil {
+            err = fmt.Errorf("Stat on file '%s' failed!\nError: %w!",
+                file, err)
+            return
+        }
+        
+        if !exist {
+            return false, nil
+        }
+    }
+    return true, nil
 }
 
 func (self *dataFile) Datfile() string {

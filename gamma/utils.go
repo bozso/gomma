@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+    bio "bufio"
 	io "io/ioutil"
 	fp "path/filepath"
 	conv "strconv"
@@ -18,7 +19,6 @@ type (
 
 	Params struct {
 		par, sep string
-		contents []string
 	}
 
 	Tmp struct {
@@ -116,48 +116,58 @@ func (self *path) Info() (os.FileInfo, error) {
 	return ret, nil
 }
 
-func ReadFile(path string) ([]byte, error) {
+func Exist(path string) (ret bool, err error) {
+    _, err = os.Stat(path)
+    
+    if err != nil {
+        if os.IsNotExist(err) {
+            return false, nil
+        }
+        return false, err
+    }
+    return true, nil
+}
+
+func ReadFile(path string) (ret []byte, err error) {
 	handle := Handler("ReadFile")
 
-	f, err := os.Open(path)
+	f, err = os.Open(path)
 	if err != nil {
-		return []byte{}, handle(err, "Could not open file: '%v'!", path)
+		err = handle(err, "Could not open file: '%v'!", path)
+        return
 	}
 
 	defer f.Close()
 
 	contents, err := io.ReadAll(f)
 	if err != nil {
-		return []byte{}, handle(err, "Could not read file: '%v'!", path)
+		 err = handle(err, "Could not read file: '%v'!", path)
+         return
 	}
 
 	return contents, nil
 }
 
-func FromFile(path, sep string) (self Params, err error) {
-	data, err := ReadFile(path)
-
-	if err != nil {
-        err = fmt.Errorf("In FromFile: Failed to read file: '%s'!\nError: %w",
-            path, err)
-        return
-	}
-
-	return Params{par: path, sep: sep,
-		contents: str.Split(string(data[:]), "\n")}, nil
-}
-
-func FromString(contents, sep string) Params {
-	return Params{sep: sep, contents: str.Split(contents, "\n")}
-}
-
 func (self *Params) Par(name string) (ret string, err error) {
-	for _, line := range self.contents {
+    handle := Handler("Params.Par")
+    file, err := os.Open(self.par)
+    
+    if err != nil {
+        err = handle(err, "Could not open file: '%s'!", qual)
+        return
+    }
+    
+    defer file.Close()
+    
+    scanner := bio.NewScanner(file)
+    
+    for scanner.Scan() {
+        line := scanner.Text()
 		if str.Contains(line, name) {
 			return str.Trim(str.Split(line, self.sep)[1], " "), nil
 		}
-	}
-
+    }
+    
 	err = fmt.Errorf("In Par: Could not find parameter '%s' in %v",
 		name, self.par)
     return
