@@ -195,17 +195,14 @@ func NewIW(dat, par, TOPS_par string) (self S1IW, err error) {
         TOPS_par = dat + ".TOPS_par"
     }
     
-    self.TOPS_par, err = NewGammaParam(TOPS_par)
-    
-    if err != nil {
-        err = handle(err, "Failed to parse TOPS_parfile: '%s'!", TOPS_par)
-        return
-    }
+    self.TOPS_par = NewGammaParam(TOPS_par)
+    self.files = []string{dat, par, TOPS_par}
     
     return self, nil
 }
 
 func (self *S1SLC) Exist() (ret bool, err error) {
+    var exist bool
     for _, iw := range self.IWs {
         exist, err = iw.Exist()
         
@@ -287,13 +284,9 @@ func iwInfo(path string) (ret IWInfo, err error) {
         return
 	}
     
-	info := FromString(_info, ":")
-	TOPS, err := FromFile(TOPS_par, ":")
-
-	if err != nil {
-		err = handle(err, "Could not parse TOPS_par file!")
-        return
-	}
+    // TODO: generic reader Params
+	//info := FromString(_info, ":")
+	TOPS := NewGammaParam(TOPS_par)
 
 	nburst, err := TOPS.Int("number_of_bursts")
 
@@ -393,9 +386,11 @@ func IWAbsDiff(one, two IWInfos) (float64, error) {
 }
 
 func (self *S1Zip) SLC(pol string) (ret S1SLC, err error) {
+    handle := Handler("S1Zip.SLC")
     const mode = "slc"
-    tab := self.tab(mode, pol)
+    tab := self.tabName(mode, pol)
     
+    var exist bool
     exist, err = Exist(tab)
     
     if err != nil {
@@ -403,7 +398,7 @@ func (self *S1Zip) SLC(pol string) (ret S1SLC, err error) {
     }
     
     if !exist {
-        err = fmt.Errorf("In SLC: tabfile '%s' does not exist!", tab)
+        err = handle(err, "tabfile '%s' does not exist!", tab)
         return
     }
     
@@ -423,19 +418,17 @@ func (self *S1Zip) SLC(pol string) (ret S1SLC, err error) {
 }
 
 func (self *S1Zip) RSLC(pol string) (ret S1SLC, err error) {
+    handle := Handler("S1Zip.RSLC")
     const mode = "rslc"
-    tab := self.tab(mode, pol)
+    tab := self.tabName(mode, pol)
     
-    exist, err = Exist(tab)
+    file, err := os.Create(tab)
     
     if err != nil {
+        err = handle(err, "Failed to create file '%s'%", tab)
         return
     }
-    
-    if !exist {
-        err = fmt.Errorf("In SLC: tabfile '%s' does not exist!", tab)
-        return
-    }
+    defer file.Close()
     
     for ii := 0; ii < 4; ii++ {
         dat, par, TOPS_par := self.SLCNames(mode, pol, ii)
@@ -443,6 +436,15 @@ func (self *S1Zip) RSLC(pol string) (ret S1SLC, err error) {
         
         if err != nil {
             err = handle(err, "Could not create new IW!")
+            return
+        }
+        line := fmt.Sprintf("%s %s %s\n", dat, par, TOPS_par)
+        
+        _, err = file.WriteString(line)
+        
+        if err != nil {
+            err = handle(err, "Failed to write line '%s' to file'%s'!",
+                line, tab)
             return
         }
     }
@@ -455,15 +457,15 @@ func (self *S1Zip) RSLC(pol string) (ret S1SLC, err error) {
 func (self *S1Zip) SLCNames(mode, pol string, ii int) (dat, par, TOPS string) {
     slcPath := fp.Join(self.Root, mode)
     
-    dat  := fp.Join(slcPath, fmt.Sprintf("iw%d_%s.slc", ii, pol))
-    par  := dat + ".par"
-    TOPS := dat + "TOPS_par"
+    dat  = fp.Join(slcPath, fmt.Sprintf("iw%d_%s.slc", ii, pol))
+    par  = dat + ".par"
+    TOPS = dat + "TOPS_par"
     
     return
 }
 
 
-func (self *S1Zip) tabName(mode, pol, string) string {
+func (self *S1Zip) tabName(mode, pol string) string {
     return fp.Join(self.Root, mode, fmt.Sprintf("%s.tab", pol))
 }
 
@@ -561,34 +563,6 @@ func (self *S1Zip) ImportSLC(exto *ExtractOpt) (ret S1SLC, err error) {
     ret.tab = tab
     
     return ret, nil
-}
-
-
-func (self *S1Zip) RSLC(pol string) (tab string, exist bool) {
-    tab = self.tab("rslc", pol)
-    
-    
-    
-    file, err := os.Create(tab)
-    if err != nil {
-        err = handle(err, "Failed to open file: '%s'!", tab)
-        return
-    }
-    defer file.Close()
-    
-    for ii = 1; ii < 4; ii++ {
-        dat, par TOPS_par := self.SLC("rslc", pol, ii)
-        line := fmt.Sprintf("%s %s %s\n", dat, par, TOPS_par)
-        
-        _, err = file.WriteString(line)
-        
-        if err != nil {
-            err = handle(err, "Failed to write line '%s' to file'%s'!",
-                line, tab)
-            return
-        }
-    }
-    return tab, true
 }
 
 func (self *S1Zip) Quicklook(exto *ExtractOpt) (ret string, err error) {

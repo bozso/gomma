@@ -80,12 +80,7 @@ func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
         par = base + ".off"
     }
     
-    self.Params, err = NewGammaParam(par)
-    
-    if err != nil {
-        err = handle(err, "Could no parse parameter file: '%s'!", par)
-        return
-    }
+    self.Params = NewGammaParam(par)
     
     if len(simUnw) == 0 {
         simUnw = base + ".sim_unw"
@@ -93,12 +88,7 @@ func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
     
     self.quality, self.simUnwrap = quality, simUnw
     
-    self.diffPar, err = NewGammaParam(diffPar)
-    
-    if err != nil {
-        err = handle(err, "Could no parse parameter file: '%s'!", diffPar)
-        return
-    }
+    self.diffPar = NewGammaParam(diffPar)
     
     return self, nil
 }

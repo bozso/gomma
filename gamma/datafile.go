@@ -1,6 +1,7 @@
 package gamma
 
 import (
+    "fmt"
     "time"
 )
 
@@ -22,8 +23,8 @@ type(
 	}
 )
 
-func NewGammaParam(path string) (Params, error) {
-    return FromFile(path, ":")
+func NewGammaParam(path string) Params {
+    return Params{par:path, sep:":"}
 }
 
 func NewDataFile(dat, par string) (ret dataFile, err error) {
@@ -38,12 +39,7 @@ func NewDataFile(dat, par string) (ret dataFile, err error) {
         par = dat + ".par"
     }
     
-    ret.Params, err = NewGammaParam(par)
-    
-    if err != nil {
-        err = handle(err, "Failed to parse gamma parameter file: '%s'", par)
-        return
-    }
+    ret.Params = NewGammaParam(par)
     
     ret.files = []string{dat, par}
     
@@ -51,6 +47,7 @@ func NewDataFile(dat, par string) (ret dataFile, err error) {
 }
 
 func (self *dataFile) Exist() (ret bool, err error) {
+    var exist bool
     for _, file := range self.files {
         exist, err = Exist(file)
         

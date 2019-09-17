@@ -72,11 +72,12 @@ func extract(file *zip.ReadCloser, template, root string) (ret string, err error
     
     //log.Fatalf("%s %s", root, template)
     
+    var matched, exist bool
 	// go through files in the zipfile
 	for _, zipfile := range file.File {
 		name := zipfile.Name
         
-		matched, err := matches(name, template)
+		matched, err = matches(name, template)
         
 		if err != nil {
 			err = handle(err,
@@ -85,7 +86,7 @@ func extract(file *zip.ReadCloser, template, root string) (ret string, err error
             return
 		}
 		
-        ret := fp.Join(root, name)
+        ret = fp.Join(root, name)
         
 		if !matched {
             continue

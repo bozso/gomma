@@ -131,7 +131,7 @@ func Exist(path string) (ret bool, err error) {
 func ReadFile(path string) (ret []byte, err error) {
 	handle := Handler("ReadFile")
 
-	f, err = os.Open(path)
+	f, err := os.Open(path)
 	if err != nil {
 		err = handle(err, "Could not open file: '%v'!", path)
         return
@@ -153,7 +153,7 @@ func (self *Params) Par(name string) (ret string, err error) {
     file, err := os.Open(self.par)
     
     if err != nil {
-        err = handle(err, "Could not open file: '%s'!", qual)
+        err = handle(err, "Could not open file: '%s'!", self.par)
         return
     }
     

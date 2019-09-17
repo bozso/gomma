@@ -265,7 +265,7 @@ func stepCoreg(self *config) error {
                 s1.Path)
         }
         
-        s1zips := append(s1, s1zips)
+        s1zips = append(s1zips, s1)
     }
     
     
