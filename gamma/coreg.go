@@ -9,7 +9,6 @@ import (
 )
 
 type (
-    
 	CoregOpt struct {
 		coreg
 		hgt, poly1, poly2 string
@@ -18,7 +17,7 @@ type (
 	}
 )
 
-var _coreg = Gamma["S1_coreg_TOPS"]
+var _coreg = Gamma.must("S1_coreg_TOPS")
 
 func S1Coreg(master, slc, rslc, rslcRef *S1SLC, opt CoregOpt) (ret IFG, err error) {
 	handle := Handler("S1Coreg")

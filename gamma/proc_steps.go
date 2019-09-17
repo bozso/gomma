@@ -1,10 +1,14 @@
 package gamma
 
+//go:generate cpp -P -nostfinc -nostfinc++ -Wunused-macros
+#include "utils.h"
+
 import (
 	"fmt"
 	"sort"
     "log"
     "math"
+    "time"
 	fp "path/filepath"
 	//conv "strconv"
 	//str "strings"
@@ -28,6 +32,9 @@ type(
     checkerFun func(*S1Zip) bool
 )
 
+func After(image Date, date time.Time) bool {
+    return image.Stop().Before(date)
+}
 
 func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err error) {
     handle := Handler("proc_steps.parseS1")
@@ -95,7 +102,7 @@ func stepPreselect(self *config) error {
         }
         
         startCheck = func(s1zip *S1Zip) bool {
-            return s1zip.Dates.start.After(_dateStart)
+            return s1zip.Start().After(_dateStart)
         }
         check = true
     }
@@ -109,7 +116,7 @@ func stepPreselect(self *config) error {
         }
         
         stopCheck = func(s1zip *S1Zip) bool {
-            return s1zip.Dates.stop.Before(_dateStop)
+            return s1zip.Stop().Before(_dateStop)
         }
         check = true
     }
@@ -172,11 +179,11 @@ func stepPreselect(self *config) error {
 	if masterDate == "auto" {
 		sort.Sort(ByDate(zips))
 		master = zips[0]
-    	masterDate = date2string(master, short)
+    	masterDate = date2str(master, short)
         idx = 0
 	} else {
 		for ii, s1zip := range zips {
-			if date2string(s1zip, short) == masterDate {
+			if date2str(s1zip, short) == masterDate {
 				master = s1zip
                 idx = ii
 			}
@@ -190,7 +197,7 @@ func stepPreselect(self *config) error {
     }
     
     
-    toSave := S1Zips{}
+    var toSave []string
     
     for _, s1zip := range zips {
         iw, err := s1zip.Info(extInfo)
@@ -216,7 +223,7 @@ func stepPreselect(self *config) error {
         
         if !(math.RoundToEven(diff) > 0.0) {
             fmt.Printf("Selected %v\n", s1zip)
-            toSave = append(toSave, s1zip)
+            toSave = append(toSave, s1zip.Path)
         }
         
     }
@@ -228,6 +235,9 @@ func stepPreselect(self *config) error {
 	fmt.Println(idx)
 
 	return nil
+}
+
+func stepImport(conf *config) error {
 }
 
 func stepCoreg(conf *config) error {

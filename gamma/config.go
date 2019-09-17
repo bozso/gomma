@@ -74,7 +74,7 @@ type (
     
     S1ProcData struct {
         MasterDate string
-        Zipfiles   S1Zips
+        Zipfiles   []string
     }
     
 	stepFun func(*config) error

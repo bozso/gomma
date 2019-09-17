@@ -49,28 +49,30 @@ func ParseDate(format dateFormat, str string) (time.Time, error) {
 	return ret, nil
 }
 
-func NewDate(format dateFormat, start, stop string) (date, error) {
-	self := date{}
+func NewDate(format dateFormat, start, stop string) (ret date, err error) {
 	handle := Handler("NewDate")
-
-	_start, err := ParseDate(format, start)
+    var _start, _stop time.Time
+    
+	_start, err = ParseDate(format, start)
 	if err != nil {
-		return self, handle(err, "Could not parse date: '%s'", start)
+		err = handle(err, "Could not parse date: '%s'", start)
+        return
 	}
 
-	_stop, err := ParseDate(format, stop)
+	_stop, err = ParseDate(format, stop)
 	if err != nil {
-		return self, handle(err, "Could not parse date: '%s'", start)
+		err = handle(err, "Could not parse date: '%s'", start)
+        return
 	}
 
 	// TODO: Optional check duration, is it max or min
 	delta := _start.Sub(_stop) / 2.0
-	self.center = _stop.Add(delta)
+	ret.center = _stop.Add(delta)
 
-	self.start = _start
-	self.stop = _stop
+	ret.start = _start
+	ret.stop = _stop
 
-	return self, nil
+	return ret, nil
 }
 
 func (self *date) Start() time.Time {
@@ -86,7 +88,7 @@ func (self *date) Stop() time.Time {
 }
 
 func Before(one, two Date) bool {
-	return one.Start().Before(two.Start())
+    return one.Center().Before(two.Center())
 }
 
 func date2str(date Date, format dateFormat) string {

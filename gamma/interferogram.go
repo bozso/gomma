@@ -1,8 +1,12 @@
 package gamma
 
 import (
+    "os"
     "time"
+    "log"
     bio "bufio"
+    str "strings"
+    conv "strconv"
 )
 
 type (
@@ -12,7 +16,7 @@ type (
     IFG struct {
         dataFile
         diffPar Params
-        qual, coherence, simUnwrap string
+        quality, coherence, simUnwrap string
         deltaT time.Duration
         slc1, slc2 SLC
     }
@@ -20,7 +24,7 @@ type (
     Coherence struct {
         dataFile
     }
-    
+        
     ifgOpt struct {
         Looks RngAzi
         interact bool
@@ -56,6 +60,11 @@ var (
     }
 )
 
+func NewCoherence(dat, par string) (ret Coherence, err error) {
+    ret.dataFile, err = NewDataFile(dat, par)
+    return
+}
+
 func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
     handle := Handler("NewIFG")
     
@@ -82,7 +91,7 @@ func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
         simUnw = base + ".sim_unw"
     }
     
-    self.qual, self.simUnwrap = quality, simUnw
+    self.quality, self.simUnwrap = quality, simUnw
     
     self.diffPar, err = NewGammaParam(diffPar)
     
@@ -156,7 +165,7 @@ def img_fmt(self):
 
 func (self *IFG) CheckQuality() (ret bool, err error) {
     handle := Handler("IFG:CheckQuality")
-    qual = self.qual
+    qual := self.quality
     
     file, err := os.Create(qual)
     
@@ -167,16 +176,18 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
     
     defer file.Close()
     
-    scaner := bio.NewScanner(file)
+    scanner := bio.NewScanner(file)
     
     offs := 0.0
     
-    for scaner.Scan() {
+    var diff float64
+    
+    for scanner.Scan() {
         line := scanner.Text()
         if str.HasPrefix(line, "azimuth_pixel_offset") {
             split := str.Split(line, " ")[1]
             
-            diff, err = str.ParseFloat(split, 64)
+            diff, err = conv.ParseFloat(split, 64)
             
             if err != nil {
                 err = handle(err, "Could no parse: '%s' into float64!", split)
@@ -198,17 +209,28 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
     return ret, nil
 }
 
-func (self *IFG) AdaptFilt() (ret IFG, cc Coherence, err error) {
+func (self *IFG) AdaptFilt(opt *AdaptFiltOpt ) (ret IFG, cc Coherence, err error) {
     handle := Handler("IFG.AdaptFilt")
-    step := opt.FFTWin / 8.0
+    step := float64(opt.FFTWindow) / 8.0
     
     if opt.step > 0.0 {
         step = opt.step
     }
     
     // TODO: figure out the name of the output files
-    filt = NewIFG(self.dat + ".filt")
-    cc = NewDataFile()
+    ret, err = NewIFG(self.dat + ".filt", "", "", "", "")
+    
+    if err != nil {
+        err = handle(err, "Could not create new interferogram struct!")
+        return
+    }
+    
+    cc, err = NewCoherence("", "")
+    
+    if err != nil {
+        err = handle(err, "Could not create new dataFile struct!")
+        return
+    }
     
     /*
     if Empty(filt):
@@ -225,7 +247,7 @@ func (self *IFG) AdaptFilt() (ret IFG, cc Coherence, err error) {
         return
     }
     
-    _, err = adf(self.dat, filt, cc, rng, opt.alpha, opt.FFTWindow,
+    _, err = adf(self.dat, ret.dat, cc.dat, rng, opt.alpha, opt.FFTWindow,
                  opt.cohWindow, step, opt.offset.Azi, opt.offset.Rng,
                  opt.frac)
     
@@ -233,15 +255,24 @@ func (self *IFG) AdaptFilt() (ret IFG, cc Coherence, err error) {
         err = handle(err, "Adaptive filtering failed!")
         return
     }
+    
+    return ret, cc, nil
 }
 
 func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
+    handle := Handler("IFG.Coherence")
     weightFlag := CoherenceWeight[opt.WeightType]
+    var width int
     
     //log.info("CALCULATING COHERENCE AND CREATING QUICKLOOK IMAGES.")
     //log.info('Weight type is "%s"'.format(weight_type))
     
-    width = self.Rng()
+    width, err = self.Rng()
+    
+    if err != nil {
+        err = handle(err, "Could not retreive range samples!")
+        return
+    }
     
     log.Printf("Estimating phase slope. ")
     
@@ -253,8 +284,12 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
                         opt.SlopeCorrelationThresh)
 
     log.Printf("Calculating coherence. ")
+    
+    mli1, mli2 := "", ""
+    
     _, err = CCAdaptive(self.dat, mli1, mli2, slope, nil, ret.dat, width,
-                        opt.Box.min, opt.Box.max, weightFlag)
+                        opt.Box.Min, opt.Box.Max, weightFlag)
+    return ret, nil
 }
 
 /*

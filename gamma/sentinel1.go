@@ -1,7 +1,11 @@
 package gamma
 
 import (
+    "log"
+    "fmt"
+    "math"
     fp "path/filepath"
+    str "strings"
 )
 
 const(
@@ -84,6 +88,83 @@ func init() {
 			log.Fatalf("No Fun.")
 		}
 	}
+}
+
+func NewS1Zip(zipPath, root string) (self *S1Zip, err error) {
+    const rexTemplate = "%s-iw%%d-slc-%%s-.*"
+    handle := Handler("NewS1Zip")
+
+    zipBase := fp.Base(zipPath)
+    self = &S1Zip{Path: zipPath, zipBase: zipBase}
+
+    self.mission = str.ToLower(zipBase[:3])
+    self.dateStr = zipBase[17:48]
+
+    start, stop := zipBase[17:32], zipBase[33:48]
+
+    if self.date, err = NewDate(long, start, stop); err != nil {
+        err = handle(err, "Could not create new date from strings: '%s' '%s'",
+            start, stop)
+        return
+    }
+    
+    self.mode = zipBase[4:6]
+    safe := str.ReplaceAll(zipBase, ".zip", ".SAFE")
+    tpl := fmt.Sprintf(rexTemplate, self.mission)
+    
+    self.Templates = [6]string{
+        tiff: fp.Join(safe, "measurement", tpl + ".tiff"),
+        annot: fp.Join(safe, "annotation", tpl + ".xml"),
+        calib: fp.Join(safe, calibPath, fmt.Sprintf("calibration-%s.xml", tpl)),
+        noise: fp.Join(safe, calibPath, fmt.Sprintf("noise-%s.xml", tpl)),
+        preview: fp.Join(safe, "preview", "product-preview.html"),
+        quicklook: fp.Join(safe, "preview", "quick-look.png"),
+    }
+
+    self.Safe = safe
+    self.Root = fp.Join(root, self.Safe)
+    self.productType = zipBase[7:10]
+    self.resolution = string(zipBase[10])
+    self.level = string(zipBase[12])
+    self.productClass = string(zipBase[13])
+    self.pol = zipBase[14:16]
+    self.absoluteOrbit = zipBase[49:55]
+    self.DTID = str.ToLower(zipBase[56:62])
+    self.UID = zipBase[63:67]
+
+    return self, nil
+}
+
+func (self *S1Zip) Info(exto *ExtractOpt) (ret IWInfos, err error) {
+    handle := Handler("S1Zip.Info")
+    ext, err := self.newExtractor(exto)
+    var _annot string
+    
+    if err != nil {
+        err = handle(err, "Failed to create new S1Extractor!")
+        return 
+    }
+    
+    defer ext.Close()
+    
+    for ii := 1; ii < 4; ii++ {
+        _annot, err = ext.extract(annot, ii)
+        
+        if err != nil {
+            err = handle(err, "Failed to extract annotation file from '%s'!",
+                self.Path)
+            return
+        }
+        
+        if ret[ii - 1], err = iwInfo(_annot); err != nil {
+            err = handle(err,
+                "Parsing of IW information of annotation file '%s' failed!",
+                _annot)
+            return
+        }
+        
+    }
+    return ret, nil
 }
 
 func NewIW(dat, par, TOPS_par string) (self S1IW, err error) {
@@ -306,4 +387,11 @@ func (self *S1Zip) Quicklook(exto *ExtractOpt) (ret string, err error) {
     }
     
     return ret, nil
+}
+
+func (self ByDate) Len() int      { return len(self) }
+func (self ByDate) Swap(i, j int) { self[i], self[j] = self[j], self[i] }
+
+func (self ByDate) Less(i, j int) bool {
+    return Before(self[i], self[j])
 }
