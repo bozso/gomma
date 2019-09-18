@@ -480,7 +480,7 @@ func (self *S1Zip) tabName(mode, pol string) string {
     return fp.Join(self.Root, mode, fmt.Sprintf("%s.tab", pol))
 }
 
-func (self *S1Zip) ImportSLC(exto *ExtractOpt) (ret S1SLC, err error) {
+func (self *S1Zip) ImportSLC(exto *ExtractOpt) (err error) {
     handle := Handler("S1Zip.ImportSLC")
     var _annot, _calib, _tiff, _noise string
     ext, err := self.newExtractor(exto)
@@ -493,8 +493,6 @@ func (self *S1Zip) ImportSLC(exto *ExtractOpt) (ret S1SLC, err error) {
     defer ext.Close()
     
     path, pol := self.Path, exto.pol
-    
-    slcPath := fp.Join(self.Root, "slc")
     tab := self.tabName("slc", pol)
     
     file, err := os.Create(tab)
@@ -539,13 +537,6 @@ func (self *S1Zip) ImportSLC(exto *ExtractOpt) (ret S1SLC, err error) {
             return
         }
         
-        err = os.MkdirAll(slcPath, os.ModePerm)
-        
-        if err != nil {
-            err = handle(err, "Failed to create directory: %s!", slcPath)
-            return
-        }
-        
         dat, par, TOPS_par := self.SLCNames("slc", pol, ii)
         
         _, err = Gamma["par_S1_SLC"](_tiff, _annot, _calib, _noise, par, dat,
@@ -555,11 +546,13 @@ func (self *S1Zip) ImportSLC(exto *ExtractOpt) (ret S1SLC, err error) {
             return
         }
         
+        /*
         ret.IWs[ii - 1], err = NewIW(dat, par, TOPS_par)
         if err != nil {
             err = handle(err, "Could not create new S1SLC!")
             return
         }
+        */
         
         line := fmt.Sprintf("%s %s %s\n", dat, par, TOPS_par)
         
@@ -572,9 +565,9 @@ func (self *S1Zip) ImportSLC(exto *ExtractOpt) (ret S1SLC, err error) {
         }
     }
     
-    ret.tab = tab
+    // ret.tab = tab
     
-    return ret, nil
+    return nil
 }
 
 func (self *S1Zip) Quicklook(exto *ExtractOpt) (ret string, err error) {

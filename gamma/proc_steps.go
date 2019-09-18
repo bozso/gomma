@@ -3,9 +3,8 @@ package gamma
 
 import (
 	"fmt"
-	"sort"
     "log"
-    "math"
+    //"math"
     //"time"
 	fp "path/filepath"
 	//conv "strconv"
@@ -58,8 +57,7 @@ func (self *config) extOpt(satellite string) *ExtractOpt {
         root: fp.Join(self.General.CachePath, satellite)}
 }
 
-
-func stepPreselect(self *config) error {
+func stepSelect(self *config) error {
 	handle := Handler("stepPreselect")
 
 	dataPath := self.General.DataPath
@@ -68,8 +66,6 @@ func stepPreselect(self *config) error {
 	if len(dataPath) == 0 {
 		return fmt.Errorf("DataPath needs to be specified!")
 	}
-
-	masterDate := Select.MasterDate
 
 	ll, ur := Select.LowerLeft, Select.UpperRight
 
@@ -143,8 +139,6 @@ func stepPreselect(self *config) error {
     
 	// nzip := len(zipfiles)
 
-	zips := S1Zips{}
-    
     if check {
         for _, zip := range zipfiles {
             s1zip, IWs, err := parseS1(zip, root, extInfo)
@@ -154,7 +148,7 @@ func stepPreselect(self *config) error {
             }
             
             if IWs.contains(aoi) && checker(s1zip) {
-                zips = append(zips, s1zip)
+                fmt.Printf("%s\n", s1zip.Path)
             }
         }
 	} else {
@@ -166,39 +160,12 @@ func stepPreselect(self *config) error {
             }
             
             if IWs.contains(aoi) {
-                zips = append(zips, s1zip)
+                fmt.Printf("%s\n", s1zip.Path)
             }
         }
     }
     
-	var (
-        master *S1Zip
-        idx int
-    )
-    
-	if masterDate == "auto" {
-		sort.Sort(ByDate(zips))
-		master = zips[0]
-    	masterDate = date2str(master, short)
-        idx = 0
-	} else {
-		for ii, s1zip := range zips {
-			if date2str(s1zip, short) == masterDate {
-				master = s1zip
-                idx = ii
-			}
-		}
-	}
-    
-    masterIW, err := master.Info(extInfo)
-    if err != nil {
-        return handle(err, "Failed to parse S1Zip data from master '%s'",
-            master.Path)
-    }
-    
-    
-    var toSave []string
-    
+    /*
     for _, s1zip := range zips {
         iw, err := s1zip.Info(extInfo)
         if err != nil {
@@ -222,7 +189,7 @@ func stepPreselect(self *config) error {
         }
         
         if !(math.RoundToEven(diff) > 0.0) {
-            _, err = s1zip.ImportSLC(extInfo)
+            err = s1zip.ImportSLC(extInfo)
             
             if err != nil {
                 return handle(err, "Failed to import S1SLC files!")
@@ -232,15 +199,7 @@ func stepPreselect(self *config) error {
         }
         
     }
-    
-    path := self.General.Metafile
-    conf := Meta{MasterDate: masterDate, Zipfiles: toSave, MasterIdx:idx}
-    
-    err = SaveJson(path, conf)
-    
-    if err != nil {
-        return handle(err, "Failed to write metadata to: '%s'!", path)
-    }
+    */
     
 	return nil
 }
@@ -250,10 +209,8 @@ func stepCoreg(self *config) error {
 	handle := Handler("stepCoreg")
     path := self.General.Metafile
 	
-    extInfo := self.extOpt("sentinel1")
-    root, meta := extInfo.root, Meta{}
+    root, meta := fp.Join(self.General.CachePath, "sentinel1"), Meta{}
     midx := meta.MasterIdx
-    
     
     err := LoadJson(path, &meta)
     
@@ -261,7 +218,7 @@ func stepCoreg(self *config) error {
         return handle(err, "Failed to read metadata from: '%s'!", path)
     }
     
-    s1zips:= S1Zips{}
+    s1zips, coregistered := S1Zips{}, []*S1SLC{}
     
     for _, zip := range meta.Zipfiles {
         s1, err := NewS1Zip(zip, root)
@@ -276,18 +233,31 @@ func stepCoreg(self *config) error {
     
     master := s1zips[midx]
     
-    mslc, err := master.ImportSLC(extInfo)
-    
     if err != nil {
         return handle(err, "Failed to import master SLC data!")
     }
     
-    for ii, s1 := range s1zips {
+    nzip := len(s1zips)
+    
+    for ii, S1 := range s1zips {
         if ii == midx {
             continue
         }
         
+        date1 := S1.Center()
+        date2 := s1zips[0].Center()
         
+        idx, diff1 := 0, math.Abs(float64(date1.Sub(date2)))
+        
+        for jj := 1; jj < nzip; jj++ {
+            diff2 := math.Abs(float64(date1.Sub(s1zips[jj].Center())))
+            
+            if diff2 < diff1 {
+                idx = jj
+            }
+        }
+        
+        // S1Coreg(mslc, )
     }
     
 	return nil

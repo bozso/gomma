@@ -22,7 +22,7 @@ func main() {
         start, stop, err := proc.Parse()
     
 		if err != nil {
-			log.Printf("Error parsing processing steps!\nError: %w", err)
+			log.Printf("Error parsing processing steps!\nError: %s", err)
 			return
 		}
         
@@ -30,7 +30,7 @@ func main() {
         
 		if err != nil {
 			log.Printf(
-				"Error occurred while running processing steps!\nError: %w",
+				"Error occurred while running processing steps!\nError: %s",
 				err)
 			return
 		}
@@ -38,14 +38,14 @@ func main() {
 	case "init":
 		init, err := gm.InitParse(os.Args[2:])
         if err != nil {
-            log.Printf("Failed to parse command line arguments!\nError: %w",
+            log.Printf("Failed to parse command line arguments!\nError: %s",
                 err)
             return
         }
 
 		err = gm.MakeDefaultConfig(init)
 		if err != nil {
-			log.Printf("Could not create config file: '%s'!\nError: %w",
+			log.Printf("Could not create config file: '%s'!\nError: %s",
 				init, err)
 			return
 		}
@@ -53,7 +53,7 @@ func main() {
 	case "list":
 		list, err := gm.NewLister(os.Args[2:])
         if err != nil {
-            log.Printf("Failed to parse command line arguments!\nError: %w",
+            log.Printf("Failed to parse command line arguments!\nError: %s",
                 err)
             return
         }

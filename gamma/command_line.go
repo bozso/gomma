@@ -19,9 +19,8 @@ type(
     }
     
     Lister struct {
-        conf, Mode string
+        conf, Mode, infile string
         config
-        Meta
     }
     
     Meta struct {
@@ -168,57 +167,68 @@ func InitParse(args []string) (ret string, err error) {
 
 
 func NewLister(args []string) (ret Lister, err error) {
-    handle := Handler("NewLister")
     flag := fl.NewFlagSet("init", fl.ContinueOnError)
+    
+    mode := args[0]
+    
+    if mode != "quicklook" {
+        err = Handle(nil, "Unrecognized lister mode '%s'", mode)
+        return
+    }
+    
+    ret.Mode = mode
     
 	flag.StringVar(&ret.conf, "config", "gamma.json",
 		"Processing configuration file")
-    flag.StringVar(&ret.Mode, "mode", "", "Which type of files to list.")
+    flag.StringVar(&ret.infile, "file", "", "Inputfile.")
     
-    err = flag.Parse(args)
+    err = flag.Parse(args[1:])
     
     if err != nil {
+        return
+    }
+    
+    if len(ret.infile) == 0 {
+        err = Handle(nil, "Inputfile must by specified!")
         return
     }
     
     path := ret.conf
-    
     err = LoadJson(path, &ret.config)
     
-    
     if err != nil {
-        err = handle(err, "Failed to parse json file: '%s'!", path)
+        err = Handle(err, "Failed to parse json file: '%s'!", path)
         return
     }
     
-    path = ret.General.Metafile
-    
-    err = LoadJson(path, &ret.Meta)
-    
-    if err != nil {
-        err = handle(err, "Failed to parse json file: '%s'!",
-            path)
-        return
-    }
-    
-	return ret, nil
+ 	return ret, nil
 }
 
 
 func (self *Lister) Quicklook() error {
-    handle := Handler("Lister.Quicklook")
-    
     cache := fp.Join(self.General.CachePath, "sentinel1")
     
     info := &ExtractOpt{root:cache, pol:self.General.Pol}
     
-    zips := self.Meta.Zipfiles
+    path := self.infile
+    file, err := NewReader(path)
     
-    for _, zip := range zips {
-        s1, err := NewS1Zip(zip, cache)
+    if err != nil {
+        return Handle(err, "Could not create FileReader for file '%s'!", path)
+    }
+    
+    defer file.Close()
+    
+    for file.Scan() {
+        line := file.Text()
+        
+        fmt.Println(line)
+        
+        s1, err := NewS1Zip(line, cache)
+        
         
         if err != nil {
-            return handle(err, 
+            return Handle(err, 
                 "Failed to parse Sentinel-1 information from zipfile '%s'!",
                 s1.Path)
         }
@@ -226,7 +236,7 @@ func (self *Lister) Quicklook() error {
         image, err := s1.Quicklook(info)
         
         if err != nil {
-            return handle(err, "Failed to retreive quicklook file in zip '%s'!",
+            return Handle(err, "Failed to retreive quicklook file in zip '%s'!",
                 s1.Path)
         }
         

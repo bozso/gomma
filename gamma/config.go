@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+    "log"
 	ref "reflect"
 	//conv "strconv"
 	str "strings"
@@ -29,9 +30,9 @@ type (
 	}
 
 	preselect struct {
-		DateStart, DateStop, MasterDate string
-        LowerLeft, UpperRight           LatLon
-		CheckZips                       bool
+		DateStart, DateStop   string
+        LowerLeft, UpperRight LatLon
+		CheckZips             bool
 	}
 
 	geocoding struct {
@@ -75,7 +76,7 @@ const (
 
 var (
 	steps = map[string]stepFun{
-		"select": stepPreselect,
+		"select": stepSelect,
         //"coreg":  stepCoreg,
 	}
 
@@ -85,6 +86,7 @@ var (
 		General: general{
 			Pol: "vv",
             Metafile: "meta.json",
+            OutputDir: ".",
 			Looks: RngAzi{
                 Rng: 1,
                 Azi: 1,
@@ -92,7 +94,6 @@ var (
 		},
 
 		PreSelect: preselect{
-			MasterDate: "auto",
 			CheckZips:  false,
 		},
 
@@ -141,20 +142,11 @@ func init() {
 	}
 }
 
-func center(s string, n int, fill string) string {
-	div := n / 2
-    rep := str.Repeat(fill, div)
-	return rep + s + rep
-}
-
-const width = 40
-
 func delim(msg, sym string) {
 	msg = fmt.Sprintf("%s %s %s", sym, msg, sym)
-	syms := center(str.Repeat(sym, len(msg)), width, " ")
-	msg = center(msg, width, " ")
+	syms := str.Repeat(sym, len(msg))
 
-	fmt.Printf("%s\n%s\n%s\n", syms, msg, syms)
+	log.Printf("\n%s\n%s\n%s\n", syms, msg, syms)
 }
 
 

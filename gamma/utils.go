@@ -16,7 +16,12 @@ type (
 	CmdFun     func(args ...interface{}) (string, error)
 	handlerFun func(err error, format string, args ...interface{}) error
 	Joiner     func(args ...string) string
-
+    
+    FileReader struct {
+        *bio.Scanner
+        *os.File
+    }
+    
 	Params struct {
 		par, sep string
         contents []string
@@ -47,6 +52,16 @@ func Fatal(err error, format string, args ...interface{}) {
 
 func Empty(str string) bool {
     return len(str) == 0
+}
+
+func Handle(err error, format string, args ...interface{}) error {
+    str := fmt.Sprintf(format, args...)
+    
+    if err == nil {
+        return fmt.Errorf("%s\n", str)
+    } else {
+        return fmt.Errorf("%s\n%w", str, err)
+    }
 }
 
 func Handler(name string) handlerFun {
@@ -84,6 +99,19 @@ func MakeCmd(cmd string) CmdFun {
 
 		return result, nil
 	}
+}
+
+func NewReader(path string) (ret FileReader, err error) {
+    ret.File, err = os.Open(path)
+    
+    if err != nil {
+        err = Handle(err, "Could not open file '%s'!", path)
+        return
+    }
+    
+    ret.Scanner = bio.NewScanner(ret.File)
+    
+    return ret, nil
 }
 
 func NewPath(args ...string) path {

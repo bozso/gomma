@@ -5,7 +5,6 @@ import (
     "math"
 	//"fmt"
 	//"os"
-	set "github.com/deckarep/golang-set"
 	fp "path/filepath"
     pt "path"
     str "strings"
@@ -53,8 +52,7 @@ var (
 		"20181130": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
 	}
 
-	pols = []interface{}{"vv", "hh", "hv", "vh"}
-	Pols = set.NewSetFromSlice(pols)
+	Pols = [4]string{"vv", "hh", "hv", "vh"}
 
 	DataTypes = map[string]int{
 		"FCOMPLEX":  0,
