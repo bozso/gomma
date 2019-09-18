@@ -39,6 +39,9 @@ func NewProcess(args []string) (ret Process, err error) {
     
 	flag.StringVar(&ret.Conf, "config", "gamma.json",
 		"Processing configuration file")
+	
+    flag.StringVar(&ret.infile, "file", "",
+		"Infile. List of files to process.")
 
 	flag.StringVar(&ret.Step, "step", "",
 		"Single processing step to be executed.")
@@ -65,7 +68,7 @@ func NewProcess(args []string) (ret Process, err error) {
     if err != nil {
         return
     }
-    
+        
 	return ret, nil
 }
 
@@ -221,8 +224,6 @@ func (self *Lister) Quicklook() error {
     
     for file.Scan() {
         line := file.Text()
-        
-        fmt.Println(line)
         
         s1, err := NewS1Zip(line, cache)
         

@@ -59,7 +59,8 @@ type (
 	}
 
 	config struct {
-		General   general
+		infile    string
+        General   general
 		PreSelect preselect
 		Geocoding geocoding
 		Coreg     coreg
@@ -77,6 +78,7 @@ const (
 var (
 	steps = map[string]stepFun{
 		"select": stepSelect,
+        "import": stepImport,
         //"coreg":  stepCoreg,
 	}
 

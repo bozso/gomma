@@ -4,7 +4,8 @@ package gamma
 import (
 	"fmt"
     "log"
-    //"math"
+    "sort"
+    "math"
     //"time"
 	fp "path/filepath"
 	//conv "strconv"
@@ -165,11 +166,77 @@ func stepSelect(self *config) error {
         }
     }
     
-    /*
+	return nil
+}
+
+
+func stepImport(self *config) error {
+    if len(self.infile) == 0 {
+        return Handle(nil, "Inputfile must by specified!")
+    }
+    
+    meta := Meta{}
+    path := self.General.Metafile
+    err := LoadJson(path, &meta)
+    
+    if err != nil {
+        return Handle(err, "Could not parse meta json file '%s'!", path)
+    }
+    
+	extInfo := self.extOpt("sentinel1")
+    root := extInfo.root
+    
+    path = self.infile
+    file, err := NewReader(path)
+    
+    if err != nil {
+        return Handle(err, "Could not open file '%s' for reading!", path)
+    }
+    
+    defer file.Close()
+    
+    zips := S1Zips{}
+    
+    for file.Scan() {
+        line := file.Text()
+        s1zip, err := NewS1Zip(line, root)
+        
+        if err != nil {
+            return Handle(err, "Failed to parse zipfile '%s'!", line)
+        }
+        zips = append(zips, s1zip)
+    }
+    
+    
+    var (
+        master *S1Zip
+        idx int
+    )
+    
+    sort.Sort(ByDate(zips))
+    
+    masterDate := meta.MasterDate
+    
+    for ii, s1zip := range zips {
+        if date2str(s1zip, short) == masterDate {
+            master = s1zip
+            idx = ii
+        }
+    }
+    
+    meta.MasterIdx = idx
+    
+    masterIW, err := master.Info(extInfo)
+    if err != nil {
+        return Handle(err, "Failed to parse S1Zip data from master '%s'",
+            master.Path)
+    }
+    
     for _, s1zip := range zips {
         iw, err := s1zip.Info(extInfo)
+        
         if err != nil {
-            return handle(err, "Failed to parse S1Zip data from '%s'",
+            return Handle(err, "Failed to parse S1Zip data from '%s'",
                 s1zip.Path)
         }
         
@@ -181,9 +248,8 @@ func stepSelect(self *config) error {
         
         diff, err := IWAbsDiff(masterIW, iw)
         
-        
         if err != nil {
-            return handle(err,
+            return Handle(err,
             "Failed to calculate burst number differences between " +
             "master and '%s'", s1zip.Path)
         }
@@ -192,16 +258,22 @@ func stepSelect(self *config) error {
             err = s1zip.ImportSLC(extInfo)
             
             if err != nil {
-                return handle(err, "Failed to import S1SLC files!")
+                return Handle(err, "Failed to import S1SLC files!")
             }
             
-            toSave = append(toSave, s1zip.Path)
+            fmt.Printf("%s\n", s1zip.Path)
         }
         
     }
-    */
     
-	return nil
+    path = self.General.Metafile
+    err = SaveJson(path, meta)
+    
+    if err != nil {
+        return Handle(err, "Failed to write metadata to '%s'!", path)
+    }
+    
+    return nil
 }
 
 /*
