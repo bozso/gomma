@@ -222,7 +222,12 @@ func stepPreselect(self *config) error {
         }
         
         if !(math.RoundToEven(diff) > 0.0) {
-            s1zip.ImportSLC(extInfo)
+            _, err = s1zip.ImportSLC(extInfo)
+            
+            if err != nil {
+                return handle(err, "Failed to import S1SLC files!")
+            }
+            
             toSave = append(toSave, s1zip.Path)
         }
         
@@ -240,6 +245,7 @@ func stepPreselect(self *config) error {
 	return nil
 }
 
+/*
 func stepCoreg(self *config) error {
 	handle := Handler("stepCoreg")
     path := self.General.Metafile
@@ -255,7 +261,7 @@ func stepCoreg(self *config) error {
         return handle(err, "Failed to read metadata from: '%s'!", path)
     }
     
-    s1zips, coregistered := S1Zips{}, []S1SLC{}
+    s1zips:= S1Zips{}
     
     for _, zip := range meta.Zipfiles {
         s1, err := NewS1Zip(zip, root)
@@ -267,7 +273,6 @@ func stepCoreg(self *config) error {
         
         s1zips = append(s1zips, s1)
     }
-    
     
     master := s1zips[midx]
     
@@ -287,6 +292,7 @@ func stepCoreg(self *config) error {
     
 	return nil
 }
+*/
 
 /*
 [check_ionosphere]

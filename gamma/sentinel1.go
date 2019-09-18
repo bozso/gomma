@@ -90,6 +90,7 @@ var (
         preview:    false,
         quicklook:  false,
     }
+    slcPaths = [2]string{"slc", "rslc"}
 )
 
 func init() {
@@ -104,6 +105,7 @@ func init() {
 
 func NewS1Zip(zipPath, root string) (self *S1Zip, err error) {
     const rexTemplate = "%s-iw%%d-slc-%%s-.*"
+    
     handle := Handler("NewS1Zip")
 
     zipBase := fp.Base(zipPath)
@@ -132,9 +134,20 @@ func NewS1Zip(zipPath, root string) (self *S1Zip, err error) {
         preview: fp.Join(safe, "preview", "product-preview.html"),
         quicklook: fp.Join(safe, "preview", "quick-look.png"),
     }
-
+    
     self.Safe = safe
     self.Root = fp.Join(root, self.Safe)
+    
+    for _, slcPath := range slcPaths {
+        path := fp.Join(self.Root, slcPath)
+        err = os.MkdirAll(path, os.ModePerm)
+        
+        if err != nil {
+            err = handle(err, "Failed to create directory '%s'!", path)
+            return
+        }
+    }
+
     self.productType = zipBase[7:10]
     self.resolution = string(zipBase[10])
     self.level = string(zipBase[12])
@@ -285,7 +298,7 @@ func iwInfo(path string) (ret IWInfo, err error) {
 	}
     
     // TODO: generic reader Params
-	//info := FromString(_info, ":")
+	info := FromString(_info, ":")
 	TOPS := NewGammaParam(TOPS_par)
 
 	nburst, err := TOPS.Int("number_of_bursts")
@@ -329,10 +342,8 @@ func iwInfo(path string) (ret IWInfo, err error) {
 func (self *Point) inIWs(IWs IWInfos) bool {
 	for _, iw := range IWs {
 		if self.InRect(&iw.extent) {
-			//log.Printf("%v in %v", *self, iw.extent)
             return true
 		}
-        //log.Printf("%v not in %v", *self, iw.extent)
 	}
 	return false
 }
@@ -459,7 +470,7 @@ func (self *S1Zip) SLCNames(mode, pol string, ii int) (dat, par, TOPS string) {
     
     dat  = fp.Join(slcPath, fmt.Sprintf("iw%d_%s.slc", ii, pol))
     par  = dat + ".par"
-    TOPS = dat + "TOPS_par"
+    TOPS = dat + ".TOPS_par"
     
     return
 }
@@ -470,7 +481,7 @@ func (self *S1Zip) tabName(mode, pol string) string {
 }
 
 func (self *S1Zip) ImportSLC(exto *ExtractOpt) (ret S1SLC, err error) {
-    handle := Handler("S1Zip.SLC")
+    handle := Handler("S1Zip.ImportSLC")
     var _annot, _calib, _tiff, _noise string
     ext, err := self.newExtractor(exto)
     
@@ -485,6 +496,7 @@ func (self *S1Zip) ImportSLC(exto *ExtractOpt) (ret S1SLC, err error) {
     
     slcPath := fp.Join(self.Root, "slc")
     tab := self.tabName("slc", pol)
+    
     file, err := os.Create(tab)
     
     if err != nil {

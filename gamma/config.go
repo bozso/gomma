@@ -76,7 +76,7 @@ const (
 var (
 	steps = map[string]stepFun{
 		"select": stepPreselect,
-        "coreg":  stepCoreg,
+        //"coreg":  stepCoreg,
 	}
 
 	stepList []string

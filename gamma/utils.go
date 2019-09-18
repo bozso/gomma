@@ -19,6 +19,7 @@ type (
 
 	Params struct {
 		par, sep string
+        contents []string
 	}
 
 	Tmp struct {
@@ -148,25 +149,39 @@ func ReadFile(path string) (ret []byte, err error) {
 	return contents, nil
 }
 
+func FromString(params, sep string) Params {
+    return Params{par:"", sep:sep, contents: str.Split(params, "\n")}
+}
+
 func (self *Params) Par(name string) (ret string, err error) {
     handle := Handler("Params.Par")
-    file, err := os.Open(self.par)
     
-    if err != nil {
-        err = handle(err, "Could not open file: '%s'!", self.par)
-        return
+    if self.contents == nil {
+        var file *os.File
+        file, err = os.Open(self.par)
+        
+        if err != nil {
+            err = handle(err, "Could not open file: '%s'!", self.par)
+            return
+        }
+        
+        defer file.Close()
+        scanner := bio.NewScanner(file)
+        
+        for scanner.Scan() {
+            line := scanner.Text()
+            if str.Contains(line, name) {
+                return str.Trim(str.Split(line, self.sep)[1], " "), nil
+            }
+        }
+    } else {
+        for _, line := range self.contents {
+            if str.Contains(line, name) {
+                return str.Trim(str.Split(line, self.sep)[1], " "), nil
+            }
+        }
     }
     
-    defer file.Close()
-    
-    scanner := bio.NewScanner(file)
-    
-    for scanner.Scan() {
-        line := scanner.Text()
-		if str.Contains(line, name) {
-			return str.Trim(str.Split(line, self.sep)[1], " "), nil
-		}
-    }
     
 	err = fmt.Errorf("In Par: Could not find parameter '%s' in %v",
 		name, self.par)

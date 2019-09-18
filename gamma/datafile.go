@@ -24,7 +24,7 @@ type(
 )
 
 func NewGammaParam(path string) Params {
-    return Params{par:path, sep:":"}
+    return Params{par:path, sep:":", contents: nil}
 }
 
 func NewDataFile(dat, par string) (ret dataFile, err error) {
