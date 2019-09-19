@@ -11,6 +11,8 @@ from ctypes import sizeof, c_float, c_int, c_byte, c_short
 
 import gamma as gm
 
+a = gm.DataFile("asd")
+
 
 log = getLogger("gamma.ipta")
 

@@ -158,9 +158,9 @@ class Date(object):
     
     def date2str(self, fmt="%Y%m%d"):
         return self.center.strftime(fmt)
-    
 
-def date2str(obj, fmt="%Y%m%d"):
+
+def date2str(obj: str, fmt="%Y%m%d"):
     date = obj.date
     
     if isinstance(date, Date):
@@ -228,7 +228,7 @@ class Parfile(object):
 
 
 class DataFile(Parfile):
-    __slots__ = ("dat", "datpar", "tab", "files")
+    __slots__ = ("dat", "datpar", "tab", "files", "ras")
     
     __save__ = {"dat", "par", "tab"}
     
@@ -258,8 +258,6 @@ class DataFile(Parfile):
         
         self.dat, self.par, self.tab, = \
         datfile, parfile, kwargs.get("tabfile", None)
-        
-        return cls(dat=datfile, par=parfile, )
     
     
     def __bool__(self):
@@ -272,8 +270,8 @@ class DataFile(Parfile):
     
     @classmethod
     def from_json(cls, line):
-        return cls.new(datfile=line["dat"], parfile=line["par"],
-                       tabfile=line["tab"])
+        return cls(datfile=line["dat"], parfile=line["par"],
+                   tabfile=line["tab"])
     
     
     def save(self, datfile, parfile=None):
