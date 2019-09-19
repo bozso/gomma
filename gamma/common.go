@@ -28,18 +28,6 @@ type (
 	Rect struct {
 		Max, Min Point
 	}
-
-	disArgs struct {
-		flip, debug        bool
-		rng, azi           int
-		imgFormat, datfile string
-	}
-
-	rasArgs struct {
-		disArgs
-		ext     string
-		avgFact int
-	}
 )
 
 const (
@@ -105,10 +93,10 @@ func (self GammaFun) selectFun(name1, name2 string) CmdFun {
     ret, ok = self[name2]
     
     if !ok {
-        log.Fatalf("Either '%s' ot '%s' must be an available executable!",
+        log.Fatalf("Either '%s' or '%s' must be an available executable!",
             name1, name2)
-        return nil
     }
+    
     return ret
 }
 
@@ -116,8 +104,9 @@ func (self GammaFun) must(name string) (ret CmdFun) {
     ret, ok := self[name]
     
     if !ok {
-        log.Fatalf("Gamma executable '%s' does not exist!", name)
+        log.Fatalf("Could not find Gamma executable '%s'!", name)
     }
+    
     return
 }
 
@@ -134,49 +123,6 @@ func (self *Point) InRect(r *Rect) bool {
 
 func First() string {
 	return "First"
-}
-
-func ParseDisArgs(d dataFile, args disArgs) (ret *disArgs, err error) {
-	if len(args.datfile) == 0 {
-		args.datfile = d.dat
-	}
-
-	if args.rng == 0 {
-		if args.rng, err = d.Rng(); err != nil {
-			err = Handle(err, "Could not get range_samples!")
-            return
-		}
-	}
-
-	if args.azi == 0 {
-		if args.azi, err = d.Azi(); err != nil {
-			err = Handle(err, "Could not get azimuth_lines!")
-            return
-		}
-	}
-
-	// parts = pth.basename(datfile).split(".")
-	if len(args.imgFormat) == 0 {
-		if args.imgFormat, err = d.imgFormat(); err != nil {
-			err = Handle(err, "Could not get image_format!")
-            return
-		}
-	}
-
-	// args.flip = -1 if flip else 1
-
-	/*
-	   if cmd is None:
-	       try:
-	           ext = [ext for ext in parts if ext in extensions][0]
-	       except IndexError:
-	           raise ValueError("Unrecognized extension of file %s. Available "
-	                            "extensions: %s" % (datfile, pr.extensions))
-	       cmd = [cmd for cmd, exts in plot_cmd_files.items()
-	              if ext in exts][0]
-	*/
-
-	return &args, nil
 }
 
 func isclose(num1, num2 float64) bool {

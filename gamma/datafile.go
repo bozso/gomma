@@ -1,113 +1,250 @@
 package gamma
 
 import (
-    "os"
-    fp "path/filepath"
-    "fmt"
-    "time"
+	"fmt"
+	"os"
+
+	//"time"
+	fp "path/filepath"
 )
 
-type(
+type (
 	dataFile struct {
-		dat string
+		dat   string
+		files []string
 		Params
 		date
-        files []string
 	}
 
-    DataFile interface {
+	DataFile interface {
 		Datfile() string
-        Parfile() string
-		Rng() int
-		Azi() int
-		Int() int
-		Float() float64
+		Parfile() string
+		Rng() (int, error)
+		Azi() (int, error)
+		Int() (int, error)
+		Float() (float64, error)
+		PlotCmd() string
+		//Display(disArgs) error
+		//Raster(rasArgs) error
 	}
-    
-    
-    SLC struct {
-        dataFile
-        date
-    }
+
+	SLC struct {
+		dataFile
+	}
+
+	MLI struct {
+		dataFile
+	}
+
+	disArgs struct {
+		flip              bool
+		ImgFmt, Datfile   string
+		Start, Nlines, LR int
+		Scale, Exp        float64
+		RngAzi
+	}
+
+	rasArgs struct {
+		disArgs
+		ext                 string
+		avgFact, headerSize int
+		Avg                 RngAzi
+	}
 )
 
 func NewGammaParam(path string) Params {
-    return Params{par:path, sep:":", contents: nil}
+	return Params{par: path, sep: ":", contents: nil}
 }
 
 func NewDataFile(dat, par string) (ret dataFile, err error) {
-    handle := Handler("NewDatfile")
-    ret.dat = dat
-    
-    if len(dat) == 0 {
-        err = handle(err, "'dat' should not be an empty string: '%s'", dat)
-    }
-    
-    if len(par) == 0 {
-        par = dat + ".par"
-    }
-    
-    ret.Params = NewGammaParam(par)
-    
-    ret.files = []string{dat, par}
-    
-    return ret, nil
+	handle := Handler("NewDatfile")
+	ret.dat = dat
+
+	if len(dat) == 0 {
+		err = handle(err, "'dat' should not be an empty string: '%s'", dat)
+	}
+
+	if len(par) == 0 {
+		par = dat + ".par"
+	}
+
+	ret.Params = NewGammaParam(par)
+
+	ret.files = []string{dat, par}
+
+	return ret, nil
 }
 
-func (self *dataFile) Exist() (ret bool, err error) {
-    var exist bool
-    for _, file := range self.files {
-        exist, err = Exist(file)
-        
-        if err != nil {
-            err = fmt.Errorf("Stat on file '%s' failed!\nError: %w!",
-                file, err)
-            return
-        }
-        
-        if !exist {
-            return false, nil
-        }
-    }
-    return true, nil
+func NewSLC(dat, par string) (ret SLC, err error) {
+	ret.dataFile, err = NewDataFile(dat, par)
+	return
 }
 
-func (self *dataFile) Move(path string) error {
-    for _, file := range self.files {
-        if len(file) == 0 {
-            continue
-        }
-        
-        dst := fp.Join(path, file)
-        err := os.Rename(file, dst)
-        
-        if err != nil {
-            return Handle(err, "Failed to move file '%s' to '%s'!", file, dst)
-        }
-    }
-    return nil
+func (d *dataFile) Exist() (ret bool, err error) {
+	var exist bool
+	for _, file := range d.files {
+		exist, err = Exist(file)
+
+		if err != nil {
+			err = fmt.Errorf("Stat on file '%s' failed!\nError: %w!",
+				file, err)
+			return
+		}
+
+		if !exist {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
-func (self *dataFile) Datfile() string {
-    return self.dat
+func (d *dataFile) Move(path string) error {
+	for _, file := range d.files {
+		if len(file) == 0 {
+			continue
+		}
+
+		dst := fp.Join(path, file)
+		err := os.Rename(file, dst)
+
+		if err != nil {
+			return Handle(err, "Failed to move file '%s' to '%s'!", file, dst)
+		}
+	}
+	return nil
 }
 
-func (self *dataFile) Parfile() string {
-    return self.par
+func (d *dataFile) Datfile() string {
+	return d.dat
 }
 
-func (self *dataFile) Rng() (int, error) {
-	return self.Int("range_samples")
+func (d *dataFile) Parfile() string {
+	return d.par
 }
 
-func (self *dataFile) Azi() (int, error) {
-	return self.Int("azimuth_samples")
+func (d *dataFile) Rng() (int, error) {
+	return d.Int("range_samples")
 }
 
-func (self *dataFile) imgFormat() (string, error) {
-	return self.Par("image_format")
+func (d *dataFile) Azi() (int, error) {
+	return d.Int("azimuth_samples")
 }
 
-func (self *dataFile) Date() time.Time {
-	return self.center
+func (d *dataFile) imgFormat() (string, error) {
+	return d.Par("image_format")
+}
+
+func (d *SLC) PlotFun() string {
+	return "SLC"
+}
+
+func (arg *disArgs) Parse(dat DataFile) (err error) {
+	if len(arg.Datfile) == 0 {
+		arg.Datfile = dat.Datfile()
+	}
+
+	if arg.Rng == 0 {
+		if arg.Rng, err = dat.Rng(); err != nil {
+			return Handle(err, "Could not get range_samples!")
+		}
+	}
+
+	if arg.Azi == 0 {
+		if arg.Azi, err = dat.Azi(); err != nil {
+			return Handle(err, "Could not get azimuth_lines!")
+		}
+	}
+
+	// parts = pth.basename(datfile).split(".")
+	if len(arg.ImgFmt) == 0 {
+		if arg.ImgFmt, err = dat.imgFormat(); err != nil {
+			return Handle(err, "Could not get image_format!")
+		}
+	}
+
+	if arg.flip {
+		arg.LR = 1
+	} else {
+		arg.LR = 0
+	}
+
+	// args.flip = -1 if flip else 1
+
+	/*
+	   if cmd is None:
+	       try:
+	           ext = [ext for ext in parts if ext in extensions][0]
+	       except IndexError:
+	           raise ValueError("Unrecognized extension of file %s. Available "
+	                            "extensions: %s" % (datfile, pr.extensions))
+	       cmd = [cmd for cmd, exts in plot_cmd_files.items()
+	              if ext in exts][0]
+	*/
+
+	return nil
+}
+
+func (opt *rasArgs) Parse(dat DataFile) error {
+	err := opt.disArgs.Parse(dat)
+
+	if err != nil {
+		return Handle(err, "Failed to parse display arguments!")
+	}
+
+	return nil
+}
+
+func Display(dat DataFile, opt disArgs) error {
+	opt.Parse(self)
+
+	cmd := dat.PlotFun()
+	fun := Gamma.must("dis" + cmd)
+
+	if cmd == "SLC" {
+		fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines, opt.Scale, opt.Exp)
+	}
+}
+
+func Raster(dat DataFile, opt rasArgs, sec string) error {
+	opt.Parse(dat)
+
+	LR := 0
+
+	if opt.Flip {
+		LR = 1
+	}
+
+	cmd := dat.PlotCmd()
+	fun := Gamma.must("ras" + cmd)
+
+	raster := fmt.Sprintf("%s.%s", dat.Datfile(), Settings.RasExt)
+
+	if cmd == "SLC" {
+		_, err := fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+			opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
+			opt.ImgFmt, opt.headerSize, raster)
+
+		if err != nil {
+			return Handle(err, "Failed to create rasterfile '%s'!", raster)
+		}
+	} else {
+		if len(sec) == 0 {
+			_, err := fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+				opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
+				opt.LR, raster, opt.ImgFmt, opt.headerSize)
+
+			if err != nil {
+				return Handle(err, "Failed to create rasterfile '%s'!", raster)
+			}
+		} else {
+			_, err := fun(opt.datfile, sec, opt.Rng, opt.Start, opt.Nlines,
+				opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
+				opt.LR, raster, opt.ImgFmt, opt.headerSize)
+
+			if err != nil {
+				return Handle(err, "Failed to create rasterfile '%s'!", raster)
+			}
+		}
+	}
+
 }

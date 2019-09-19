@@ -18,7 +18,7 @@ type (
 	}
 )
 
-var _coreg = Gamma.must("S1_coreg_TOPS")
+var coregFun = Gamma.must("S1_coreg_TOPS")
 
 func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
     pol := self.pol
@@ -48,14 +48,26 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
         return
     }
     
+    exist, err := RSLC.Exist()
+    
+    if err != nil {
+        err = Handle(err, "Could not check whether target RSLC exists!")
+        return
+    }
+    
+    if exist {
+        return true, nil
+    }
+    
 	if true {
 		if ref == nil {
 			log.Printf("Coregistering: '%s'", slc2Tab)
             
-			_, err = _coreg(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
-                            self.Looks.Rng, self.Looks.Azi, self.poly1,
-                            self.poly2, self.CoherenceThresh, self.FractionThresh,
-                            self.PhaseStdevThresh, cleaning, flag1)
+			_, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
+                              self.Looks.Rng, self.Looks.Azi, self.poly1,
+                              self.poly2, self.CoherenceThresh,
+                              self.FractionThresh, self.PhaseStdevThresh,
+                              cleaning, flag1)
             
             if err != nil {
                 err = Handle(err, "Coregistration failed!")
@@ -75,11 +87,11 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
             log.Printf("Coregistering: '%s'. Reference: '%s'", slc2Tab,
 				rslcRefTab)
 			
-			_, err = _coreg(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
-                            self.Looks.Rng, self.Looks.Azi, self.poly1,
-                            self.poly2, self.CoherenceThresh,
-                            self.FractionThresh, self.PhaseStdevThresh,
-                            cleaning, flag1, rslcRefTab, rslcRefID)
+			_, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
+                              self.Looks.Rng, self.Looks.Azi, self.poly1,
+                              self.poly2, self.CoherenceThresh,
+                              self.FractionThresh, self.PhaseStdevThresh,
+                              cleaning, flag1, rslcRefTab, rslcRefID)
             
             if err != nil {
                 err = Handle(err, "Coregistration failed!")

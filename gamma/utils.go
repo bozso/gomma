@@ -1,30 +1,31 @@
 package gamma
 
 import (
+	bio "bufio"
 	"fmt"
+	io "io/ioutil"
 	"log"
 	"os"
 	"os/exec"
-    bio "bufio"
-	io "io/ioutil"
 	fp "path/filepath"
 	conv "strconv"
 	str "strings"
 )
 
 type (
+	String     string
 	CmdFun     func(args ...interface{}) (string, error)
 	handlerFun func(err error, format string, args ...interface{}) error
 	Joiner     func(args ...string) string
-    
-    FileReader struct {
-        *bio.Scanner
-        *os.File
-    }
-    
+
+	FileReader struct {
+		*bio.Scanner
+		*os.File
+	}
+
 	Params struct {
 		par, sep string
-        contents []string
+		contents []string
 	}
 
 	Tmp struct {
@@ -43,6 +44,50 @@ Output of command is: %v
 
 var tmp = Tmp{}
 
+func (s String) Join(args ...string) string {
+	arg := append([]string{string(s)}, args...)
+	return fp.Join(arg...)
+}
+
+func (s String) Empty() bool {
+	return len(s) == 0
+}
+
+func (s String) Glob() (ret []string, err error) {
+	path := string(s)
+	ret, err = fp.Glob(path)
+
+	if err != nil {
+		err = Handle(err, "Could not execute glob on '%s'!", path)
+		return
+	}
+	return ret, nil
+}
+
+func (s String) Info() (ret os.FileInfo, err error) {
+	path := string(s)
+	ret, err = os.Stat(path)
+
+	if err != nil {
+		err = Handle(err, "Failed to get FileInfo of '%s'", path)
+		return
+	}
+	return ret, nil
+}
+
+func (s String) Exist() (ret bool, err error) {
+	path := string(s)
+	_, err = os.Stat(path)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func Fatal(err error, format string, args ...interface{}) {
 	if err != nil {
 		str := fmt.Sprintf(format, args...)
@@ -50,18 +95,14 @@ func Fatal(err error, format string, args ...interface{}) {
 	}
 }
 
-func Empty(str string) bool {
-    return len(str) == 0
-}
-
 func Handle(err error, format string, args ...interface{}) error {
-    str := fmt.Sprintf(format, args...)
-    
-    if err == nil {
-        return fmt.Errorf("%s\n", str)
-    } else {
-        return fmt.Errorf("%s\n%w", str, err)
-    }
+	str := fmt.Sprintf(format, args...)
+
+	if err == nil {
+		return fmt.Errorf("%s\n", str)
+	} else {
+		return fmt.Errorf("%s\n%w", str, err)
+	}
 }
 
 func Handler(name string) handlerFun {
@@ -89,15 +130,15 @@ func MakeCmd(cmd string) CmdFun {
 				arg[ii] = "-"
 			}
 		}
-        
-        //fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
-        //os.Exit(0)
-        
+
+		//fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
+		//os.Exit(0)
+
 		out, err := exec.Command(cmd, arg...).CombinedOutput()
 		result := string(out)
-        
-        fmt.Printf("%s\n", out)
-        
+
+		fmt.Printf("%s\n", out)
+
 		if err != nil {
 			return "", fmt.Errorf(cmdErr, cmd, result, err)
 		}
@@ -107,59 +148,20 @@ func MakeCmd(cmd string) CmdFun {
 }
 
 func NewReader(path string) (ret FileReader, err error) {
-    ret.File, err = os.Open(path)
-    
-    if err != nil {
-        err = Handle(err, "Could not open file '%s'!", path)
-        return
-    }
-    
-    ret.Scanner = bio.NewScanner(ret.File)
-    
-    return ret, nil
+	ret.File, err = os.Open(path)
+
+	if err != nil {
+		err = Handle(err, "Could not open file '%s'!", path)
+		return
+	}
+
+	ret.Scanner = bio.NewScanner(ret.File)
+
+	return ret, nil
 }
 
 func NewPath(args ...string) path {
 	return path{fp.Join(args...), args}
-}
-
-func (self *path) Join(args ...string) path {
-	newpath := append(self.parts, args...)
-	return path{fp.Join(newpath...), newpath}
-}
-
-func (self *path) Glob() ([]string, error) {
-	ret, err := fp.Glob(self.path)
-
-	if err != nil {
-		return ret,
-			fmt.Errorf("In path.Glob: Could not get Glob of: '%s'",
-				self.path)
-	}
-	return ret, nil
-}
-
-func (self *path) Info() (os.FileInfo, error) {
-	ret, err := os.Stat(self.path)
-
-	if err != nil {
-		return ret,
-			fmt.Errorf("In path.Info: Could not get FileInfo of: '%s'",
-				self.path)
-	}
-	return ret, nil
-}
-
-func Exist(path string) (ret bool, err error) {
-    _, err = os.Stat(path)
-    
-    if err != nil {
-        if os.IsNotExist(err) {
-            return false, nil
-        }
-        return false, err
-    }
-    return true, nil
 }
 
 func ReadFile(path string) (ret []byte, err error) {
@@ -168,55 +170,54 @@ func ReadFile(path string) (ret []byte, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		err = handle(err, "Could not open file: '%v'!", path)
-        return
+		return
 	}
 
 	defer f.Close()
 
 	contents, err := io.ReadAll(f)
 	if err != nil {
-		 err = handle(err, "Could not read file: '%v'!", path)
-         return
+		err = handle(err, "Could not read file: '%v'!", path)
+		return
 	}
 
 	return contents, nil
 }
 
 func FromString(params, sep string) Params {
-    return Params{par:"", sep:sep, contents: str.Split(params, "\n")}
+	return Params{par: "", sep: sep, contents: str.Split(params, "\n")}
 }
 
 func (self *Params) Par(name string) (ret string, err error) {
-    if self.contents == nil {
-        var file *os.File
-        file, err = os.Open(self.par)
-        
-        if err != nil {
-            err = Handle(err, "Could not open file: '%s'!", self.par)
-            return
-        }
-        
-        defer file.Close()
-        scanner := bio.NewScanner(file)
-        
-        for scanner.Scan() {
-            line := scanner.Text()
-            if str.Contains(line, name) {
-                return str.Trim(str.Split(line, self.sep)[1], " "), nil
-            }
-        }
-    } else {
-        for _, line := range self.contents {
-            if str.Contains(line, name) {
-                return str.Trim(str.Split(line, self.sep)[1], " "), nil
-            }
-        }
-    }
-    
-    
+	if self.contents == nil {
+		var file *os.File
+		file, err = os.Open(self.par)
+
+		if err != nil {
+			err = Handle(err, "Could not open file: '%s'!", self.par)
+			return
+		}
+
+		defer file.Close()
+		scanner := bio.NewScanner(file)
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			if str.Contains(line, name) {
+				return str.Trim(str.Split(line, self.sep)[1], " "), nil
+			}
+		}
+	} else {
+		for _, line := range self.contents {
+			if str.Contains(line, name) {
+				return str.Trim(str.Split(line, self.sep)[1], " "), nil
+			}
+		}
+	}
+
 	err = fmt.Errorf("In Par: Could not find parameter '%s' in %v",
 		name, self.par)
-    return
+	return
 }
 
 func toInt(par string, idx int) (int, error) {
@@ -268,8 +269,8 @@ func TmpFile() (ret string, err error) {
 
 	if err != nil {
 		err = fmt.Errorf(
-            "In TmpFile: Failed to create a temporary file!\nError: %w", err)
-        return
+			"In TmpFile: Failed to create a temporary file!\nError: %w", err)
+		return
 	}
 
 	defer file.Close()
@@ -282,12 +283,12 @@ func TmpFile() (ret string, err error) {
 }
 
 func TmpFileExt(ext string) (string, error) {
-	file, err := io.TempFile("", "*." + ext)
+	file, err := io.TempFile("", "*."+ext)
 
 	if err != nil {
 		return "", fmt.Errorf(
-            "In TmpFileExt: Failed to create a temporary file!\nError: %w",
-            err)
+			"In TmpFileExt: Failed to create a temporary file!\nError: %w",
+			err)
 	}
 
 	defer file.Close()
@@ -300,7 +301,7 @@ func TmpFileExt(ext string) (string, error) {
 }
 
 func RemoveTmp() {
-    log.Printf("Removing temporary files...\n")
+	log.Printf("Removing temporary files...\n")
 	for _, file := range tmp.files {
 		if err := os.Remove(file); err != nil {
 			log.Printf("Failed to remove temporary file '%s': %w\n", file, err)
