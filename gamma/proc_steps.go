@@ -340,6 +340,8 @@ func stepCoreg(self *config) error {
             return Handle(err, "Coregistration failed!")
         }
         
+        fmt.Println("%s\n", err)
+        
         if !ok {
             log.Printf("%s\n",
                 Handle(err,"Coregistration of '%s' failed!", curr.Path))

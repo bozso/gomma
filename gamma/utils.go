@@ -90,8 +90,8 @@ func MakeCmd(cmd string) CmdFun {
 			}
 		}
         
-        fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
-        os.Exit(0)
+        //fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
+        //os.Exit(0)
         
 		out, err := exec.Command(cmd, arg...).CombinedOutput()
 		result := string(out)
