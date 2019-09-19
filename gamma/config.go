@@ -79,7 +79,7 @@ var (
 	steps = map[string]stepFun{
 		"select": stepSelect,
         "import": stepImport,
-        //"coreg":  stepCoreg,
+        "coreg":  stepCoreg,
 	}
 
 	stepList []string
@@ -153,44 +153,40 @@ func delim(msg, sym string) {
 
 
 func MakeDefaultConfig(path string) error {
-	handle := Handler("MakeDefaultConfig")
-
 	out, err := json.MarshalIndent(defaultConfig, "", "    ")
 	if err != nil {
-		return handle(err, "Failed to json encode default configuration!")
+		return Handle(err, "Failed to json encode default configuration!")
 	}
 
 	f, err := os.Create(path)
 	if err != nil {
-		return handle(err, "Failed to create file: %v!", path)
+		return Handle(err, "Failed to create file: %v!", path)
 	}
 	defer f.Close()
 
 	_, err = f.Write(out)
 	if err != nil {
-		return handle(err, "Failed to write to file '%v'!", path)
+		return Handle(err, "Failed to write to file '%v'!", path)
 	}
 
 	return nil
 }
 
 func SaveJson(path string, val interface{}) error {
-	handle := Handler("SaveJson")
-	
     out, err := json.MarshalIndent(val, "", "    ")
 	if err != nil {
-		return handle(err, "Failed to json encode struct!")
+		return Handle(err, "Failed to json encode struct: %v!", val)
 	}
 
 	f, err := os.Create(path)
 	if err != nil {
-		return handle(err, "Failed to create file: %v!", path)
+		return Handle(err, "Failed to create file: %v!", path)
 	}
 	defer f.Close()
 
 	_, err = f.Write(out)
 	if err != nil {
-		return handle(err, "Failed to write to file '%v'!", path)
+		return Handle(err, "Failed to write to file '%v'!", path)
 	}
 
 	return nil
@@ -198,16 +194,14 @@ func SaveJson(path string, val interface{}) error {
 }
 
 func LoadJson(path string, val interface{}) error {
-	handle := Handler("LoadJson")
-	
 	data, err := ReadFile(path)
 
 	if err != nil {
-		return handle(err, "Failed to read file:  '%s'!", path)
+		return Handle(err, "Failed to read file:  '%s'!", path)
 	}
     
 	if err := json.Unmarshal(data, &val); err != nil {
-		return handle(err, "Failed to parse json data: %s'!", data)
+		return Handle(err, "Failed to parse json data: %s'!", data)
 	}
 
 	return nil

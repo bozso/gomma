@@ -66,10 +66,9 @@ func NewCoherence(dat, par string) (ret Coherence, err error) {
 }
 
 func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
-    handle := Handler("NewIFG")
-    
     if len(dat) == 0 {
-        err = handle(nil, "'dat' should not be an empty string!")
+        err = Handle(nil, "'dat' should not be an empty string!")
+        return
     }
     
     self.dat = dat
@@ -90,12 +89,13 @@ func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
     
     self.diffPar = NewGammaParam(diffPar)
     
+    self.files = []string{}
+    
     return self, nil
 }
     
     
-func FromSLC(slc1, slc2, ref SLC, opt ifgOpt) (ret IFG, err error) {
-    handle := Handler("FromSLC")
+func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
     inter := 0
     
     if opt.interact {
@@ -109,14 +109,19 @@ func FromSLC(slc1, slc2, ref SLC, opt ifgOpt) (ret IFG, err error) {
     simUnw := "%s.sim_unw"
     diff := "%s.diff"
     
-    par1, par2 := slc1.Parfile(), slc2.Parfile()
+    par1, par2 := slc1.par, slc2.par
     
     _, err = createOffset(par1, par2, off, opt.algo, rng, azi, inter)
+    
+    if err != nil {
+        err = Handle(err, "Creation of offset table failed!")
+        return
+    }
     
     slcRefPar := ""
     
     if ref != nil {
-        slcRefPar = ref.Parfile()
+        slcRefPar = ref.par
     }
     
     _, err = phaseSimOrb(par1, par2, off, opt.hgt, simUnw, slcRefPar,
@@ -126,15 +131,20 @@ func FromSLC(slc1, slc2, ref SLC, opt ifgOpt) (ret IFG, err error) {
     _, err = slcDiffIntf(dat1, dat2, par1, par2, off,
                          simUnw, diff, rng, azi, 0, 0)
     
-    ret, err = NewIFG(diff, off, "", "", "")
-    
     if err != nil {
-        err = handle(err, "Could not create new interferogram struct!")
+        err = Handle(err, "Failed to create differential interferogram!")
         return
     }
     
+    ret, err = NewIFG(diff, off, "", "", "")
     
-    ret.slc1, ret.slc2, ret.deltaT = slc1, slc2, slc1.Center().Sub(slc2.Center())
+    if err != nil {
+        err = Handle(err, "Could not create new interferogram struct!")
+        return
+    }
+    
+    // TODO: Check date difference order
+    ret.slc1, ret.slc2, ret.deltaT = *slc1, *slc2, slc1.Center().Sub(slc2.Center())
     
     return ret, nil
 }

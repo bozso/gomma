@@ -26,7 +26,6 @@ type(
     Meta struct {
         MasterIdx  int
         MasterDate string
-        Zipfiles   []string
     }
 )    
 
@@ -86,8 +85,6 @@ func listSteps() {
 }
 
 func (self *Process) Parse() (istart int, istop int, err error) {
-	handle := Handler("Process.Parse")
-    
 	if self.Show {
 		listSteps()
 		os.Exit(0)
@@ -99,7 +96,7 @@ func (self *Process) Parse() (istart int, istop int, err error) {
 	if istep == -1 {
 		if istart == -1 {
 			listSteps()
-            err = handle(nil,
+            err = Handle(nil,
                 "Starting step '%s' is not in list of available steps!",
                 self.Start)
             return
@@ -107,7 +104,7 @@ func (self *Process) Parse() (istart int, istop int, err error) {
 
 		if istop == -1 {
 			listSteps()
-            err = handle(nil,
+            err = Handle(nil,
                 "Stopping step '%s' is not in list of available steps!",
                 self.Stop)
 			return
@@ -121,12 +118,12 @@ func (self *Process) Parse() (istart int, istop int, err error) {
 	data, err := ReadFile(path)
 
 	if err != nil {
-		err = handle(err, "Failed to read file:  '%s'!", path)
+		err = Handle(err, "Failed to read file:  '%s'!", path)
         return
 	}
 
 	if err = json.Unmarshal(data, &self.config); err != nil {
-		err = handle(err, "Failed to parse json data: %s'!", data)
+		err = Handle(err, "Failed to parse json data: %s'!", data)
         return
 	}
 
@@ -134,8 +131,6 @@ func (self *Process) Parse() (istart int, istop int, err error) {
 }
 
 func (self *Process) RunSteps(start, stop int) error {
-	handle := Handler("Process.RunSteps")
-
 	for ii := start; ii < stop; ii++ {
 		name := stepList[ii]
 		step, _ := steps[name]
@@ -143,7 +138,7 @@ func (self *Process) RunSteps(start, stop int) error {
 		delim(fmt.Sprintf("START: %s", name), "*")
 
 		if err := step(&self.config); err != nil {
-			return handle(err, "Error while running step: '%s'",
+			return Handle(err, "Error while running step: '%s'",
 				name)
 		}
 
@@ -226,7 +221,6 @@ func (self *Lister) Quicklook() error {
         line := file.Text()
         
         s1, err := NewS1Zip(line, cache)
-        
         
         if err != nil {
             return Handle(err, 

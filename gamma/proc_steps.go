@@ -17,10 +17,6 @@ type(
         contains(*AOI) bool
     }
     
-    SLC interface {
-        DataFile
-        Date
-    }
     
     SARImage interface {
         Info(*ExtractOpt) (SARInfo, error)
@@ -32,11 +28,10 @@ type(
 
 
 func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err error) {
-    handle := Handler("proc_steps.parseS1")
     s1, err = NewS1Zip(zip, root)
     
     if err != nil {
-        err = handle(err, "Failed to parse S1Zip data from '%s'", zip)
+        err = Handle(err, "Failed to parse S1Zip data from '%s'", zip)
         return
     }
 
@@ -45,7 +40,7 @@ func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err err
     IWs, err = s1.Info(ext)
     
     if err != nil {
-        err = handle(err, "Failed to parse IW information for zip '%s'",
+        err = Handle(err, "Failed to parse IW information for zip '%s'",
             s1.Path)
         return
     }
@@ -59,8 +54,6 @@ func (self *config) extOpt(satellite string) *ExtractOpt {
 }
 
 func stepSelect(self *config) error {
-	handle := Handler("stepPreselect")
-
 	dataPath := self.General.DataPath
     Select := self.PreSelect
     
@@ -82,7 +75,7 @@ func stepSelect(self *config) error {
 
 	zipfiles, err := fp.Glob(fp.Join(dataPath, "S1*_IW_SLC*.zip"))
 	if err != nil {
-		return handle(err, "Glob to find zipfiles failed!")
+		return Handle(err, "Glob to find zipfiles failed!")
 	}
     
     
@@ -94,7 +87,7 @@ func stepSelect(self *config) error {
         _dateStart, err := ParseDate(short, dateStart)
         
         if err != nil {
-            return handle(err, "Could not parse date '%s' in short format!",
+            return Handle(err, "Could not parse date '%s' in short format!",
                 dateStart)
         }
         
@@ -108,7 +101,7 @@ func stepSelect(self *config) error {
         _dateStop, err := ParseDate(short, dateStop)
         
         if err != nil {
-            return handle(err, "Could not parse date '%s' in short format!",
+            return Handle(err, "Could not parse date '%s' in short format!",
                 dateStop)
         }
         
@@ -144,7 +137,7 @@ func stepSelect(self *config) error {
         for _, zip := range zipfiles {
             s1zip, IWs, err := parseS1(zip, root, extInfo)
             if err != nil {
-                return handle(err,
+                return Handle(err,
                     "Failed to import S1Zip data from '%s'", zip)
             }
             
@@ -156,7 +149,7 @@ func stepSelect(self *config) error {
         for _, zip := range zipfiles {
             s1zip, IWs, err := parseS1(zip, root, extInfo)
             if err != nil {
-                return handle(err,
+                return Handle(err,
                     "Failed to import S1Zip data from '%s'", zip)
             }
             
@@ -276,40 +269,111 @@ func stepImport(self *config) error {
     return nil
 }
 
-/*
 func stepCoreg(self *config) error {
-	handle := Handler("stepCoreg")
+    pol := self.General.Pol
     path := self.General.Metafile
-	
-    root, meta := fp.Join(self.General.CachePath, "sentinel1"), Meta{}
-    midx := meta.MasterIdx
     
+    root, meta := fp.Join(self.General.CachePath, "sentinel1"), Meta{}
     err := LoadJson(path, &meta)
     
     if err != nil {
-        return handle(err, "Failed to read metadata from: '%s'!", path)
+        return Handle(err, "Failed to read metadata from: '%s'!", path)
     }
     
-    s1zips, coregistered := S1Zips{}, []*S1SLC{}
+    midx := meta.MasterIdx
     
-    for _, zip := range meta.Zipfiles {
-        s1, err := NewS1Zip(zip, root)
+    path = self.infile
+    file, err := NewReader(path)
+    
+    if err != nil {
+        return Handle(err, "Could not open file '%s' for reading!", path)
+    }
+    
+    defer file.Close()
+    
+    s1zips := S1Zips{}
+    
+    for file.Scan() {
+        line := file.Text()
+        s1, err := NewS1Zip(line, root)
         
         if err != nil {
-            return handle(err, "Failed to parse S1Zip data from '%s'",
-                s1.Path)
+            return Handle(err, "Failed to parse S1Zip data from '%s'",
+                line)
         }
         
         s1zips = append(s1zips, s1)
     }
     
-    master := s1zips[midx]
+    mzip := s1zips[midx]
+    
+    fmt.Printf("Master date: %s\n", mzip.Center())
+    
+    mslc, err := mzip.SLC(pol)
     
     if err != nil {
-        return handle(err, "Failed to import master SLC data!")
+        return Handle(err, "Failed to import master SLC data!")
     }
     
+    master := S1Coreg{
+        pol: pol,
+        tab: mslc.tab,
+        ID: date2str(mzip, short),
+        coreg: self.Coreg,
+        hgt: "0.1",
+        poly1: "-",
+        poly2: "-",
+        Looks: self.General.Looks,
+        clean: false,
+        useInter: true, 
+    }
+    
+    var prev *S1Zip
     nzip := len(s1zips)
+    
+    for ii := midx + 1; ii < nzip; ii++ {
+        curr := s1zips[ii]
+        
+        ok, err := master.Coreg(curr, prev)
+        
+        if err != nil {
+            return Handle(err, "Coregistration failed!")
+        }
+        
+        if !ok {
+            log.Printf("%s\n",
+                Handle(err,"Coregistration of '%s' failed!", curr.Path))
+            log.Fatalf("First.\n")
+            continue
+        }
+        
+        log.Fatalf("First.\n")
+        
+        prev = curr
+    }
+    
+    
+    prev = nil
+    
+    for ii := midx - 1; ii > -1; ii-- {
+        curr := s1zips[ii]
+        
+        ok, err := master.Coreg(curr, prev)
+        
+        if err != nil {
+            return Handle(err, "Coregistration failed!")
+        }
+        
+        if !ok {
+            log.Printf("%s\n", Handle(err,"Coregistration of '%s' failed!",
+                curr.Center()))
+            continue
+        }
+        
+        prev = curr
+    }
+    
+    /*
     
     for ii, S1 := range s1zips {
         if ii == midx {
@@ -331,10 +395,9 @@ func stepCoreg(self *config) error {
         
         // S1Coreg(mslc, )
     }
-    
+    */
 	return nil
 }
-*/
 
 /*
 [check_ionosphere]

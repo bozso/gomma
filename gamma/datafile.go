@@ -1,6 +1,8 @@
 package gamma
 
 import (
+    "os"
+    fp "path/filepath"
     "fmt"
     "time"
 )
@@ -21,6 +23,12 @@ type(
 		Int() int
 		Float() float64
 	}
+    
+    
+    SLC struct {
+        dataFile
+        date
+    }
 )
 
 func NewGammaParam(path string) Params {
@@ -62,6 +70,22 @@ func (self *dataFile) Exist() (ret bool, err error) {
         }
     }
     return true, nil
+}
+
+func (self *dataFile) Move(path string) error {
+    for _, file := range self.files {
+        if len(file) == 0 {
+            continue
+        }
+        
+        dst := fp.Join(path, file)
+        err := os.Rename(file, dst)
+        
+        if err != nil {
+            return Handle(err, "Failed to move file '%s' to '%s'!", file, dst)
+        }
+    }
+    return nil
 }
 
 func (self *dataFile) Datfile() string {

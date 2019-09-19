@@ -89,7 +89,10 @@ func MakeCmd(cmd string) CmdFun {
 				arg[ii] = "-"
 			}
 		}
-
+        
+        fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
+        os.Exit(0)
+        
 		out, err := exec.Command(cmd, arg...).CombinedOutput()
 		result := string(out)
 
@@ -182,14 +185,12 @@ func FromString(params, sep string) Params {
 }
 
 func (self *Params) Par(name string) (ret string, err error) {
-    handle := Handler("Params.Par")
-    
     if self.contents == nil {
         var file *os.File
         file, err = os.Open(self.par)
         
         if err != nil {
-            err = handle(err, "Could not open file: '%s'!", self.par)
+            err = Handle(err, "Could not open file: '%s'!", self.par)
             return
         }
         
