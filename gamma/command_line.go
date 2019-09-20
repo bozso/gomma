@@ -3,9 +3,9 @@ package gamma
 import (
 	//"log"
 	"encoding/json"
-	fl "flag"
 	"fmt"
 	"os"
+	fl "flag"
 	fp "path/filepath"
 	//str "strings"
 )
@@ -31,6 +31,7 @@ type (
 var (
 	ListModes = []string{"quicklook"}
 )
+
 
 func NewProcess(args []string) (ret Process, err error) {
 	flag := fl.NewFlagSet("proc", fl.ContinueOnError)
@@ -132,7 +133,7 @@ func (proc *Process) Parse() (istart int, istop int, err error) {
 func (proc *Process) RunSteps(start, stop int) error {
 	for ii := start; ii < stop; ii++ {
 		name := stepList[ii]
-		step, _ := steps[name]
+		step := steps[name]
 
 		delim(fmt.Sprintf("START: %s", name), "*")
 

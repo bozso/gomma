@@ -24,6 +24,7 @@ type (
 		Int() (int, error)
 		Float() (float64, error)
 		PlotCmd() string
+        ImageFormat() (string, error)
 		//Display(disArgs) error
 		//Raster(rasArgs) error
 	}
@@ -37,16 +38,16 @@ type (
 	}
 
 	disArgs struct {
-		flip              bool
-		ImgFmt, Datfile   string
-		Start, Nlines, LR int
-		Scale, Exp        float64
+		Flip                 bool
+		ImgFmt, Datfile, Cmd string
+		Start, Nlines, LR    int
+		Scale, Exp           float64
 		RngAzi
 	}
 
 	rasArgs struct {
 		disArgs
-		ext                 string
+		//ext                 string
 		avgFact, headerSize int
 		Avg                 RngAzi
 	}
@@ -57,11 +58,11 @@ func NewGammaParam(path string) Params {
 }
 
 func NewDataFile(dat, par string) (ret dataFile, err error) {
-	handle := Handler("NewDatfile")
 	ret.dat = dat
 
 	if len(dat) == 0 {
-		err = handle(err, "'dat' should not be an empty string: '%s'", dat)
+		err = Handle(err, "'dat' should not be an empty string: '%s'", dat)
+        return
 	}
 
 	if len(par) == 0 {
@@ -130,7 +131,7 @@ func (d *dataFile) Azi() (int, error) {
 	return d.Int("azimuth_samples")
 }
 
-func (d *dataFile) imgFormat() (string, error) {
+func (d *dataFile) ImageFormat() (string, error) {
 	return d.Par("image_format")
 }
 
@@ -142,6 +143,8 @@ func (arg *disArgs) Parse(dat DataFile) (err error) {
 	if len(arg.Datfile) == 0 {
 		arg.Datfile = dat.Datfile()
 	}
+	
+    arg.Cmd = dat.PlotCmd()
 
 	if arg.Rng == 0 {
 		if arg.Rng, err = dat.Rng(); err != nil {
@@ -157,12 +160,12 @@ func (arg *disArgs) Parse(dat DataFile) (err error) {
 
 	// parts = pth.basename(datfile).split(".")
 	if len(arg.ImgFmt) == 0 {
-		if arg.ImgFmt, err = dat.imgFormat(); err != nil {
+		if arg.ImgFmt, err = dat.ImageFormat(); err != nil {
 			return Handle(err, "Could not get image_format!")
 		}
 	}
 
-	if arg.flip {
+	if arg.Flip {
 		arg.LR = 1
 	} else {
 		arg.LR = 0
@@ -184,6 +187,7 @@ func (arg *disArgs) Parse(dat DataFile) (err error) {
 	return nil
 }
 
+// TODO: Finish
 func (opt *rasArgs) Parse(dat DataFile) error {
 	err := opt.disArgs.Parse(dat)
 
@@ -195,56 +199,59 @@ func (opt *rasArgs) Parse(dat DataFile) error {
 }
 
 func Display(dat DataFile, opt disArgs) error {
-	opt.Parse(self)
-
-	cmd := dat.PlotFun()
-	fun := Gamma.must("dis" + cmd)
-
+	err := opt.Parse(dat)
+    
+    if err != nil {
+        return Handle(err, "Failed to parse display options!")
+    }
+    
+    cmd := opt.Cmd
+    fun := Gamma.must("dis" + cmd)
+    
 	if cmd == "SLC" {
-		fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines, opt.Scale, opt.Exp)
+		_, err := fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines, opt.Scale,
+                      opt.Exp)
+        
+        if err != nil {
+            return Handle(err, "Failed to execute display command!")
+        }
 	}
+    return nil
 }
 
-func Raster(dat DataFile, opt rasArgs, sec string) error {
-	opt.Parse(dat)
-
-	LR := 0
-
-	if opt.Flip {
-		LR = 1
-	}
-
-	cmd := dat.PlotCmd()
-	fun := Gamma.must("ras" + cmd)
+func Raster(dat DataFile, opt rasArgs, sec string) (err error) {
+	err = opt.Parse(dat)
+    
+    if err != nil {
+        return Handle(err, "Failed to parse display options!")
+    }
+	
+    cmd := opt.Cmd
+    fun := Gamma.must("dis" + cmd)
 
 	raster := fmt.Sprintf("%s.%s", dat.Datfile(), Settings.RasExt)
 
 	if cmd == "SLC" {
-		_, err := fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+		_, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
 			opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
 			opt.ImgFmt, opt.headerSize, raster)
 
-		if err != nil {
-			return Handle(err, "Failed to create rasterfile '%s'!", raster)
-		}
 	} else {
 		if len(sec) == 0 {
-			_, err := fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+			_, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
 				opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
 				opt.LR, raster, opt.ImgFmt, opt.headerSize)
 
-			if err != nil {
-				return Handle(err, "Failed to create rasterfile '%s'!", raster)
-			}
 		} else {
-			_, err := fun(opt.datfile, sec, opt.Rng, opt.Start, opt.Nlines,
+			_, err = fun(opt.Datfile, sec, opt.Rng, opt.Start, opt.Nlines,
 				opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
 				opt.LR, raster, opt.ImgFmt, opt.headerSize)
-
-			if err != nil {
-				return Handle(err, "Failed to create rasterfile '%s'!", raster)
-			}
 		}
 	}
-
+    
+    if err != nil {
+        return Handle(err, "Failed to create rasterfile '%s'!", raster)
+    }
+    
+    return nil
 }

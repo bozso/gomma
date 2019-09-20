@@ -16,7 +16,7 @@ type (
     IFG struct {
         dataFile
         diffPar Params
-        quality, coherence, simUnwrap string
+        quality, simUnwrap string
         deltaT time.Duration
         slc1, slc2 SLC
     }
@@ -126,6 +126,11 @@ func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
     
     _, err = phaseSimOrb(par1, par2, off, opt.hgt, simUnw, slcRefPar,
                          nil, nil, 1)
+    
+    if err != nil {
+        err = Handle(err, "Could not create simulated orbital phase!")
+        return
+    }
     
     dat1, dat2 := slc1.Datfile(), slc2.Datfile()
     _, err = slcDiffIntf(dat1, dat2, par1, par2, off,
@@ -282,6 +287,11 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
     // parameters: xmin, xmax, ymin, ymax not yet given
     _, err = phaseSlope(self.dat, slope, opt.SlopeWindow,
                         opt.SlopeCorrelationThresh)
+    
+    if err != nil {
+        err = Handle(err, "Calculation of phase slope failed!")
+        return
+    }
 
     log.Printf("Calculating coherence. ")
     
@@ -289,6 +299,12 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
     
     _, err = CCAdaptive(self.dat, mli1, mli2, slope, nil, ret.dat, width,
                         opt.Box.Min, opt.Box.Max, weightFlag)
+    
+    if err != nil {
+        err = Handle(err, "Adaptive filtering failed!")
+        return
+    }
+    
     return ret, nil
 }
 

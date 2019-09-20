@@ -100,7 +100,7 @@ if 0:
     gamma_commands = {"rashgt", "ScanSAR_burst_corners"}
 
 
-gp = make_object("Gamma", 
+gp = make_object("Gamma",
                  {pth.basename(cmd): staticmethod(make_cmd(cmd))
                   for cmd in gamma_commands})
 
@@ -122,8 +122,7 @@ Extracted = new_type("Extracted", ("outpath", "file_list"))
 def extract(self, outpath):
     checker = compose(isfile, partial(pth.join, outpath))
     
-    (self.files.filter_false(checker)
-               .map(self.comp_file.extract, path=outpath))
+    (self.files.filter_false(checker).map(self.comp_file.extract, path=outpath))
 
 
 def filter_file(template, namelist):
@@ -215,11 +214,11 @@ class Parfile(object):
                 lines = (line for line in f)
         
                 lines = (
-                            "%s: %s" % (key, new)
-                            if key in line
-                            else line
-                            for line in lines
-                        )
+                    "%s: %s" % (key, new)
+                    if key in line
+                    else line
+                    for line in lines
+                )
             
                 f.seek(0)
                 f.truncate()
@@ -244,8 +243,8 @@ class DataFile(Parfile):
     
     
     def __init__(self, **kwargs):
-        datfile   = kwargs.get("datfile")
-        parfile   = kwargs.get("parfile")
+        datfile = kwargs.get("datfile")
+        parfile = kwargs.get("parfile")
         
         if datfile is None:
             datfile = tmp_file(**kwargs)
@@ -272,8 +271,8 @@ class DataFile(Parfile):
     def from_json(cls, line):
         return cls(datfile=line["dat"], parfile=line["par"],
                    tabfile=line["tab"])
-    
-    
+
+
     def save(self, datfile, parfile=None):
         if parfile is None:
             parfile = datfile + ".par"
@@ -322,8 +321,8 @@ class DataFile(Parfile):
         
         if start_stop:
             start = timedelta(seconds=self.float("start_time"))
-            cent  = timedelta(seconds=self.float("center_time"))
-            stop  = timedelta(seconds=self.float("end_time"))
+            cent = timedelta(seconds=self.float("center_time"))
+            stop = timedelta(seconds=self.float("end_time"))
             
             return gm.Date(start=date + start, stop=date + stop,
                            center=date + cent)
@@ -357,7 +356,7 @@ class DataFile(Parfile):
     @staticmethod
     def parse_dis_args(gp_file, **kwargs):
         datfile = kwargs.get("datfile", None)
-        cmd  = kwargs.get("mode", None)
+        cmd = kwargs.get("mode", None)
         flip = bool(kwargs.get("flip", False))
         rng = kwargs.get("rng", None)
         azi = kwargs.get("azi", None)
@@ -453,15 +452,15 @@ class DataFile(Parfile):
             if sec is None:
                 ras\
                 (args["datfile"], args["rng"], args["start"], args["nlines"],
-                 args["arng"], args["aazi"], args["scale"], args["exp"], args["LR"],
-                 args["raster"], args["img_fmt"], args["hdrsz"],
+                 args["arng"], args["aazi"], args["scale"], args["exp"],
+                 args["LR"], args["raster"], args["img_fmt"], args["hdrsz"],
                  debug=args["debug"])
             else:
                 ras\
-                (args["datfile"], sec, args["rng"], args["start"], args["nlines"],
-                 args["arng"], args["aazi"], args["scale"], args["exp"], args["LR"],
-                 args["raster"], args["img_fmt"], args["hdrsz"],
-                 debug=args["debug"])
+                (args["datfile"], sec, args["rng"], args["start"],
+                 args["nlines"], args["arng"], args["aazi"], args["scale"],
+                 args["exp"], args["LR"], args["raster"], args["img_fmt"],
+                 args["hdrsz"], debug=args["debug"])
         
         self.ras = args["raster"]
 

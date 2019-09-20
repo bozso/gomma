@@ -13,7 +13,6 @@ import (
 )
 
 type (
-	String     string
 	CmdFun     func(args ...interface{}) (string, error)
 	handlerFun func(err error, format string, args ...interface{}) error
 	Joiner     func(args ...string) string
@@ -44,40 +43,12 @@ Output of command is: %v
 
 var tmp = Tmp{}
 
-func (s String) Join(args ...string) string {
-	arg := append([]string{string(s)}, args...)
-	return fp.Join(arg...)
-}
-
-func (s String) Empty() bool {
+func Empty(s string) bool {
 	return len(s) == 0
 }
 
-func (s String) Glob() (ret []string, err error) {
-	path := string(s)
-	ret, err = fp.Glob(path)
-
-	if err != nil {
-		err = Handle(err, "Could not execute glob on '%s'!", path)
-		return
-	}
-	return ret, nil
-}
-
-func (s String) Info() (ret os.FileInfo, err error) {
-	path := string(s)
-	ret, err = os.Stat(path)
-
-	if err != nil {
-		err = Handle(err, "Failed to get FileInfo of '%s'", path)
-		return
-	}
-	return ret, nil
-}
-
-func (s String) Exist() (ret bool, err error) {
-	path := string(s)
-	_, err = os.Stat(path)
+func Exist(s string) (ret bool, err error) {
+	_, err = os.Stat(s)
 
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -304,7 +275,7 @@ func RemoveTmp() {
 	log.Printf("Removing temporary files...\n")
 	for _, file := range tmp.files {
 		if err := os.Remove(file); err != nil {
-			log.Printf("Failed to remove temporary file '%s': %w\n", file, err)
+			log.Printf("Failed to remove temporary file '%s': %s\n", file, err)
 		}
 	}
 }

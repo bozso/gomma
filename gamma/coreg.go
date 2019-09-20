@@ -35,6 +35,11 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
     
     SLC, err := slc.SLC(pol)
     
+    if err != nil {
+        err = Handle(err, "Failed to retreive slave SLC!")
+        return
+    }
+    
 	slc1Tab, slc1ID := self.tab, self.ID
 	slc2Tab, slc2ID := SLC.tab, date2str(slc, short)
 	

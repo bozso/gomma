@@ -33,20 +33,20 @@ type (
 	S1Zip struct {
 		Path          string    `json:"path"`
 		Root          string    `json:"root"`
-		zipBase       string    `json:"-"`
-		mission       string    `json:"-"`
-		dateStr       string    `json:"-"`
-		mode          string    `json:"-"`
-		productType   string    `json:"-"`
-		resolution    string    `json:"-"`
+		zipBase       string
+		mission       string
+		dateStr       string
+		mode          string
+		productType   string
+		resolution    string
 		Safe          string    `json:"safe"`
-		level         string    `json:"-"`
-		productClass  string    `json:"-"`
-		pol           string    `json:"-"`
-		absoluteOrbit string    `json:"-"`
+		level         string
+		productClass  string
+		pol           string
+		absoluteOrbit string
 		DTID          string    `json:"-"`
 		UID           string    `json:"-"`
-		Templates     templates `json:templates`
+		Templates     templates `json:"templates"`
 		date          `json:"date"`
 	}
 
@@ -425,7 +425,7 @@ func (self *S1Zip) RSLC(pol string) (ret S1SLC, err error) {
 	file, err := os.Create(tab)
 
 	if err != nil {
-		err = Handle(err, "Failed to create file '%s'%", tab)
+		err = Handle(err, "Failed to create file '%s'!", tab)
 		return
 	}
 	defer file.Close()

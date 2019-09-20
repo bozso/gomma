@@ -71,7 +71,7 @@ func makeGamma() GammaFun {
 			glob, err := fp.Glob(_path)
 
 			if err != nil {
-				Fatal(err, "makeGamma: Glob '%s' failed! %w", _path, err)
+				Fatal(err, "makeGamma: Glob '%s' failed! %s", _path, err)
 			}
 
 			for _, path := range glob {

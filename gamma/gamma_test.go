@@ -3,7 +3,6 @@ package gamma;
 import (
     "fmt";
     test "testing";
-    gm "../gamma";
 );
 
 const NUM = 10000000;
@@ -61,7 +60,7 @@ func TestGetParameter(t *test.T) {
         "range_samples: %d\nazimuth_lines: %d\nimage_format: %v",
         rng, azi, img_fmt);
     
-    pars := gm.FromString(params, ":");
+    pars := FromString(params, ":");
     
     got, err := pars.Int("range_samples");
     
@@ -96,10 +95,10 @@ func TestGetParameter(t *test.T) {
 
 
 func TestPoints(t *test.T) {
-    rect := gm.Rect{Max: gm.Point{X:1.0, Y:2.0},
-                    Min: gm.Point{X:0.0, Y:-1.0}}
+    rect := Rect{Max: Point{X:1.0, Y:2.0},
+                 Min: Point{X:0.0, Y:-1.0}}
     
-    point1, point2 :=  gm.Point{X:0.5, Y: -0.8}, gm.Point{X:2.0, Y: -0.8}
+    point1, point2 :=  Point{X:0.5, Y: -0.8}, Point{X:2.0, Y: -0.8}
     
     if !point1.InRect(&rect) {
         t.Errorf("point1 (%v) should be in rectangle (%v)", point1, rect)
