@@ -215,7 +215,7 @@ func toFloat(par string, idx int) (float64, error) {
 	return ret, nil
 }
 
-func (self *Params) Int(name string) (int, error) {
+func (self Params) Int(name string) (int, error) {
 	data, err := self.Par(name)
 
 	if err != nil {
@@ -225,7 +225,7 @@ func (self *Params) Int(name string) (int, error) {
 	return toInt(data, 0)
 }
 
-func (self *Params) Float(name string) (float64, error) {
+func (self Params) Float(name string) (float64, error) {
 	data, err := self.Par(name)
 
 	if err != nil {

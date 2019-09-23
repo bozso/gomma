@@ -7,7 +7,7 @@ import (
 	"os"
 	fl "flag"
 	fp "path/filepath"
-	//str "strings"
+	str "strings"
 )
 
 type (
@@ -26,6 +26,11 @@ type (
 		MasterIdx  int
 		MasterDate string
 	}
+    
+    Displayer struct {
+        dat, par, mode, sec string
+        rasArgs
+    }
 )
 
 var (
@@ -163,7 +168,7 @@ func InitParse(args []string) (ret string, err error) {
 }
 
 func NewLister(args []string) (ret Lister, err error) {
-	flag := fl.NewFlagSet("init", fl.ContinueOnError)
+	flag := fl.NewFlagSet("list", fl.ContinueOnError)
 
 	mode := args[0]
 
@@ -236,4 +241,106 @@ func (self *Lister) Quicklook() error {
 	}
 
 	return nil
+}
+
+func NewDisplayer(args []string) (ret Displayer, err error) {
+	flag := fl.NewFlagSet("display", fl.ContinueOnError)
+
+	mode := args[0]
+
+	if mode != "ras" || mode != "dis" {
+		err = Handle(nil, "Unrecognized display mode '%s'", mode)
+		return
+	}
+
+	ret.mode = mode
+    
+    flag.StringVar(&ret.dat, "dat", "",
+        "Datafile containing data to plot.")
+    flag.StringVar(&ret.par, "par", "", "Parfile describing datafile.")
+    
+    flag.StringVar(&ret.sec, "sec", "", "Secondary input datafile.")
+    
+    flag.IntVar(&ret.Rng, "rng", 0, "Range samples of datafile.")
+    flag.IntVar(&ret.Azi, "Azi", 0, "Azimuth lines of datafile.")
+    
+    flag.BoolVar(&ret.Flip, "flip", false,
+        "Should the output image be flipped.")
+    
+    flag.StringVar(&ret.Cmd, "cmd", "", "Plot command type to be used.")
+    
+    flag.IntVar(&ret.Start, "start", 0, "Starting lines.")
+    flag.IntVar(&ret.Nlines, "nline", 0, "Number of lines to plot.")
+    
+    flag.Float64Var(&ret.Scale, "scale", 1.0, "Display scale factor.")
+    flag.Float64Var(&ret.Exp, "exp", 0.35, "Display exponent.")
+    
+    flag.IntVar(&ret.rasArgs.avgFact, "avg", 1000, "Averaging factor of pixels.")
+    flag.IntVar(&ret.rasArgs.headerSize, "header", 0, "Header size?.")
+    
+	err = flag.Parse(args[1:])
+    
+    
+    
+    if err != nil {
+        err = Handle(err, "Failed to parse command line options!")
+        return
+    }
+    
+    ext := str.Split(ret.dat, ".")[-1]
+    
+    if len(ret.Cmd) == 0 {
+        for key, val := range PlotCmdFiles {
+            if val.Contains(ext) {
+                ret.Cmd = key
+            }
+        }
+        
+        if len(ret.Cmd) == 0 {
+            err = Handle(nil,
+                "Could not figure out plot command based on extension '%s'!",
+                ext)
+            return
+        }
+    }
+    
+    return ret, nil
+}
+
+func (dis *Displayer) Plot() error {
+    dat, err := NewDataFile(dis.dat, dis.par)
+    
+    if err != nil {
+        return Handle(err, "Could not parse datafile!")
+    }
+    
+    err = dis.disArgs.Parse(dat)
+    
+    if err != nil {
+        return Handle(err, "Could not parse plotting options!")
+    }
+    
+    switch dis.mode {
+    case "dis":
+        err := Display(dat,  dis.rasArgs.disArgs)
+        
+        if err != nil {
+            return Handle(err, "Failed to execute display!")
+        }
+    
+    case "ras":
+        err := Raster(dat,  dis.rasArgs, dis.sec)
+        
+        if err != nil {
+            return Handle(err, "Failed to execute raster!")
+        }
+    }
+    return nil
+}
+
+var PlotCmdFiles = map[string]Slice{
+    "pwr": Slice{"pix_sigma0", "pix_gamma0", "sbi_pwr", "cc", "rmli", "mli"},
+    "SLC": Slice{"slc", "rslc"},
+    "mph": Slice{"sbi", "sm", "diff", "lookup", "lt"},
+    "hgt": Slice{"hgt", "rdc"},
 }

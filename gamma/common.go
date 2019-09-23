@@ -11,6 +11,7 @@ import (
 )
 
 type (
+    Slice []string
     GammaFun map[string]CmdFun
 
 	settings struct {
@@ -127,4 +128,13 @@ func First() string {
 
 func isclose(num1, num2 float64) bool {
     return math.RoundToEven(math.Abs(num1 - num2)) > 0.0
+}
+
+func (sl Slice) Contains(s string) bool {
+    for _, elem := range sl {
+        if s == elem {
+            return true
+        }
+    }
+    return false
 }

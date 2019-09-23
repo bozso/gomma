@@ -21,8 +21,8 @@ type (
 		Parfile() string
 		Rng() (int, error)
 		Azi() (int, error)
-		Int() (int, error)
-		Float() (float64, error)
+		Int(string) (int, error)
+		Float(string) (float64, error)
 		PlotCmd() string
         ImageFormat() (string, error)
 		//Display(disArgs) error
@@ -47,7 +47,6 @@ type (
 
 	rasArgs struct {
 		disArgs
-		//ext                 string
 		avgFact, headerSize int
 		Avg                 RngAzi
 	}
@@ -64,19 +63,36 @@ func NewDataFile(dat, par string) (ret dataFile, err error) {
 		err = Handle(err, "'dat' should not be an empty string: '%s'", dat)
         return
 	}
-
+    
+    exist, err := Exist(dat)
+    
+    if err != nil {
+        err = Handle(err, "Could not check whether datafile '%s' exists!",
+            dat)
+        return
+    }
+    
+    if !exist {
+        err = Handle(nil, "Datafile '%s' does not exist!", dat)
+        return
+    }
+    
 	if len(par) == 0 {
 		par = dat + ".par"
 	}
 
 	ret.Params = NewGammaParam(par)
-
 	ret.files = []string{dat, par}
 
 	return ret, nil
 }
 
 func NewSLC(dat, par string) (ret SLC, err error) {
+	ret.dataFile, err = NewDataFile(dat, par)
+	return
+}
+
+func NewMLI(dat, par string) (ret MLI, err error) {
 	ret.dataFile, err = NewDataFile(dat, par)
 	return
 }
@@ -115,36 +131,46 @@ func (d *dataFile) Move(path string) error {
 	return nil
 }
 
-func (d *dataFile) Datfile() string {
+func (d dataFile) Datfile() string {
 	return d.dat
 }
 
-func (d *dataFile) Parfile() string {
+func (d dataFile) Parfile() string {
 	return d.par
 }
 
-func (d *dataFile) Rng() (int, error) {
+func (d dataFile) Rng() (int, error) {
 	return d.Int("range_samples")
 }
 
-func (d *dataFile) Azi() (int, error) {
+func (d dataFile) Azi() (int, error) {
 	return d.Int("azimuth_samples")
 }
 
-func (d *dataFile) ImageFormat() (string, error) {
+func (d dataFile) ImageFormat() (string, error) {
 	return d.Par("image_format")
 }
 
-func (d *SLC) PlotFun() string {
+func (d dataFile) PlotCmd() string {
+	return ""
+}
+
+func (d SLC) PlotCmd() string {
 	return "SLC"
+}
+
+func (d MLI) PlotCmd() string {
+	return "MLI"
 }
 
 func (arg *disArgs) Parse(dat DataFile) (err error) {
 	if len(arg.Datfile) == 0 {
 		arg.Datfile = dat.Datfile()
 	}
-	
-    arg.Cmd = dat.PlotCmd()
+    
+    if len(arg.Cmd) == 0 {
+        arg.Cmd = dat.PlotCmd()
+    }
 
 	if arg.Rng == 0 {
 		if arg.Rng, err = dat.Rng(); err != nil {
@@ -171,26 +197,25 @@ func (arg *disArgs) Parse(dat DataFile) (err error) {
 		arg.LR = 0
 	}
 
-	// args.flip = -1 if flip else 1
-
-	/*
-	   if cmd is None:
-	       try:
-	           ext = [ext for ext in parts if ext in extensions][0]
-	       except IndexError:
-	           raise ValueError("Unrecognized extension of file %s. Available "
-	                            "extensions: %s" % (datfile, pr.extensions))
-	       cmd = [cmd for cmd, exts in plot_cmd_files.items()
-	              if ext in exts][0]
-	*/
-
 	return nil
 }
 
 // TODO: Finish
 func (opt *rasArgs) Parse(dat DataFile) error {
 	err := opt.disArgs.Parse(dat)
-
+    
+    if opt.avgFact == 0 {
+        opt.avgFact = 1000
+    }
+    
+    if opt.Avg.Rng == 0 {
+        opt.Avg.Rng = opt.Rng / opt.avgFact
+    }
+    
+    if opt.Avg.Azi == 0 {
+        opt.Avg.Azi = opt.Azi / opt.avgFact
+    }
+    
 	if err != nil {
 		return Handle(err, "Failed to parse display arguments!")
 	}
