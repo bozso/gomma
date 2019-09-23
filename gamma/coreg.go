@@ -83,7 +83,7 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
             REFSLC, err = ref.RSLC(pol)
             
             if err != nil {
-                err = Handle(err, "could not create RSLC")
+                err = Handle(err, "failed to create RSLC")
                 return
             }
             
@@ -99,7 +99,7 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
                               cleaning, flag1, rslcRefTab, rslcRefID)
             
             if err != nil {
-                err = Handle(err, "Coregistration failed!")
+                err = Handle(err, "coregistration failed")
                 return
             }
         }
@@ -111,14 +111,14 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
         ID + ".coreg_quality")
     
     if err != nil {
-        err = Handle(err, "could not create IFG '%s'", ID + ".diff")
+        err = Handle(err, "failed to create IFG '%s'", ID + ".diff")
         return
     }
     
     ok, err := ifg.CheckQuality()
     
     if err != nil {
-        err = Handle(err, "could not check coregistration quality '%s'",
+        err = Handle(err, "failed to check coregistration quality '%s'",
             ifg.quality)
         return
     }

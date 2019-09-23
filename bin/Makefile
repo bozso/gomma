@@ -1,6 +1,8 @@
 MAIN := gamma
 
-$(MAIN): gamma.go
+SRC := $(wildcard ../gamma/*.go)
+
+$(MAIN): gamma.go $(SRC)
 	go build gamma.go
 
 deploy: $(MAIN)

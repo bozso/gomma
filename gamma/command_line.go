@@ -249,7 +249,7 @@ func NewDisplayer(args []string) (ret Displayer, err error) {
 
     mode := args[0]
 
-    if mode != "ras" || mode != "dis" {
+    if mode != "ras" && mode != "dis" {
         err = Handle(nil, "unrecognized display mode '%s'", mode)
         return
     }
@@ -281,14 +281,18 @@ func NewDisplayer(args []string) (ret Displayer, err error) {
     
     err = flag.Parse(args[1:])
     
-    
-    
     if err != nil {
         err = Handle(err, "failed to parse command line options")
         return
     }
     
-    ext := str.Split(ret.dat, ".")[-1]
+    if len(ret.dat) == 0 {
+        err = Handle(nil, "dat should be valied path not empty string")
+        return
+    }
+    
+    split := str.Split(ret.dat, ".")
+    ext := split[len(split)-1]
     
     if len(ret.Cmd) == 0 {
         for key, val := range PlotCmdFiles {

@@ -143,7 +143,7 @@ func (d dataFile) Rng() (int, error) {
 }
 
 func (d dataFile) Azi() (int, error) {
-    return d.Int("azimuth_samples")
+    return d.Int("azimuth_lines")
 }
 
 func (d dataFile) ImageFormat() (string, error) {
@@ -203,22 +203,38 @@ func (arg *disArgs) Parse(dat DataFile) (err error) {
 func (opt *rasArgs) Parse(dat DataFile) error {
     err := opt.disArgs.Parse(dat)
     
+    if err != nil {
+        return Handle(err, "failed to parse display arguments")
+    }
+    
     if opt.avgFact == 0 {
         opt.avgFact = 1000
     }
     
-    if opt.Avg.Rng == 0 {
-        opt.Avg.Rng = opt.Rng / opt.avgFact
+    rng := opt.Avg.Rng
+    
+    if rng == 0 {
+        rng = opt.Rng / opt.avgFact
+        
+        if rng < 0 {
+            rng = 1
+        }
     }
     
-    if opt.Avg.Azi == 0 {
-        opt.Avg.Azi = opt.Azi / opt.avgFact
+    opt.Avg.Rng = rng
+    
+    azi := opt.Avg.Azi
+    
+    if azi == 0 {
+        azi = opt.Azi / opt.avgFact
+        
+        if azi < 0 {
+            azi = 1
+        }
     }
     
-    if err != nil {
-        return Handle(err, "failed to parse display arguments")
-    }
-
+    opt.Avg.Azi = azi
+    
     return nil
 }
 
@@ -251,7 +267,7 @@ func Raster(dat DataFile, opt rasArgs, sec string) (err error) {
     }
     
     cmd := opt.Cmd
-    fun := Gamma.must("dis" + cmd)
+    fun := Gamma.must("ras" + cmd)
 
     raster := fmt.Sprintf("%s.%s", dat.Datfile(), Settings.RasExt)
 

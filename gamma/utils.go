@@ -1,12 +1,12 @@
 package gamma
 
 import (
-    bio "bufio"
     "fmt"
-    io "io/ioutil"
     "log"
     "os"
     "os/exec"
+    bio "bufio"
+    io "io/ioutil"
     fp "path/filepath"
     conv "strconv"
     str "strings"
@@ -70,23 +70,9 @@ func Handle(err error, format string, args ...interface{}) error {
     str := fmt.Sprintf(format, args...)
 
     if err == nil {
-        return fmt.Errorf("%s: ", str)
+        return fmt.Errorf("%s", str)
     } else {
         return fmt.Errorf("%s: %w", str, err)
-    }
-}
-
-func Handler(name string) handlerFun {
-    name = fmt.Sprintf("In %s", name)
-
-    return func(err error, format string, args ...interface{}) error {
-        str := fmt.Sprintf(format, args...)
-
-        if err == nil {
-            return fmt.Errorf("%s: %s\n", name, str)
-        } else {
-            return fmt.Errorf("%s: %s\nError: %w", name, str, err)
-        }
     }
 }
 
@@ -108,7 +94,7 @@ func MakeCmd(cmd string) CmdFun {
         out, err := exec.Command(cmd, arg...).CombinedOutput()
         result := string(out)
 
-        fmt.Printf("%s\n", out)
+        fmt.Printf("%s\n", result)
 
         if err != nil {
             return "", fmt.Errorf(cmdErr, cmd, result, err)
@@ -136,11 +122,9 @@ func NewPath(args ...string) path {
 }
 
 func ReadFile(path string) (ret []byte, err error) {
-    handle := Handler("ReadFile")
-
     f, err := os.Open(path)
     if err != nil {
-        err = handle(err, "Could not open file: '%v'!", path)
+        err = Handle(err, "failed to open file '%s'", path)
         return
     }
 
@@ -148,7 +132,7 @@ func ReadFile(path string) (ret []byte, err error) {
 
     contents, err := io.ReadAll(f)
     if err != nil {
-        err = handle(err, "Could not read file: '%v'!", path)
+        err = Handle(err, "failed to read file '%s'!", path)
         return
     }
 
@@ -165,7 +149,7 @@ func (self *Params) Par(name string) (ret string, err error) {
         file, err = os.Open(self.par)
 
         if err != nil {
-            err = Handle(err, "Could not open file: '%s'!", self.par)
+            err = Handle(err, "failed to open file '%s'", self.par)
             return
         }
 
@@ -186,30 +170,27 @@ func (self *Params) Par(name string) (ret string, err error) {
         }
     }
 
-    err = fmt.Errorf("In Par: Could not find parameter '%s' in %v",
-        name, self.par)
+    err = Handle(nil, "failed to find parameter '%s' in '%s'", name, self.par)
     return
 }
 
-func toInt(par string, idx int) (int, error) {
-    ret, err := conv.Atoi(str.Split(par, " ")[idx])
+func toInt(par string, idx int) (ret int, err error) {
+    ret, err = conv.Atoi(str.Split(par, " ")[idx])
 
     if err != nil {
-        return 0,
-            fmt.Errorf("In toInt: Could not convert string %s to float64!\nError: %w",
-                par, err)
+        err = Handle(err, "failed to convert string '%s' to int", par)
+        return
     }
 
     return ret, nil
 }
 
-func toFloat(par string, idx int) (float64, error) {
-    ret, err := conv.ParseFloat(str.Split(par, " ")[idx], 64)
+func toFloat(par string, idx int) (ret float64, err error) {
+    ret, err = conv.ParseFloat(str.Split(par, " ")[idx], 64)
 
     if err != nil {
-        return 0.0,
-            fmt.Errorf("Could not convert string %s to float64!\nError: %w",
-                par, err)
+        err = Handle(err, "failed to convert string '%s' to float64", par)
+        return
     }
 
     return ret, nil
@@ -239,8 +220,7 @@ func TmpFile() (ret string, err error) {
     file, err := io.TempFile("", "*")
 
     if err != nil {
-        err = fmt.Errorf(
-            "In TmpFile: Failed to create a temporary file!\nError: %w", err)
+        err = Handle(err, "failed to create a temporary file")
         return
     }
 
@@ -253,13 +233,12 @@ func TmpFile() (ret string, err error) {
     return name, nil
 }
 
-func TmpFileExt(ext string) (string, error) {
+func TmpFileExt(ext string) (ret string, err error) {
     file, err := io.TempFile("", "*."+ext)
 
     if err != nil {
-        return "", fmt.Errorf(
-            "In TmpFileExt: Failed to create a temporary file!\nError: %w",
-            err)
+        err = Handle(err, "failed to create a temporary file")
+        return
     }
 
     defer file.Close()
