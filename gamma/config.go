@@ -1,19 +1,19 @@
 package gamma
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
+    "encoding/json"
+    "fmt"
+    "os"
     "log"
-	ref "reflect"
-	//conv "strconv"
-	str "strings"
+    ref "reflect"
+    //conv "strconv"
+    str "strings"
 )
 
 type (
-	minmax struct {
-		Min, Max float64
-	}
+    minmax struct {
+        Min, Max float64
+    }
     
     LatLon struct {
         Lat, Lon float64
@@ -23,52 +23,52 @@ type (
         Rng, Azi int
     }
     
-	general struct {
-		DataPath, OutputDir, Pol, Metafile string
+    general struct {
+        DataPath, OutputDir, Pol, Metafile string
         CachePath                          string `json:"CACHE_PATH"`
-		Looks                              RngAzi
-	}
+        Looks                              RngAzi
+    }
 
-	preselect struct {
-		DateStart, DateStop   string
+    preselect struct {
+        DateStart, DateStop   string
         LowerLeft, UpperRight LatLon
-		CheckZips             bool
-	}
+        CheckZips             bool
+    }
 
-	geocoding struct {
-		DEMPath      string
-		Iter, NPoly  int
+    geocoding struct {
+        DEMPath      string
+        Iter, NPoly  int
         DEMOverlap      RngAzi
         DEMOverSampling LatLon
-	}
+    }
 
-	coreg struct {
-		CoherenceThresh, FractionThresh, PhaseStdevThresh float64
-	}
+    coreg struct {
+        CoherenceThresh, FractionThresh, PhaseStdevThresh float64
+    }
 
-	ifgSelect struct {
-		Bperp  minmax
-		DeltaT minmax
-	}
+    ifgSelect struct {
+        Bperp  minmax
+        DeltaT minmax
+    }
 
-	coherence struct {
-		WeightType             string
-		Box                    minmax
-		SlopeCorrelationThresh float64
-		SlopeWindow            int
-	}
+    coherence struct {
+        WeightType             string
+        Box                    minmax
+        SlopeCorrelationThresh float64
+        SlopeWindow            int
+    }
 
-	config struct {
-		infile    string
+    config struct {
+        infile    string
         General   general
-		PreSelect preselect
-		Geocoding geocoding
-		Coreg     coreg
-		IFGSelect ifgSelect
-		Coherence coherence
-	}
+        PreSelect preselect
+        Geocoding geocoding
+        Coreg     coreg
+        IFGSelect ifgSelect
+        Coherence coherence
+    }
 
-	stepFun func(*config) error
+    stepFun func(*config) error
 )
 
 const (
@@ -76,133 +76,133 @@ const (
 )
 
 var (
-	steps = map[string]stepFun{
-		"select": stepSelect,
+    steps = map[string]stepFun{
+        "select": stepSelect,
         "import": stepImport,
         "coreg":  stepCoreg,
-	}
+    }
 
-	stepList []string
+    stepList []string
 
-	defaultConfig = config{
-		General: general{
-			Pol: "vv",
+    defaultConfig = config{
+        General: general{
+            Pol: "vv",
             Metafile: "meta.json",
             OutputDir: ".",
-			Looks: RngAzi{
+            Looks: RngAzi{
                 Rng: 1,
                 Azi: 1,
             },
-		},
+        },
 
-		PreSelect: preselect{
-			CheckZips:  false,
-		},
+        PreSelect: preselect{
+            CheckZips:  false,
+        },
 
-		Geocoding: geocoding{
-			DEMPath:            "/home/istvan/DEM/srtm.vrt",
-			Iter: 1,
-			DEMOverlap: RngAzi{
+        Geocoding: geocoding{
+            DEMPath:            "/home/istvan/DEM/srtm.vrt",
+            Iter: 1,
+            DEMOverlap: RngAzi{
                 Rng: 100,
                 Azi: 100,
             },
-			NPoly: 1,
-			DEMOverSampling: LatLon{
+            NPoly: 1,
+            DEMOverSampling: LatLon{
                 Lat: 2.0,
                 Lon: 2.0,
             },
-		},
+        },
 
-		Coreg: coreg{
-			CoherenceThresh:  0.8,
-			FractionThresh:   0.01,
-			PhaseStdevThresh: 0.8,
-		},
+        Coreg: coreg{
+            CoherenceThresh:  0.8,
+            FractionThresh:   0.01,
+            PhaseStdevThresh: 0.8,
+        },
 
-		IFGSelect: ifgSelect{
-			Bperp:  minmax{Min: 0.0, Max: 150.0},
-			DeltaT: minmax{Min: 0.0, Max: 15.0},
-		},
+        IFGSelect: ifgSelect{
+            Bperp:  minmax{Min: 0.0, Max: 150.0},
+            DeltaT: minmax{Min: 0.0, Max: 15.0},
+        },
 
-		Coherence: coherence{
-			WeightType:             "gaussian",
-			Box:                    minmax{Min: 3.0, Max: 9.0},
-			SlopeCorrelationThresh: 0.4,
-			SlopeWindow:            5,
-		},
-	}
+        Coherence: coherence{
+            WeightType:             "gaussian",
+            Box:                    minmax{Min: 3.0, Max: 9.0},
+            SlopeCorrelationThresh: 0.4,
+            SlopeWindow:            5,
+        },
+    }
 )
 
 
 func init() {
-	keys := ref.ValueOf(steps).MapKeys()
+    keys := ref.ValueOf(steps).MapKeys()
 
-	stepList = make([]string, len(keys))
+    stepList = make([]string, len(keys))
 
-	for ii, key := range keys {
-		stepList[ii] = key.String()
-	}
+    for ii, key := range keys {
+        stepList[ii] = key.String()
+    }
 }
 
 func delim(msg, sym string) {
-	msg = fmt.Sprintf("%s %s %s", sym, msg, sym)
-	syms := str.Repeat(sym, len(msg))
+    msg = fmt.Sprintf("%s %s %s", sym, msg, sym)
+    syms := str.Repeat(sym, len(msg))
 
-	log.Printf("\n%s\n%s\n%s\n", syms, msg, syms)
+    log.Printf("\n%s\n%s\n%s\n", syms, msg, syms)
 }
 
 
 func MakeDefaultConfig(path string) error {
-	out, err := json.MarshalIndent(defaultConfig, "", "    ")
-	if err != nil {
-		return Handle(err, "Failed to json encode default configuration!")
-	}
+    out, err := json.MarshalIndent(defaultConfig, "", "    ")
+    if err != nil {
+        return Handle(err, "failed to json encode default configuration")
+    }
 
-	f, err := os.Create(path)
-	if err != nil {
-		return Handle(err, "Failed to create file: %v!", path)
-	}
-	defer f.Close()
+    f, err := os.Create(path)
+    if err != nil {
+        return Handle(err, "failed to create file: %s", path)
+    }
+    defer f.Close()
 
-	_, err = f.Write(out)
-	if err != nil {
-		return Handle(err, "Failed to write to file '%v'!", path)
-	}
+    _, err = f.Write(out)
+    if err != nil {
+        return Handle(err, "failed to write to file '%s'", path)
+    }
 
-	return nil
+    return nil
 }
 
 func SaveJson(path string, val interface{}) error {
     out, err := json.MarshalIndent(val, "", "    ")
-	if err != nil {
-		return Handle(err, "Failed to json encode struct: %v!", val)
-	}
+    if err != nil {
+        return Handle(err, "failed to json encode struct: %v", val)
+    }
 
-	f, err := os.Create(path)
-	if err != nil {
-		return Handle(err, "Failed to create file: %v!", path)
-	}
-	defer f.Close()
+    f, err := os.Create(path)
+    if err != nil {
+        return Handle(err, "failed to create file: %s", path)
+    }
+    defer f.Close()
 
-	_, err = f.Write(out)
-	if err != nil {
-		return Handle(err, "Failed to write to file '%v'!", path)
-	}
+    _, err = f.Write(out)
+    if err != nil {
+        return Handle(err, "failed to write to file '%s'", path)
+    }
 
-	return nil
+    return nil
     
 }
 
 func LoadJson(path string, val interface{}) error {
-	data, err := ReadFile(path)
+    data, err := ReadFile(path)
 
-	if err != nil {
-		return Handle(err, "Failed to read file:  '%s'!", path)
-	}
+    if err != nil {
+        return Handle(err, "failed to read file '%s'", path)
+    }
     
-	if err := json.Unmarshal(data, &val); err != nil {
-		return Handle(err, "Failed to parse json data: %s'!", data)
-	}
+    if err := json.Unmarshal(data, &val); err != nil {
+        return Handle(err, "failed to parse json data %s'", data)
+    }
 
-	return nil
+    return nil
 }

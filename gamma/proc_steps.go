@@ -2,14 +2,14 @@ package gamma
 
 
 import (
-	"fmt"
+    "fmt"
     "log"
     "sort"
     "math"
     //"time"
-	fp "path/filepath"
-	//conv "strconv"
-	//str "strings"
+    fp "path/filepath"
+    //conv "strconv"
+    //str "strings"
 )
 
 type(
@@ -31,7 +31,7 @@ func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err err
     s1, err = NewS1Zip(zip, root)
     
     if err != nil {
-        err = Handle(err, "Failed to parse S1Zip data from '%s'", zip)
+        err = Handle(err, "failed to parse S1Zip data from '%s'", zip)
         return
     }
 
@@ -40,7 +40,7 @@ func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err err
     IWs, err = s1.Info(ext)
     
     if err != nil {
-        err = Handle(err, "Failed to parse IW information for zip '%s'",
+        err = Handle(err, "failed to parse IW information for zip '%s'",
             s1.Path)
         return
     }
@@ -54,29 +54,29 @@ func (self *config) extOpt(satellite string) *ExtractOpt {
 }
 
 func stepSelect(self *config) error {
-	dataPath := self.General.DataPath
+    dataPath := self.General.DataPath
     Select := self.PreSelect
     
-	if len(dataPath) == 0 {
-		return fmt.Errorf("DataPath needs to be specified!")
-	}
+    if len(dataPath) == 0 {
+        return fmt.Errorf("DataPath needs to be specified")
+    }
 
-	ll, ur := Select.LowerLeft, Select.UpperRight
+    ll, ur := Select.LowerLeft, Select.UpperRight
 
-	aoi := AOI{
-		Point{X: ll.Lon, Y: ll.Lat}, Point{X: ll.Lon, Y: ur.Lat},
-		Point{X: ur.Lon, Y: ur.Lat}, Point{X: ur.Lon, Y: ll.Lat},
-	}
+    aoi := AOI{
+        Point{X: ll.Lon, Y: ll.Lat}, Point{X: ll.Lon, Y: ur.Lat},
+        Point{X: ur.Lon, Y: ur.Lat}, Point{X: ur.Lon, Y: ll.Lat},
+    }
     
-	extInfo := self.extOpt("sentinel1")
+    extInfo := self.extOpt("sentinel1")
     root := extInfo.root
     
     dateStart, dateStop := Select.DateStart, Select.DateStop
 
-	zipfiles, err := fp.Glob(fp.Join(dataPath, "S1*_IW_SLC*.zip"))
-	if err != nil {
-		return Handle(err, "Glob to find zipfiles failed!")
-	}
+    zipfiles, err := fp.Glob(fp.Join(dataPath, "S1*_IW_SLC*.zip"))
+    if err != nil {
+        return Handle(err, "failed to Glob zipfiles")
+    }
     
     
     var checker, startCheck, stopCheck checkerFun
@@ -87,7 +87,7 @@ func stepSelect(self *config) error {
         _dateStart, err := ParseDate(short, dateStart)
         
         if err != nil {
-            return Handle(err, "Could not parse date '%s' in short format!",
+            return Handle(err, "failed to parse date '%s' in short format",
                 dateStart)
         }
         
@@ -101,7 +101,7 @@ func stepSelect(self *config) error {
         _dateStop, err := ParseDate(short, dateStop)
         
         if err != nil {
-            return Handle(err, "Could not parse date '%s' in short format!",
+            return Handle(err, "failed to parse date '%s' in short format",
                 dateStop)
         }
         
@@ -131,26 +131,26 @@ func stepSelect(self *config) error {
     //
     //}
     
-	// nzip := len(zipfiles)
+    // nzip := len(zipfiles)
 
     if check {
         for _, zip := range zipfiles {
             s1zip, IWs, err := parseS1(zip, root, extInfo)
             if err != nil {
                 return Handle(err,
-                    "Failed to import S1Zip data from '%s'", zip)
+                    "failed to import S1Zip data from '%s'", zip)
             }
             
             if IWs.contains(aoi) && checker(s1zip) {
                 fmt.Printf("%s\n", s1zip.Path)
             }
         }
-	} else {
+    } else {
         for _, zip := range zipfiles {
             s1zip, IWs, err := parseS1(zip, root, extInfo)
             if err != nil {
                 return Handle(err,
-                    "Failed to import S1Zip data from '%s'", zip)
+                    "failed to import S1Zip data from '%s'", zip)
             }
             
             if IWs.contains(aoi) {
@@ -159,13 +159,13 @@ func stepSelect(self *config) error {
         }
     }
     
-	return nil
+    return nil
 }
 
 
 func stepImport(self *config) error {
     if len(self.infile) == 0 {
-        return Handle(nil, "Inputfile must by specified!")
+        return Handle(nil, "inputfile must by specified")
     }
     
     meta := Meta{}
@@ -173,17 +173,17 @@ func stepImport(self *config) error {
     err := LoadJson(path, &meta)
     
     if err != nil {
-        return Handle(err, "Could not parse meta json file '%s'!", path)
+        return Handle(err, "failed to parse meta json file '%s'", path)
     }
     
-	extInfo := self.extOpt("sentinel1")
+    extInfo := self.extOpt("sentinel1")
     root := extInfo.root
     
     path = self.infile
     file, err := NewReader(path)
     
     if err != nil {
-        return Handle(err, "Could not open file '%s' for reading!", path)
+        return Handle(err, "failed to open file '%s'", path)
     }
     
     defer file.Close()
@@ -195,7 +195,7 @@ func stepImport(self *config) error {
         s1zip, err := NewS1Zip(line, root)
         
         if err != nil {
-            return Handle(err, "Failed to parse zipfile '%s'!", line)
+            return Handle(err, "failed to parse zipfile '%s'", line)
         }
         zips = append(zips, s1zip)
     }
@@ -221,7 +221,7 @@ func stepImport(self *config) error {
     
     masterIW, err := master.Info(extInfo)
     if err != nil {
-        return Handle(err, "Failed to parse S1Zip data from master '%s'",
+        return Handle(err, "failed to parse S1Zip data from master '%s'",
             master.Path)
     }
     
@@ -229,7 +229,7 @@ func stepImport(self *config) error {
         iw, err := s1zip.Info(extInfo)
         
         if err != nil {
-            return Handle(err, "Failed to parse S1Zip data from '%s'",
+            return Handle(err, "failed to parse S1Zip data from '%s'",
                 s1zip.Path)
         }
         
@@ -243,7 +243,7 @@ func stepImport(self *config) error {
         
         if err != nil {
             return Handle(err,
-            "Failed to calculate burst number differences between " +
+            "failed to calculate burst number differences between " +
             "master and '%s'", s1zip.Path)
         }
         
@@ -251,7 +251,7 @@ func stepImport(self *config) error {
             err = s1zip.ImportSLC(extInfo)
             
             if err != nil {
-                return Handle(err, "Failed to import S1SLC files!")
+                return Handle(err, "failed to import S1SLC files")
             }
             
             fmt.Printf("%s\n", s1zip.Path)
@@ -263,7 +263,7 @@ func stepImport(self *config) error {
     err = SaveJson(path, meta)
     
     if err != nil {
-        return Handle(err, "Failed to write metadata to '%s'!", path)
+        return Handle(err, "failed to write metadata to '%s'", path)
     }
     
     return nil
@@ -277,7 +277,7 @@ func stepCoreg(self *config) error {
     err := LoadJson(path, &meta)
     
     if err != nil {
-        return Handle(err, "Failed to read metadata from: '%s'!", path)
+        return Handle(err, "failed to read metadata from '%s'", path)
     }
     
     midx := meta.MasterIdx
@@ -286,7 +286,7 @@ func stepCoreg(self *config) error {
     file, err := NewReader(path)
     
     if err != nil {
-        return Handle(err, "Could not open file '%s' for reading!", path)
+        return Handle(err, "failed to open file '%s'", path)
     }
     
     defer file.Close()
@@ -298,7 +298,7 @@ func stepCoreg(self *config) error {
         s1, err := NewS1Zip(line, root)
         
         if err != nil {
-            return Handle(err, "Failed to parse S1Zip data from '%s'",
+            return Handle(err, "failed to parse S1Zip data from '%s'",
                 line)
         }
         
@@ -312,7 +312,7 @@ func stepCoreg(self *config) error {
     mslc, err := mzip.SLC(pol)
     
     if err != nil {
-        return Handle(err, "Failed to import master SLC data!")
+        return Handle(err, "failed to import master SLC data")
     }
     
     master := S1Coreg{
@@ -337,14 +337,14 @@ func stepCoreg(self *config) error {
         ok, err := master.Coreg(curr, prev)
         
         if err != nil {
-            return Handle(err, "Coregistration failed!")
+            return Handle(err, "coregistration failed")
         }
         
         fmt.Println("%s\n", err)
         
         if !ok {
             log.Printf("%s\n",
-                Handle(err,"Coregistration of '%s' failed!", curr.Path))
+                Handle(err, "coregistration of '%s' failed", curr.Path))
             log.Fatalf("First.\n")
             continue
         }
@@ -363,11 +363,11 @@ func stepCoreg(self *config) error {
         ok, err := master.Coreg(curr, prev)
         
         if err != nil {
-            return Handle(err, "Coregistration failed!")
+            return Handle(err, "coregistration failed")
         }
         
         if !ok {
-            log.Printf("%s\n", Handle(err,"Coregistration of '%s' failed!",
+            log.Printf("%s\n", Handle(err, "coregistration of '%s' failed!",
                 curr.Center()))
             continue
         }
@@ -398,7 +398,7 @@ func stepCoreg(self *config) error {
         // S1Coreg(mslc, )
     }
     */
-	return nil
+    return nil
 }
 
 /*

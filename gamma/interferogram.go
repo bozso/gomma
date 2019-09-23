@@ -67,7 +67,7 @@ func NewCoherence(dat, par string) (ret Coherence, err error) {
 
 func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
     if len(dat) == 0 {
-        err = Handle(nil, "'dat' should not be an empty string!")
+        err = Handle(nil, "'dat' should not be an empty string")
         return
     }
     
@@ -114,7 +114,7 @@ func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
     _, err = createOffset(par1, par2, off, opt.algo, rng, azi, inter)
     
     if err != nil {
-        err = Handle(err, "Creation of offset table failed!")
+        err = Handle(err, "failed to create offset table")
         return
     }
     
@@ -128,7 +128,7 @@ func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
                          nil, nil, 1)
     
     if err != nil {
-        err = Handle(err, "Could not create simulated orbital phase!")
+        err = Handle(err, "failed to create simulated orbital phase")
         return
     }
     
@@ -137,14 +137,14 @@ func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
                          simUnw, diff, rng, azi, 0, 0)
     
     if err != nil {
-        err = Handle(err, "Failed to create differential interferogram!")
+        err = Handle(err, "failed to create differential interferogram")
         return
     }
     
     ret, err = NewIFG(diff, off, "", "", "")
     
     if err != nil {
-        err = Handle(err, "Could not create new interferogram struct!")
+        err = Handle(err, "failed to create new interferogram struct")
         return
     }
     
@@ -169,13 +169,12 @@ def img_fmt(self):
 
 
 func (self *IFG) CheckQuality() (ret bool, err error) {
-    handle := Handler("IFG:CheckQuality")
     qual := self.quality
     
     file, err := os.Create(qual)
     
     if err != nil {
-        err = handle(err, "Could not open file: '%s'!", qual)
+        err = Handle(err, "failed to open file '%s'", qual)
         return
     }
     
@@ -195,7 +194,7 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
             diff, err = conv.ParseFloat(split, 64)
             
             if err != nil {
-                err = handle(err, "Could no parse: '%s' into float64!", split)
+                err = Handle(err, "failed to parse: '%s' into float64", split)
                 return
             }
             
@@ -203,7 +202,7 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
         }
     }
     
-    log.Printf("Sum of azimuth offsets in %s is %f pixel.", qual, offs)
+    log.Printf("Sum of azimuth offsets in %s is %f pixel.\n", qual, offs)
     
     if isclose(offs, 0.0) {
         ret = true
@@ -215,7 +214,6 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
 }
 
 func (self *IFG) AdaptFilt(opt *AdaptFiltOpt ) (ret IFG, cc Coherence, err error) {
-    handle := Handler("IFG.AdaptFilt")
     step := float64(opt.FFTWindow) / 8.0
     
     if opt.step > 0.0 {
@@ -226,14 +224,14 @@ func (self *IFG) AdaptFilt(opt *AdaptFiltOpt ) (ret IFG, cc Coherence, err error
     ret, err = NewIFG(self.dat + ".filt", "", "", "", "")
     
     if err != nil {
-        err = handle(err, "Could not create new interferogram struct!")
+        err = Handle(err, "failed to create new interferogram struct")
         return
     }
     
     cc, err = NewCoherence("", "")
     
     if err != nil {
-        err = handle(err, "Could not create new dataFile struct!")
+        err = Handle(err, "failed to create new dataFile struct")
         return
     }
     
@@ -248,7 +246,7 @@ func (self *IFG) AdaptFilt(opt *AdaptFiltOpt ) (ret IFG, cc Coherence, err error
     rng, err := self.Rng()
     
     if err != nil {
-        err = handle(err, "Could not retreive range samples!")
+        err = Handle(err, "failed to retreive range samples")
         return
     }
     
@@ -257,7 +255,7 @@ func (self *IFG) AdaptFilt(opt *AdaptFiltOpt ) (ret IFG, cc Coherence, err error
                  opt.frac)
     
     if err != nil {
-        err = handle(err, "Adaptive filtering failed!")
+        err = Handle(err, "adaptive filtering failed")
         return
     }
     
@@ -265,7 +263,6 @@ func (self *IFG) AdaptFilt(opt *AdaptFiltOpt ) (ret IFG, cc Coherence, err error
 }
 
 func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
-    handle := Handler("IFG.Coherence")
     weightFlag := CoherenceWeight[opt.WeightType]
     var width int
     
@@ -275,7 +272,7 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
     width, err = self.Rng()
     
     if err != nil {
-        err = handle(err, "Could not retreive range samples!")
+        err = Handle(err, "failed to retreive range samples")
         return
     }
     
@@ -289,7 +286,7 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
                         opt.SlopeCorrelationThresh)
     
     if err != nil {
-        err = Handle(err, "Calculation of phase slope failed!")
+        err = Handle(err, "failed to calculate phase slope")
         return
     }
 
@@ -301,7 +298,7 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
                         opt.Box.Min, opt.Box.Max, weightFlag)
     
     if err != nil {
-        err = Handle(err, "Adaptive filtering failed!")
+        err = Handle(err, "adaptive filtering failed")
         return
     }
     

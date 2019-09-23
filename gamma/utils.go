@@ -1,40 +1,40 @@
 package gamma
 
 import (
-	bio "bufio"
-	"fmt"
-	io "io/ioutil"
-	"log"
-	"os"
-	"os/exec"
-	fp "path/filepath"
-	conv "strconv"
-	str "strings"
+    bio "bufio"
+    "fmt"
+    io "io/ioutil"
+    "log"
+    "os"
+    "os/exec"
+    fp "path/filepath"
+    conv "strconv"
+    str "strings"
 )
 
 type (
-	CmdFun     func(args ...interface{}) (string, error)
-	handlerFun func(err error, format string, args ...interface{}) error
-	Joiner     func(args ...string) string
+    CmdFun     func(args ...interface{}) (string, error)
+    handlerFun func(err error, format string, args ...interface{}) error
+    Joiner     func(args ...string) string
 
-	FileReader struct {
-		*bio.Scanner
-		*os.File
-	}
+    FileReader struct {
+        *bio.Scanner
+        *os.File
+    }
 
-	Params struct {
-		par, sep string
-		contents []string
-	}
+    Params struct {
+        par, sep string
+        contents []string
+    }
 
-	Tmp struct {
-		files []string
-	}
+    Tmp struct {
+        files []string
+    }
 
-	path struct {
-		path  string
-		parts []string
-	}
+    path struct {
+        path  string
+        parts []string
+    }
 )
 
 const cmdErr = `Command '%v' failed!
@@ -44,238 +44,238 @@ Output of command is: %v
 var tmp = Tmp{}
 
 func Empty(s string) bool {
-	return len(s) == 0
+    return len(s) == 0
 }
 
 func Exist(s string) (ret bool, err error) {
-	_, err = os.Stat(s)
+    _, err = os.Stat(s)
 
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
+    if err != nil {
+        if os.IsNotExist(err) {
+            return false, nil
+        }
+        return false, err
+    }
+    return true, nil
 }
 
 func Fatal(err error, format string, args ...interface{}) {
-	if err != nil {
-		str := fmt.Sprintf(format, args...)
-		log.Fatalf("Error: %s\nError: %s", str, err)
-	}
+    if err != nil {
+        str := fmt.Sprintf(format, args...)
+        log.Fatalf("Error: %s\nError: %s", str, err)
+    }
 }
 
 func Handle(err error, format string, args ...interface{}) error {
-	str := fmt.Sprintf(format, args...)
+    str := fmt.Sprintf(format, args...)
 
-	if err == nil {
-		return fmt.Errorf("%s\n", str)
-	} else {
-		return fmt.Errorf("%s\n%w", str, err)
-	}
+    if err == nil {
+        return fmt.Errorf("%s: ", str)
+    } else {
+        return fmt.Errorf("%s: %w", str, err)
+    }
 }
 
 func Handler(name string) handlerFun {
-	name = fmt.Sprintf("In %s", name)
+    name = fmt.Sprintf("In %s", name)
 
-	return func(err error, format string, args ...interface{}) error {
-		str := fmt.Sprintf(format, args...)
+    return func(err error, format string, args ...interface{}) error {
+        str := fmt.Sprintf(format, args...)
 
-		if err == nil {
-			return fmt.Errorf("%s: %s\n", name, str)
-		} else {
-			return fmt.Errorf("%s: %s\nError: %w", name, str, err)
-		}
-	}
+        if err == nil {
+            return fmt.Errorf("%s: %s\n", name, str)
+        } else {
+            return fmt.Errorf("%s: %s\nError: %w", name, str, err)
+        }
+    }
 }
 
 func MakeCmd(cmd string) CmdFun {
-	return func(args ...interface{}) (string, error) {
-		arg := make([]string, len(args))
+    return func(args ...interface{}) (string, error) {
+        arg := make([]string, len(args))
 
-		for ii, elem := range args {
-			if elem != nil {
-				arg[ii] = fmt.Sprint(elem)
-			} else {
-				arg[ii] = "-"
-			}
-		}
+        for ii, elem := range args {
+            if elem != nil {
+                arg[ii] = fmt.Sprint(elem)
+            } else {
+                arg[ii] = "-"
+            }
+        }
 
-		//fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
-		//os.Exit(0)
+        //fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
+        //os.Exit(0)
 
-		out, err := exec.Command(cmd, arg...).CombinedOutput()
-		result := string(out)
+        out, err := exec.Command(cmd, arg...).CombinedOutput()
+        result := string(out)
 
-		fmt.Printf("%s\n", out)
+        fmt.Printf("%s\n", out)
 
-		if err != nil {
-			return "", fmt.Errorf(cmdErr, cmd, result, err)
-		}
+        if err != nil {
+            return "", fmt.Errorf(cmdErr, cmd, result, err)
+        }
 
-		return result, nil
-	}
+        return result, nil
+    }
 }
 
 func NewReader(path string) (ret FileReader, err error) {
-	ret.File, err = os.Open(path)
+    ret.File, err = os.Open(path)
 
-	if err != nil {
-		err = Handle(err, "Could not open file '%s'!", path)
-		return
-	}
+    if err != nil {
+        err = Handle(err, "Could not open file '%s'!", path)
+        return
+    }
 
-	ret.Scanner = bio.NewScanner(ret.File)
+    ret.Scanner = bio.NewScanner(ret.File)
 
-	return ret, nil
+    return ret, nil
 }
 
 func NewPath(args ...string) path {
-	return path{fp.Join(args...), args}
+    return path{fp.Join(args...), args}
 }
 
 func ReadFile(path string) (ret []byte, err error) {
-	handle := Handler("ReadFile")
+    handle := Handler("ReadFile")
 
-	f, err := os.Open(path)
-	if err != nil {
-		err = handle(err, "Could not open file: '%v'!", path)
-		return
-	}
+    f, err := os.Open(path)
+    if err != nil {
+        err = handle(err, "Could not open file: '%v'!", path)
+        return
+    }
 
-	defer f.Close()
+    defer f.Close()
 
-	contents, err := io.ReadAll(f)
-	if err != nil {
-		err = handle(err, "Could not read file: '%v'!", path)
-		return
-	}
+    contents, err := io.ReadAll(f)
+    if err != nil {
+        err = handle(err, "Could not read file: '%v'!", path)
+        return
+    }
 
-	return contents, nil
+    return contents, nil
 }
 
 func FromString(params, sep string) Params {
-	return Params{par: "", sep: sep, contents: str.Split(params, "\n")}
+    return Params{par: "", sep: sep, contents: str.Split(params, "\n")}
 }
 
 func (self *Params) Par(name string) (ret string, err error) {
-	if self.contents == nil {
-		var file *os.File
-		file, err = os.Open(self.par)
+    if self.contents == nil {
+        var file *os.File
+        file, err = os.Open(self.par)
 
-		if err != nil {
-			err = Handle(err, "Could not open file: '%s'!", self.par)
-			return
-		}
+        if err != nil {
+            err = Handle(err, "Could not open file: '%s'!", self.par)
+            return
+        }
 
-		defer file.Close()
-		scanner := bio.NewScanner(file)
+        defer file.Close()
+        scanner := bio.NewScanner(file)
 
-		for scanner.Scan() {
-			line := scanner.Text()
-			if str.Contains(line, name) {
-				return str.Trim(str.Split(line, self.sep)[1], " "), nil
-			}
-		}
-	} else {
-		for _, line := range self.contents {
-			if str.Contains(line, name) {
-				return str.Trim(str.Split(line, self.sep)[1], " "), nil
-			}
-		}
-	}
+        for scanner.Scan() {
+            line := scanner.Text()
+            if str.Contains(line, name) {
+                return str.Trim(str.Split(line, self.sep)[1], " "), nil
+            }
+        }
+    } else {
+        for _, line := range self.contents {
+            if str.Contains(line, name) {
+                return str.Trim(str.Split(line, self.sep)[1], " "), nil
+            }
+        }
+    }
 
-	err = fmt.Errorf("In Par: Could not find parameter '%s' in %v",
-		name, self.par)
-	return
+    err = fmt.Errorf("In Par: Could not find parameter '%s' in %v",
+        name, self.par)
+    return
 }
 
 func toInt(par string, idx int) (int, error) {
-	ret, err := conv.Atoi(str.Split(par, " ")[idx])
+    ret, err := conv.Atoi(str.Split(par, " ")[idx])
 
-	if err != nil {
-		return 0,
-			fmt.Errorf("In toInt: Could not convert string %s to float64!\nError: %w",
-				par, err)
-	}
+    if err != nil {
+        return 0,
+            fmt.Errorf("In toInt: Could not convert string %s to float64!\nError: %w",
+                par, err)
+    }
 
-	return ret, nil
+    return ret, nil
 }
 
 func toFloat(par string, idx int) (float64, error) {
-	ret, err := conv.ParseFloat(str.Split(par, " ")[idx], 64)
+    ret, err := conv.ParseFloat(str.Split(par, " ")[idx], 64)
 
-	if err != nil {
-		return 0.0,
-			fmt.Errorf("Could not convert string %s to float64!\nError: %w",
-				par, err)
-	}
+    if err != nil {
+        return 0.0,
+            fmt.Errorf("Could not convert string %s to float64!\nError: %w",
+                par, err)
+    }
 
-	return ret, nil
+    return ret, nil
 }
 
 func (self Params) Int(name string) (int, error) {
-	data, err := self.Par(name)
+    data, err := self.Par(name)
 
-	if err != nil {
-		return 0, err
-	}
+    if err != nil {
+        return 0, err
+    }
 
-	return toInt(data, 0)
+    return toInt(data, 0)
 }
 
 func (self Params) Float(name string) (float64, error) {
-	data, err := self.Par(name)
+    data, err := self.Par(name)
 
-	if err != nil {
-		return 0.0, err
-	}
+    if err != nil {
+        return 0.0, err
+    }
 
-	return toFloat(data, 0)
+    return toFloat(data, 0)
 }
 
 func TmpFile() (ret string, err error) {
-	file, err := io.TempFile("", "*")
+    file, err := io.TempFile("", "*")
 
-	if err != nil {
-		err = fmt.Errorf(
-			"In TmpFile: Failed to create a temporary file!\nError: %w", err)
-		return
-	}
+    if err != nil {
+        err = fmt.Errorf(
+            "In TmpFile: Failed to create a temporary file!\nError: %w", err)
+        return
+    }
 
-	defer file.Close()
+    defer file.Close()
 
-	name := file.Name()
+    name := file.Name()
 
-	tmp.files = append(tmp.files, name)
+    tmp.files = append(tmp.files, name)
 
-	return name, nil
+    return name, nil
 }
 
 func TmpFileExt(ext string) (string, error) {
-	file, err := io.TempFile("", "*."+ext)
+    file, err := io.TempFile("", "*."+ext)
 
-	if err != nil {
-		return "", fmt.Errorf(
-			"In TmpFileExt: Failed to create a temporary file!\nError: %w",
-			err)
-	}
+    if err != nil {
+        return "", fmt.Errorf(
+            "In TmpFileExt: Failed to create a temporary file!\nError: %w",
+            err)
+    }
 
-	defer file.Close()
+    defer file.Close()
 
-	name := file.Name()
+    name := file.Name()
 
-	tmp.files = append(tmp.files, name)
+    tmp.files = append(tmp.files, name)
 
-	return name, nil
+    return name, nil
 }
 
 func RemoveTmp() {
-	log.Printf("Removing temporary files...\n")
-	for _, file := range tmp.files {
-		if err := os.Remove(file); err != nil {
-			log.Printf("Failed to remove temporary file '%s': %s\n", file, err)
-		}
-	}
+    log.Printf("Removing temporary files...\n")
+    for _, file := range tmp.files {
+        if err := os.Remove(file); err != nil {
+            log.Printf("Failed to remove temporary file '%s': %s\n", file, err)
+        }
+    }
 }

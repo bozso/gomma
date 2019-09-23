@@ -1,78 +1,76 @@
 package gamma
 
 import (
-	"fmt"
-	"time"
+    //"fmt"
+    "time"
 )
 
 type (
-	date struct {
-		start, stop, center time.Time
-	}
+    date struct {
+        start, stop, center time.Time
+    }
 
-	Date interface {
-		Start() time.Time
-		Stop() time.Time
-		Center() time.Time
-	}
-	dateFormat int
+    Date interface {
+        Start() time.Time
+        Stop() time.Time
+        Center() time.Time
+    }
+    dateFormat int
 )
 
 const (
-	DateShort = "20060102"
-	DateLong  = "20060102T150405"
+    DateShort = "20060102"
+    DateLong  = "20060102T150405"
 
-	long dateFormat = iota
-	short
+    long dateFormat = iota
+    short
 )
 
-func ParseDate(format dateFormat, str string) (time.Time, error) {
-	var form string
+func ParseDate(format dateFormat, str string) (ret time.Time, err error) {
+    var form string
 
-	switch format {
-	case long:
-		form = DateLong
-	case short:
-		form = DateShort
-	default:
-		break
-	}
+    switch format {
+    case long:
+        form = DateLong
+    case short:
+        form = DateShort
+    default:
+        break
+    }
 
-	ret, err := time.Parse(form, str)
+    ret, err = time.Parse(form, str)
 
-	if err != nil {
-		return time.Time{},
-			fmt.Errorf("In ParseDate: Failed to parse date: %s!\nError: %w",
-				str, err)
-	}
+    if err != nil {
+        err = Handle(err, "failed to parse date '%s'", str)
+        return
+    }
 
-	return ret, nil
+    return ret, nil
 }
 
 func NewDate(format dateFormat, start, stop string) (ret date, err error) {
-	handle := Handler("NewDate")
     var _start, _stop time.Time
     
-	_start, err = ParseDate(format, start)
-	if err != nil {
-		err = handle(err, "Could not parse date: '%s'", start)
+    _start, err = ParseDate(format, start)
+    if err != nil {
+        err = Handle(err, "failed to parse date: '%s'", start)
         return
-	}
+    }
 
-	_stop, err = ParseDate(format, stop)
-	if err != nil {
-		err = handle(err, "Could not parse date: '%s'", start)
+    _stop, err = ParseDate(format, stop)
+    if err != nil {
+        err = Handle(err, "failed to parse date: '%s'", start)
         return
-	}
+    }
 
-	// TODO: Optional check duration, is it max or min
-	delta := _start.Sub(_stop) / 2.0
-	ret.center = _stop.Add(delta)
+    // TODO: Optional check duration, is it max or min
+    delta := _start.Sub(_stop) / 2.0
+    ret.center = _stop.Add(delta)
 
-	ret.start = _start
-	ret.stop = _stop
+    ret.start = _start
+    ret.stop = _stop
 
-	return ret, nil
+    return ret, nil
 }
 
 func (self *date) Start() time.Time {
@@ -92,16 +90,16 @@ func Before(one, two Date) bool {
 }
 
 func date2str(date Date, format dateFormat) string {
-	var layout string
+    var layout string
 
-	switch format {
-	case long:
-		layout = DateLong
-	case short:
-		layout = DateShort
-	default:
-		break
-	}
+    switch format {
+    case long:
+        layout = DateLong
+    case short:
+        layout = DateShort
+    default:
+        break
+    }
 
-	return date.Center().Format(layout)
+    return date.Center().Format(layout)
 }

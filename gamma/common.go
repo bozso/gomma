@@ -3,9 +3,9 @@ package gamma
 import (
     "log"
     "math"
-	//"fmt"
-	//"os"
-	fp "path/filepath"
+    //"fmt"
+    //"os"
+    fp "path/filepath"
     pt "path"
     str "strings"
 )
@@ -14,74 +14,74 @@ type (
     Slice []string
     GammaFun map[string]CmdFun
 
-	settings struct {
-		RasExt    string
-		path      string
-		modules   []string
-	}
+    settings struct {
+        RasExt    string
+        path      string
+        modules   []string
+    }
 
-	Point struct {
-		X, Y float64
-	}
+    Point struct {
+        X, Y float64
+    }
     
     AOI [4]Point
     
-	Rect struct {
-		Max, Min Point
-	}
+    Rect struct {
+        Max, Min Point
+    }
 )
 
 const (
-	useVersion = "20181130"
-	BufSize    = 50
+    useVersion = "20181130"
+    BufSize    = 50
 )
 
 var (
-	versions = map[string]string{
-		"20181130": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
-	}
+    versions = map[string]string{
+        "20181130": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
+    }
 
-	Pols = [4]string{"vv", "hh", "hv", "vh"}
+    Pols = [4]string{"vv", "hh", "hv", "vh"}
 
-	DataTypes = map[string]int{
-		"FCOMPLEX":  0,
-		"SCOMPLEX":  1,
-		"FLOAT":     0,
-		"SHORT_INT": 1,
-		"DOUBLE":    2,
-	}
-	Gamma = makeGamma()
-	Imv   = MakeCmd("eog")
+    DataTypes = map[string]int{
+        "FCOMPLEX":  0,
+        "SCOMPLEX":  1,
+        "FLOAT":     0,
+        "SHORT_INT": 1,
+        "DOUBLE":    2,
+    }
+    Gamma = makeGamma()
+    Imv   = MakeCmd("eog")
 
-	Settings = settings{
-		RasExt:  "bmp",
-		path:    versions[useVersion],
-		modules: []string{"DIFF", "DISP", "ISP", "LAT", "IPTA"},
-	}
+    Settings = settings{
+        RasExt:  "bmp",
+        path:    versions[useVersion],
+        modules: []string{"DIFF", "DISP", "ISP", "LAT", "IPTA"},
+    }
 )
 
 func makeGamma() GammaFun {
-	Path := Settings.path
+    Path := Settings.path
 
-	result := make(map[string]CmdFun)
+    result := make(map[string]CmdFun)
 
-	for _, module := range Settings.modules {
-		for _, dir := range [2]string{"bin", "scripts"} {
+    for _, module := range Settings.modules {
+        for _, dir := range [2]string{"bin", "scripts"} {
 
-			_path := fp.Join(Path, module, dir, "*")
-			glob, err := fp.Glob(_path)
+            _path := fp.Join(Path, module, dir, "*")
+            glob, err := fp.Glob(_path)
 
-			if err != nil {
-				Fatal(err, "makeGamma: Glob '%s' failed! %s", _path, err)
-			}
+            if err != nil {
+                Fatal(err, "Glob '%s' failed! %s", _path, err)
+            }
 
-			for _, path := range glob {
-				result[fp.Base(path)] = MakeCmd(path)
-			}
-		}
-	}
+            for _, path := range glob {
+                result[fp.Base(path)] = MakeCmd(path)
+            }
+        }
+    }
 
-	return result
+    return result
 }
 
 func (self GammaFun) selectFun(name1, name2 string) CmdFun {
@@ -94,7 +94,7 @@ func (self GammaFun) selectFun(name1, name2 string) CmdFun {
     ret, ok = self[name2]
     
     if !ok {
-        log.Fatalf("Either '%s' or '%s' must be an available executable!",
+        log.Fatalf("either '%s' or '%s' must be an available executable",
             name1, name2)
     }
     
@@ -105,7 +105,7 @@ func (self GammaFun) must(name string) (ret CmdFun) {
     ret, ok := self[name]
     
     if !ok {
-        log.Fatalf("Could not find Gamma executable '%s'!", name)
+        log.Fatalf("failed to find Gamma executable '%s'", name)
     }
     
     return
@@ -118,12 +118,12 @@ func NoExt(path string) string {
 
 
 func (self *Point) InRect(r *Rect) bool {
-	return (self.X < r.Max.X && self.X > r.Min.X &&
+    return (self.X < r.Max.X && self.X > r.Min.X &&
             self.Y < r.Max.Y && self.Y > r.Min.Y)
 }
 
 func First() string {
-	return "First"
+    return "First"
 }
 
 func isclose(num1, num2 float64) bool {
