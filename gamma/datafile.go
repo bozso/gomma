@@ -36,12 +36,24 @@ type (
     MLI struct {
         dataFile
     }
-
+    
+    ScaleExp struct {
+        Scale, Exp float64
+    }
+    
+    // TODO: add loff, nlines
+    MLIOpt struct {
+        refTab string
+        Looks RngAzi
+        windowFlag bool
+        ScaleExp
+    }
+    
     disArgs struct {
         Flip                 bool
         ImgFmt, Datfile, Cmd string
         Start, Nlines, LR    int
-        Scale, Exp           float64
+        ScaleExp
         RngAzi
     }
 

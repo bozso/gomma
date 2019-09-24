@@ -50,6 +50,7 @@ var (
         "SHORT_INT": 1,
         "DOUBLE":    2,
     }
+    
     Gamma = makeGamma()
     Imv   = MakeCmd("eog")
 

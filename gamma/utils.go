@@ -14,7 +14,6 @@ import (
 
 type (
     CmdFun     func(args ...interface{}) (string, error)
-    handlerFun func(err error, format string, args ...interface{}) error
     Joiner     func(args ...string) string
 
     FileReader struct {
