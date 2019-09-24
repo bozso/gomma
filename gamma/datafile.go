@@ -68,13 +68,13 @@ func NewGammaParam(path string) Params {
     return Params{par: path, sep: ":", contents: nil}
 }
 
-func NewDataFile(dat, par string) (ret dataFile, err error) {
-    ret.dat = dat
-
+func NewDataFile(dat, par, ext string) (ret dataFile, err error) {
     if len(dat) == 0 {
-        err = Handle(err, "'dat' should not be an empty string: '%s'", dat)
+        err = Handle(err, "'dat' should not be an empty string", dat)
         return
     }
+    
+    ret.dat = dat
     
     exist, err := Exist(dat)
     
@@ -85,14 +85,31 @@ func NewDataFile(dat, par string) (ret dataFile, err error) {
     }
     
     if !exist {
-        err = Handle(nil, "Datafile '%s' does not exist", dat)
+        err = Handle(nil, "datafile '%s' does not exist", dat)
         return
     }
     
     if len(par) == 0 {
-        par = dat + ".par"
+        par = "par"
     }
-
+    
+    if len(par) == 0 {
+        par = fmt.Sprintf("%s.%s", dat, ext)
+    }
+    
+    exist, err = Exist(par)
+    
+    if err != nil {
+        err = Handle(err, "failed to check whether parfile '%s' exists",
+            dat)
+        return
+    }
+    
+    if !exist {
+        err = Handle(nil, "parfile '%s' does not exist", dat)
+        return
+    }
+    
     ret.Params = NewGammaParam(par)
     ret.files = []string{dat, par}
 
@@ -100,12 +117,12 @@ func NewDataFile(dat, par string) (ret dataFile, err error) {
 }
 
 func NewSLC(dat, par string) (ret SLC, err error) {
-    ret.dataFile, err = NewDataFile(dat, par)
+    ret.dataFile, err = NewDataFile(dat, par, "par")
     return
 }
 
 func NewMLI(dat, par string) (ret MLI, err error) {
-    ret.dataFile, err = NewDataFile(dat, par)
+    ret.dataFile, err = NewDataFile(dat, par, "par")
     return
 }
 
