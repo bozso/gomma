@@ -1,50 +1,79 @@
 package gamma
 
+import (
+    "log"
+    "os"
+    fp "path/filepath"
+    str "strings"
+    conv "strconv"
+)
+
 type (
     DEM struct {
         dataFile
-        lookup string
+        lookup, lookupOld string
     }
     
     Geo2RadarOpt struct {
         width, nlines, dtype int
-        interp geo2radarMode
+        interpolMode InterpolationMode
     }
     
-    geo2radarMode int
-    radar2geoMode int
-    plotMode int
+    Radar2GeoOpt struct {
+        Geo2RadarOpt
+        flipInput, flipOutput bool
+        order int
+    }
+    
+    InterpolationMode int
+    DEMPlot int
     
     Geocode struct {
         MLI
-        hgt, simSar, zenith, orient, inc, pix, psi, lsMap, diffPar, offs,
-        ccp, coffs, coffsets string
+        hgt, simSar, zenith, orient, inc, pix, psi, lsMap, diffPar,
+        offs, offsets, ccp, coffs, coffsets, sigma0, gamma0 string
     }
     
     GeoPlotOpt struct {
-        
+        rasArgs
+        startHgt, startPwr int
+        cycle float64
+    }
+    
+    Geocoder struct {
+        mli MLI
+        geocoding
+        outDir string
+    }
+    
+    GeoMeta struct {
+        dem, demOrig DEM
+        geo Geocode
     }
 )   
 
 const (
-    Distance geo2radarMode = iota
-    NearestNeighbour
-    SqaredDistance
+    NearestNeighbour InterpolationMode = iota
+    BicubicSpline
+    BicubicSplineLog
+    BicubicSplineSqrt
+    BSpline
+    BSplineSqrt
+    Lanczos
+    LanczosSqrt
+    InvDist
+    InvSquaredDist
     Constant
     Gauss
 )
 
 const (
-    NearestNeighbour radar2geoMode = iota
-)
-
-const (
-    Dem plotMode plotMode = iota
+    Dem DEMPlot = iota
     Lookup
 )
     
 
-func NewDEM(dat, par, lookup string) (ret DEM, err error) {
+func NewDEM(dat, par, lookup, lookupOld string) (ret DEM, err error) {
     ret.dataFile, err = NewDataFile(par, dat, "par")
     
     if err != nil {
@@ -52,7 +81,8 @@ func NewDEM(dat, par, lookup string) (ret DEM, err error) {
         return
     }
     
-    ret.files = []string{dat, par, lookup}
+    ret.lookup, ret.lookupOld = lookup, lookupOld
+    ret.files = []string{dat, par, lookup, lookupOld}
 
     return ret, nil    
 }
@@ -72,14 +102,32 @@ func (dem *DEM) geo2radar(infile, outfile string, opt Geo2RadarOpt) error {
         return Handle(nil, "datafile width must be specified")
     }
     
+    interp := 0
+    
+    switch opt.interpolMode {
+    case InvDist:
+        interp = 0
+    case NearestNeighbour:
+        interp = 1
+    case InvSquaredDist:
+        interp = 2
+    case Constant:
+        interp = 3
+    case Gauss:
+        interp = 4
+    default:
+        return Handle(nil, "unrecognized interpolation option")
+    }
+    
     rng, err := dem.Rng()
     
     if err != nil {
         return Handle(err, "failed to retreive DEM width")
     }
     
-    return g2r(dem.lookup, infile, rng, outfile, opt.width, opt.nlines,
-               opt.interp, opt.dtype)
+    _, err = g2r(dem.lookup, infile, rng, outfile, opt.width, opt.nlines,
+                 interp, opt.dtype)
+    return err
 }
 
 var r2g = Gamma.must("geocode_back")
@@ -99,14 +147,43 @@ func (dem *DEM) radar2geo(infile, outfile string, opt Radar2GeoOpt) error {
         opt.order = 5
     }
     
+    var interp int
+    
+    // default interpolation mode
+    if opt.interpolMode == NearestNeighbour {
+        interp = 1
+    } else {
+        switch opt.interpolMode {
+        case NearestNeighbour:
+            interp = 0
+        case BicubicSpline:
+            interp = 1
+        case BicubicSplineLog:
+            interp = 2
+        case BicubicSplineSqrt:
+            interp = 3
+        case BSpline:
+            interp = 4
+        case BSplineSqrt:
+            interp = 5
+        case Lanczos:
+            interp = 6
+        case LanczosSqrt:
+            interp = 7
+        default:
+            return Handle(nil, "unrecognized interpolation option")
+        }
+    }
+    
     rng, err := dem.Rng()
     
     if err != nil {
         return Handle(err, "failed to retreive DEM width")
     }
     
-    return r2g(infile, rng, dem.lookup, outfile, opt.width, opt.nlines,
-               opt.interp, opt.dtype, lrIn, lrOut, opt.order)
+    _, err = r2g(infile, rng, dem.lookup, outfile, opt.width, opt.nlines,
+                 interp, opt.dtype, lrIn, lrOut, opt.order)
+    return err
 }
 
 var coord2sarpix = Gamma.must("coord_to_sarpix")
@@ -121,9 +198,9 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
         return
     }
     
-    par := FromString(out, ":")
+    params := FromString(out, ":")
     
-    line, err := par.Par(par)
+    line, err := params.Par(par)
     
     if err != nil {
         err = Handle(err, "failed to retreive range, azimuth")
@@ -154,14 +231,14 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
     return ret, nil
 }
 
-func (dem *DEM) Raster(mode plotMode, opt rasArgs) error {
+func (dem *DEM) Raster(mode DEMPlot, opt rasArgs) error {
     switch mode {
     case Lookup:
-        opt.DatFile = dem.lookup
+        opt.disArgs.Datfile = dem.lookup
         opt.ImgFmt = "FCOMPLEX"
         opt.Cmd = "mph"
     case Dem:
-        opt.Datfile = dem.dat
+        opt.disArgs.Datfile = dem.dat
         opt.Cmd = "hgt"
     default:
         return Handle(nil, "unrecognized plot mode")
@@ -176,11 +253,15 @@ func NewGeocode(dat, par string) (ret Geocode, err error) {
     return
 } 
 
-func (opt *GeoPlotOpt) Parse() error {
-    err := opt.rasArgs.Parse()
+func (opt *GeoPlotOpt) Parse(d DataFile) error {
+    err := opt.rasArgs.Parse(d)
+    
+    if err != nil {
+        return Handle(err, "failed to parse plotting options")
+    }
     
     if opt.cycle == 0 {
-        opt.cycle = default_value
+        opt.cycle = 160.0
     }
     
     return nil
@@ -188,43 +269,56 @@ func (opt *GeoPlotOpt) Parse() error {
 
 var rashgt = Gamma.must("rashgt")
 
-// TODO: implement
 func (geo *Geocode) Raster(opt GeoPlotOpt) error {
     err := opt.Parse(geo)
     
-    return rashgt(geo.hgt, geo.MLI.dat, opt.Rng, opt.startHgt, opt.startPwr,
-                  opt.Nlines, opt.Avg.Rng, opt.Avg.Azi, opt.cycle, opt.Scale,
-                  opt.Exp, opt.LR, raster)
+    if err != nil {
+        return Handle(err, "failed to parse plot arguments")
+    }
+    
+    _, err = rashgt(geo.hgt, geo.MLI.dat, opt.Rng, opt.startHgt, opt.startPwr,
+                    opt.Nlines, opt.Avg.Rng, opt.Avg.Azi, opt.cycle, opt.Scale,
+                    opt.Exp, opt.LR, raster)
+    return err
 }
 
-    
 
-func (geo* Geocoder) Run(opt GeocodeOpt) (ret Geocode, err error) {
-    out := geo.OutDir
+var (
+    createDiffPar = Gamma.must("create_diff_par")
+    vrt2dem = Gamma.must("vrt2dem")
+    gcMap = Gamma.must("gc_map")
+    pixelArea = Gamma.must("pixel_area")
+    offsetPwrm = Gamma.must("offset_pwrm")
+    offsetFitm = Gamma.must("offset_fitm")
+    gcMapFine = Gamma.must("gc_map_fine")
+)
+
+func (g* Geocoder) Run() (ret GeoMeta, err error) {
+    out := g.outDir
     
     demdir := fp.Join(out, "dem")
     geodir := fp.Join(out, "geo")
     
-    demOrig, err := NewDEM(fp.Join(demdir, "srtm.dem"), "")
+    demOrig, err := NewDEM(fp.Join(demdir, "srtm.dem"), "", "", "")
     
-    vertPath := geo.demPath
+    vrtPath := g.DEMPath
     
     if len(vrtPath) == 0 {
-        err = Handle()
+        err = Handle(nil, "path to vrt files not specified")
         return
     }
     
-    ovsamp := geo.DEMOverSampling
+    oversamp := g.DEMOverSampling
     
-    if ovsamp.Lat == 0.0 {
-        ovsamp.Lat = 2.0
+    if oversamp.Lat == 0.0 {
+        oversamp.Lat = 2.0
     }
     
-    if ovsamp.Lon == 0.0 {
-        ovsamp.Lon = 2.0
+    if oversamp.Lon == 0.0 {
+        oversamp.Lon = 2.0
     }
 
-    overlap := geo.DEMOverlap
+    overlap := g.DEMOverlap
     
     if overlap.Rng == 0 {
         overlap.Rng = 100
@@ -234,11 +328,7 @@ func (geo* Geocoder) Run(opt GeocodeOpt) (ret Geocode, err error) {
         overlap.Azi = 100
     }
 
-    n_rng_off = params.getint("n_rng_off", 64)
-    n_azi_off = params.getint("n_azi_off", 32)
-
-
-    npoly, itr := geo.NPoly, geo.Iter
+    npoly, itr := g.NPoly, g.Iter
     
     if npoly == 0 {
         npoly = 4
@@ -248,98 +338,111 @@ func (geo* Geocoder) Run(opt GeocodeOpt) (ret Geocode, err error) {
     ex, err := Exist(demOrig.dat)
     
     if err != nil {
-        err = Handle()
+        err = Handle(err, "failed to check whether original DEM exists")
         return
     }
+    
+    mli := g.mli
     
     if !ex {
         log.Printf("Creating DEM from %s\n", vrtPath)
         
-        vrt2dem(vrtPath, geo.mli.par, demOrig.dat, demOrig.par, 2, "-")
+        _, err = vrt2dem(vrtPath, mli.par, demOrig.dat, demOrig.par, 2, nil)
+        
+        if err != nil {
+            err = Handle(err, "failed to create DEM from vrt file")
+            return
+        }
     } else {
         log.Println("DEM already imported.")
     }
             
-    
     mra := RngAzi{}
     
-    mra.Rng, err = geo.mli.Rng()
+    mra.Rng, err = mli.Rng()
     
     if err != nil {
-        err = Handle()
+        err = Handle(err, "failed to retreive reference mli range samples")
         return
     }
     
-    mra.Azi, err = geo.mli.Azi()
+    mra.Azi, err = mli.Azi()
     
     if err != nil {
-        err = Handle()
+        err = Handle(err, "failed to retreive reference mli azimuth lines")
         return
     }
+    
+    offsetWin := g.OffsetWindows
     
     Patch := RngAzi{
-        Rng: int(float64(mra.Rng) / off.Rng + float64(overlap.Rng) / 2),
-        Azi: int(float64(mra.Azi) / off.Azi + float64(overlap.Azi) / 2),
+        Rng: int(float64(mra.Rng) / float64(offsetWin.Rng) + float64(overlap.Rng) / 2),
+        Azi: int(float64(mra.Azi) / float64(offsetWin.Azi) + float64(overlap.Azi) / 2),
     }
     
     // make sure the number of patches are even
     
-    if Patch.Rng % 2 {
+    if Patch.Rng % 2 == 1 {
         Patch.Rng += 1
     }
     
-    if Patch.Azi % 2 {
+    if Patch.Azi % 2 == 1 {
         Patch.Azi += 1
     }
     
-    dem, err := NewDEM(fp.Join(dempath, "dem_seg.dem")
-    
-    dem = DEM(djoin("dem_seg.dem"), parfile=djoin("dem_seg.dem_par"),
-              lookup=gjoin("lookup"), lookup_old=gjoin("lookup_old"))
-    
-    
-    geo, err := NewGeocode(geo.mli.dat, geo.mli.par)
+    dem, err := NewDEM(fp.Join(demdir, "dem_seg.dem"), "",
+        fp.Join(geodir, "lookup"), fp.Join(geodir, "lookup_old"))
     
     if err != nil {
-        err = Handle()
+        err = Handle(err, "failed to create DEM struct")
         return
     }
     
+    
     geo := Geocode{
-        MLI.dat : geo.mli.dat,
-        MLI.par : geo.mli.par,
-        hgt     : fp.Join(geopath, "hgt"),
-        simSar  : fp.Join(geopath, "sim_sar"),
-        zenith  : fp.Join(geopath, "zenith"),
-        orient  : fp.Join(geopath, "orient"),
-        orient  : fp.Join(geopath, "orient"),
-        inc     : fp.Join(geopath, "inc"),
-        pix     : fp.Join(geopath, "pix"),
-        psi     : fp.Join(geopath, "psi"),
-        lsMap   : fp.Join(geopath, "lsMap"),
-        diffPar : fp.Join(geopath, "diff_par"),
-        offs    : fp.Join(geopath, "offs"),
-        offsets : fp.Join(geopath, "offsets"),
-        ccp     : fp.Join(geopath, "ccp"),
-        coffs   : fp.Join(geopath, "coffs"),
-        coffsets: fp.Join(geopath, "coffsets"),
+        hgt     : fp.Join(geodir, "hgt"),
+        simSar  : fp.Join(geodir, "sim_sar"),
+        zenith  : fp.Join(geodir, "zenith"),
+        orient  : fp.Join(geodir, "orient"),
+        inc     : fp.Join(geodir, "inc"),
+        pix     : fp.Join(geodir, "pix"),
+        psi     : fp.Join(geodir, "psi"),
+        lsMap   : fp.Join(geodir, "lsMap"),
+        diffPar : fp.Join(geodir, "diff_par"),
+        offs    : fp.Join(geodir, "offs"),
+        offsets : fp.Join(geodir, "offsets"),
+        ccp     : fp.Join(geodir, "ccp"),
+        coffs   : fp.Join(geodir, "coffs"),
+        coffsets: fp.Join(geodir, "coffsets"),
     }
+    
+    geo.MLI = mli
     
     ex1, err := Exist(dem.lookup)
     
+    if err != nil {
+        err = Handle(err, "failed to check whether lookup table exists")
+        return
+    }
+    
     ex2, err := Exist(dem.par)
     
+    if err != nil {
+        err = Handle(err, "failed to check whether DEM parameter exists")
+        return
+    }
     
-    if !ex1 and !ex2 {
+    if !ex1 && !ex2 {
         log.Println("Calculating initial lookup table.")
         
-        err = gcMap(geo.mli.par, "-", demOrig.par, demOrig.dat,
-                    dem.par, dem.dat, dem.lookup, oversamp.Lat, oversamp.Lon,
-                    geo.simSar, geo.zenith, geo.orient, geo.inc, geo.psi,
-                    geo.pix, geo.lsMap, 8, 2)
+        // TODO: 8, 2 magic numbers
+        _, err = gcMap(mli.par, nil, demOrig.par, demOrig.dat, dem.par, dem.dat,
+                       dem.lookup, oversamp.Lat, oversamp.Lon, geo.simSar,
+                       geo.zenith, geo.orient, geo.inc, geo.psi, geo.pix,
+                       geo.lsMap, 8, 2)
         
         if err != nil {
-            err = Handle()
+            err = Handle(err, "gc_map failed")
             return
         }      
     } else {
@@ -351,73 +454,113 @@ func (geo* Geocoder) Run(opt GeocodeOpt) (ret Geocode, err error) {
     dra.Rng, err = dem.Rng()
     
     if err != nil {
-        err = Handle()
+        err = Handle(err, "failed to retreive DEM range samples")
         return
     }
     
     dra.Azi, err = dem.Azi()
     
     if err != nil {
-        err = Handle()
+        err = Handle(err, "failed to retreive DEM azimuth lines")
         return
     }
     
     // TODO: 20 magic number
-    err = pixelArea(geo.mli.par, dem.par, dem.dat, dem.lookup, geo.lsMap,
-                    geo.inc, geo.sigma0, geo.gamma0, 20)
+    _, err = pixelArea(mli.par, dem.par, dem.dat, dem.lookup, geo.lsMap,
+                       geo.inc, geo.sigma0, geo.gamma0, 20)
     
     if err != nil {
-        err = Handle()
+        err = Handle(err, "pixel area failed")
         return
     }
     
     // TODO: magic numbers, 1, 0
-    err = createDiffPar(geo.mli.par, "-", geo.diffPar, 1, 0)
+    _, err = createDiffPar(mli.par, nil, geo.diffPar, 1, 0)
     
     if err != nil {
-        err = Handle()
+        err = Handle(err, "create_diff_par failed")
         return
     }
     
     log.Println("Refining lookup table.")
-
+    
     if itr >= 1 {
         log.Println("ITERATING OFFSET REFINEMENT.")
         
         for ii := 0; ii < itr; ii++ {
             log.Printf("ITERATION %d / %d\n", ii + 1, itr)
             
-            rm(geo.diffPar)
+            err = os.Remove(geo.diffPar)
+            
+            if err != nil {
+                err = Handle(err, "failed to remove file '%s'", geo.diffPar)
+                return
+            }
 
             // copy previous lookup table
-            cp(dem.lookup, dem.lookup_old)
+            err = os.Rename(dem.lookup, dem.lookupOld)
+            
+            if err != nil {
+                err = Handle(err, "failed to move lookup file '%s'",
+                    dem.lookup)
+                return
+            }
+            
+            // TODO: magic numbers, 1, 0
+            _, err = createDiffPar(mli.par, "-", geo.diffPar, 1, 0)
+            
+            // TODO: magic numbers, 0.1, 5, 0.8
+            _, err = offsetPwrm(geo.sigma0, mli.dat, geo.diffPar, geo.offs,
+                                geo.ccp, Patch.Rng, Patch.Azi, geo.offsets, 2,
+                                offsetWin.Rng, offsetWin.Azi, 0.1, 5, 0.8)
+            
+            if err != nil {
+                err = Handle(err, "offset_pwrm failed")
+                return
+            }
+            
+            // TODO: magic numbers, 0.1
+            _, err = offsetFitm(geo.offs, geo.ccp, geo.diffPar, geo.coffs,
+                                geo.coffsets, 0.1, npoly)
+            
+            
+            if err != nil {
+                err = Handle(err, "offset_fitm failed")
+                return
+            }
 
-            gp.create_diff_par(m_mli.par, None, geo.diff_par, 1, 0)
+            // update previous lookup table
+            // TODO: magic number 1
+            _, err = gcMapFine(dem.lookupOld, dra.Rng, geo.diffPar,
+                               dem.lookup, 1)
+            
+            if err != nil {
+                err = Handle(err, "gc_map_fine failed")
+                return
+            }
 
-            gp.offset_pwrm(geo.sigma0, m_mli.dat, geo.diff_par, geo.offs,
-                           geo.ccp, rng_patch, azi_patch, geo.offsets, 2,
-                           n_rng_off, n_azi_off, 0.1, 5, 0.8)
+            // create new simulated ampliutides with the new lookup table
+            // TODO: magic number: 20
+            _, err = pixelArea(mli.par, dem.par, dem.dat, dem.lookup, geo.lsMap,
+                               geo.inc, geo.sigma0, geo.gamma0, 20)
+            
+            if err != nil {
+                err = Handle(err, "pixel_area failed")
+                return
+            }
 
-            gp.offset_fitm(geo.offs, geo.ccp, geo.diff_par, geo.coffs,
-                           geo.coffsets, 0.1, npoly)
-
-            # update previous lookup table
-            gp.gc_map_fine(dem.lookup_old, dem_s_width, geo.diff_par,
-                           dem.lookup, 1)
-
-            # create new simulated ampliutides with the new lookup table
-            gp.pixel_area(m_mli.par, dem.par, dem.dat, dem.lookup, geo.ls_map,
-                          geo.inc, geo.sigma0, geo.gamma0, 20)
-
-        # end for
-        log.info("ITERATION DONE.")
-    # end if
-    
-    
-    return {
-        "geo": geo,
-        "dem_orig": dem_orig,
-        "dem": dem
+        }
+        log.Println("ITERATION DONE.")
     }
+    
+    
+    ret = GeoMeta{
+        geo: geo,
+        demOrig: demOrig,
+        dem: dem,
+    }
+    
+    return ret, nil
+}
 
 

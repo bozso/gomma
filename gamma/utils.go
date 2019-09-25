@@ -58,6 +58,8 @@ func Exist(s string) (ret bool, err error) {
     return true, nil
 }
 
+
+
 func Fatal(err error, format string, args ...interface{}) {
     if err != nil {
         str := fmt.Sprintf(format, args...)

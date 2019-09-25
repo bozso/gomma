@@ -313,7 +313,7 @@ func NewDisplayer(args []string) (ret Displayer, err error) {
 }
 
 func (dis *Displayer) Plot() error {
-    dat, err := NewDataFile(dis.dat, dis.par)
+    dat, err := NewDataFile(dis.dat, dis.par, "par")
     
     if err != nil {
         return Handle(err, "failed to parse datafile '%s'", dis.dat)

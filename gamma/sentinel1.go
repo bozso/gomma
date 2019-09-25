@@ -193,7 +193,7 @@ func (s1 *S1Zip) Info(exto *ExtractOpt) (ret IWInfos, err error) {
 }
 
 func NewIW(dat, par, TOPS_par string) (ret S1IW, err error) {
-    ret.dataFile, err = NewDataFile(dat, par)
+    ret.dataFile, err = NewDataFile(dat, par, "par")
 
     if err != nil {
         err = Handle(err,

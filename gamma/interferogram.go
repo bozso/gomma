@@ -61,7 +61,7 @@ var (
 )
 
 func NewCoherence(dat, par string) (ret Coherence, err error) {
-    ret.dataFile, err = NewDataFile(dat, par)
+    ret.dataFile, err = NewDataFile(dat, par, "par")
     return
 }
 

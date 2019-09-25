@@ -36,9 +36,10 @@ type (
     }
 
     geocoding struct {
-        DEMPath      string
-        Iter, NPoly  int
+        DEMPath         string
+        Iter, NPoly     int
         DEMOverlap      RngAzi
+        OffsetWindows   RngAzi
         DEMOverSampling LatLon
     }
 
