@@ -350,8 +350,7 @@ func stepGeocode (c *config) error {
 }
 
 func stepCoreg(self *config) error {
-    pol := self.General.Pol
-    path := self.General.Metafile
+    path, pol := self.General.Metafile, self.General.Pol
     
     root, meta := fp.Join(self.General.CachePath, "sentinel1"), Meta{}
     err := LoadJson(path, &meta)

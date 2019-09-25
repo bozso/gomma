@@ -37,31 +37,12 @@ type (
         dataFile
     }
     
-    ScaleExp struct {
-        Scale, Exp float64
-    }
-    
     // TODO: add loff, nlines
     MLIOpt struct {
         refTab string
         Looks RngAzi
         windowFlag bool
         ScaleExp
-    }
-    
-    disArgs struct {
-        Flip                 bool
-        ImgFmt, Datfile, Cmd string
-        Start, Nlines, LR    int
-        ScaleExp
-        RngAzi
-    }
-
-    rasArgs struct {
-        disArgs
-        avgFact, headerSize int
-        Avg                 RngAzi
-        raster              string
     }
 )
 
@@ -272,8 +253,6 @@ func (opt *rasArgs) Parse(dat DataFile) error {
     return nil
 }
 
-var rasslc = Gamma.must("rasSLC")
-
 func (s *SLC) Raster(opt rasArgs) error {
     err := opt.Parse(s)
     
@@ -281,25 +260,8 @@ func (s *SLC) Raster(opt rasArgs) error {
         return Handle(err, "failed to parse raster options")
     }
     
-    dtype := 0
-    
-    switch opt.ImgFmt {
-    case "FCOMPLEX":
-        dtype = 0
-    case "SCOMPLEX":
-        dtype = 1
-    default:
-        return Handle(nil, "unrecognized image format '%s'", opt.ImgFmt)
-    }
-    
-    _, err = rasslc(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
-        opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
-        dtype, opt.headerSize, opt.raster)
-    
-    return err
+    return rasslc(opt)
 }
-
-var raspwr = Gamma.must("raspwr")
 
 func (m *MLI) Raster(opt rasArgs) error {
     err := opt.Parse(m)
@@ -308,24 +270,7 @@ func (m *MLI) Raster(opt rasArgs) error {
         return Handle(err, "failed to parse raster options")
     }
     
-    dtype := 0
-    
-    switch opt.ImgFmt {
-    case "FLOAT":
-        dtype = 0
-    case "SHORT INTEGER":
-        dtype = 1
-    case "DOUBLE":
-        dtype = 2
-    default:
-        return Handle(nil, "unrecognized image format '%s'", opt.ImgFmt)
-    }
-    
-    _, err = raspwr(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
-        opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
-        opt.LR, opt.raster, dtype, opt.headerSize)
-
-    return err
+    return raspwr(opt)
 }
 
 func Display(dat DataFile, opt disArgs) error {

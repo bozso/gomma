@@ -31,6 +31,12 @@ type (
         dat, par, mode, sec string
         rasArgs
     }
+    
+    Coder struct {
+        GeoMeta
+        CodeOpt
+        infile, outfile, metafile, mode string
+    }        
 )
 
 var (
@@ -284,14 +290,7 @@ func (l *Lister) MLI() error {
 func NewDisplayer(args []string) (ret Displayer, err error) {
     flag := fl.NewFlagSet("display", fl.ContinueOnError)
 
-    mode := args[0]
-
-    if mode != "ras" && mode != "dis" {
-        err = Handle(nil, "unrecognized display mode '%s'", mode)
-        return
-    }
-
-    ret.mode = mode
+    ret.mode = args[0]
     
     flag.StringVar(&ret.dat, "dat", "",
         "Datafile containing data to plot.")
@@ -378,6 +377,79 @@ func (dis *Displayer) Plot() error {
         }
     }
     return nil
+}
+
+
+func NewCoder(args []string) (ret Coder, err error) {
+    flag := fl.NewFlagSet("coding", fl.ContinueOnError)
+    
+    flag.StringVar(&ret.infile, "in", "", "Datafile containing to transform.")
+    flag.StringVar(&ret.outfile, "out", "", "Output datafile.")
+    flag.StringVar(&ret.metafile, "meta", "geocode.json",
+        "Metadata of geocoding.")
+    
+    flag.IntVar(&ret.inWidth, "inwidth", 0,
+        "Range samples or Width of infile.")
+    flag.IntVar(&ret.outWidth, "outwidth", 0,
+        "Range samples or Width of outfile.")
+    
+    flag.IntVar(&ret.nlines, "nlines", 0, "Number of lines to code.")
+    flag.StringVar(&ret.mode, "intpol", "nearest", "Interpolation mode.")
+    flag.IntVar(&ret.order, "order", 0,
+        "Lanczos function order or B-spline degree.")
+    flag.BoolVar(&ret.flipInput, "flipIn", false, "Flip input.")
+    flag.BoolVar(&ret.flipOutput, "flipOut", false, "Flip output.")
+    
+    err = flag.Parse(args[1:])
+    
+    if err != nil {
+        err = Handle(err, "failed to parse command line options")
+        return
+    }
+    
+    switch ret.mode {
+    case "nearest":
+        ret.interpolMode = NearestNeighbour
+    case "bic":
+        ret.interpolMode = BicubicSpline
+    case "bic_log":
+        ret.interpolMode = BicubicSplineLog
+    case "bic_sqrt":
+        ret.interpolMode = BicubicSplineSqrt
+    case "bsp":
+        ret.interpolMode = BSpline
+    case "bsp_sqrt":
+        ret.interpolMode = BSplineSqrt
+    case "lanc":
+        ret.interpolMode = Lanczos
+    case "lanc_sqrt":
+        ret.interpolMode = LanczosSqrt
+    case "inv_dist":
+        ret.interpolMode = InvDist
+    case "inv_sqrd_dist":
+        ret.interpolMode = InvSquaredDist
+    case "const":
+        ret.interpolMode = Constant
+    case "gauss":
+        ret.interpolMode = Gauss
+    default:
+        err = Handle(nil, "unrecognized interpolation mode '%s'", ret.mode)
+        return
+    }
+    
+    return ret, nil
+}
+
+// geocode = geo2radar
+
+func (g *Coder) Geo2Radar() error {
+    return g.dem.geo2radar(g.infile, g.outfile, g.CodeOpt)
+}
+
+// geocode_back = radar2geo
+
+func (g *Coder) Radar2Geo() error {
+    return g.dem.radar2geo(g.infile, g.outfile, g.CodeOpt)
 }
 
 var PlotCmdFiles = map[string]Slice{

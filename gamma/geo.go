@@ -14,13 +14,10 @@ type (
         lookup, lookupOld, lsMap, incidence, resolution, offnadir string
     }
     
-    Geo2RadarOpt struct {
-        width, nlines, dtype int
+    CodeOpt struct {
+        inWidth, outWidth, nlines, dtype, npoints int
+        oversamp, maxRad float64
         interpolMode InterpolationMode
-    }
-    
-    Radar2GeoOpt struct {
-        Geo2RadarOpt
         flipInput, flipOutput bool
         order int
     }
@@ -127,15 +124,57 @@ func (dem DEM) Azi() (int, error) {
     return dem.Int("nlines")
 }
 
+func (opt *CodeOpt) Parse() (lrIn int, lrOut int, err error) {
+    lrIn, lrOut = 1, 1
+    
+    if opt.flipInput {
+        lrIn = -1
+    }
+    
+    if opt.flipOutput {
+        lrOut = -1
+    }
+    
+    if opt.order == 0 {
+        opt.order = 5
+    }
+    
+    if opt.inWidth == 0 {
+        err = Handle(nil, "infile width must be specified")
+        return
+    }
+    
+    if opt.outWidth == 0 {
+        err = Handle(nil, "outfile width must be specified")
+        return
+    }
+    
+    if opt.oversamp == 0.0 {
+        opt.oversamp = 2.0
+    }
+    
+    if opt.maxRad == 0.0 {
+        opt.maxRad = 4 * opt.oversamp
+    }
+    
+    if opt.npoints == 0 {
+        opt.npoints = 4
+    }
+    
+    return lrIn, lrOut, nil
+}
+
 var g2r = Gamma.must("geocode")
 
-func (dem *DEM) geo2radar(infile, outfile string, opt Geo2RadarOpt) error {
-    if opt.width == 0 {
-        return Handle(nil, "datafile width must be specified")
+func (dem *DEM) geo2radar(infile, outfile string, opt CodeOpt) error {
+    lrIn, lrOut, err := opt.Parse()
+    
+    if err != nil {
+        return Handle(err, "failed to parse geo2radar arguments")
     }
     
     interp := 0
-    
+
     switch opt.interpolMode {
     case InvDist:
         interp = 0
@@ -151,32 +190,26 @@ func (dem *DEM) geo2radar(infile, outfile string, opt Geo2RadarOpt) error {
         return Handle(nil, "unrecognized interpolation option")
     }
     
-    rng, err := dem.Rng()
+    // rng, err := dem.Rng()
     
-    if err != nil {
-        return Handle(err, "failed to retreive DEM width")
-    }
+    // if err != nil {
+    //     return Handle(err, "failed to retreive DEM width")
+    // }
     
-    _, err = g2r(dem.lookup, infile, rng, outfile, opt.width, opt.nlines,
-                 interp, opt.dtype)
+    _, err = g2r(dem.lookup, infile, opt.inWidth, outfile, opt.outWidth,
+                 opt.nlines, interp, opt.dtype, lrIn, lrOut, opt.oversamp,
+                 opt.maxRad, opt.npoints)
+    
     return err
 }
 
 var r2g = Gamma.must("geocode_back")
 
-func (dem *DEM) radar2geo(infile, outfile string, opt Radar2GeoOpt) error {
-    lrIn, lrOut := 1, 1
+func (dem *DEM) radar2geo(infile, outfile string, opt CodeOpt) error {
+    lrIn, lrOut, err := opt.Parse()
     
-    if opt.flipInput {
-        lrIn = -1
-    }
-    
-    if opt.flipOutput {
-        lrOut = -1
-    }
-    
-    if opt.order == 0 {
-        opt.order = 5
+    if err != nil {
+        return Handle(err, "failed to parse radar2geo arguments")
     }
     
     var interp int
@@ -207,14 +240,20 @@ func (dem *DEM) radar2geo(infile, outfile string, opt Radar2GeoOpt) error {
         }
     }
     
-    rng, err := dem.Rng()
+    // TODO: use this if opt.inWidth == 0?
+    // rng, err := dem.Rng()
     
-    if err != nil {
-        return Handle(err, "failed to retreive DEM width")
+    // if err != nil {
+    //     return Handle(err, "failed to retreive DEM width")
+    // }
+    
+    if opt.order == 0 {
+        opt.order = 5
     }
     
-    _, err = r2g(infile, rng, dem.lookup, outfile, opt.width, opt.nlines,
-                 interp, opt.dtype, lrIn, lrOut, opt.order)
+    _, err = g2r(infile, opt.inWidth, dem.lookup, outfile, opt.outWidth,
+                 opt.nlines, interp, opt.dtype, lrIn, lrOut, opt.order)
+    
     return err
 }
 
@@ -263,8 +302,6 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
     return ret, nil
 }
 
-var rasmph = Gamma.must("rasmph")
-
 func (d *DEM) Raster(mode DEMPlot, opt rasArgs) error {
     err := opt.Parse(d)
     
@@ -276,15 +313,16 @@ func (d *DEM) Raster(mode DEMPlot, opt rasArgs) error {
     case Lookup:
         opt.disArgs.Datfile = d.lookup
         opt.ImgFmt = "FCOMPLEX"
-        opt.Cmd = "mph"
+        
+        return rasmph(opt)
     case Dem:
         opt.disArgs.Datfile = d.dat
-        opt.Cmd = "hgt"
+        // TODO: implement
     default:
         return Handle(nil, "unrecognized plot mode")
     }
     
-    return Raster(dem, opt, "")
+    return nil
 }
 
 

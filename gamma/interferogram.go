@@ -39,6 +39,12 @@ type (
     }
     
     CoherenceOpt coherence
+    
+    CCPlotOpt struct {
+        rasArgs
+        startCC, startPwr int
+        Range minmax 
+    }
 )
 
 const (
@@ -303,6 +309,31 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
     }
     
     return ret, nil
+}
+
+var rascc = Gamma.must("rascc")
+
+func (c *Coherence) Raster(mli *MLI, opt CCPlotOpt) error {
+    err := opt.rasArgs.Parse(c)
+    
+    if err != nil {
+        return Handle(err, "failed to parse plot arguments")
+    }
+    
+    if opt.Range.Min == 0.0 {
+        opt.Range.Min = 0.1
+    }
+    
+    if opt.Range.Max == 0.0 {
+        opt.Range.Min = 0.9
+    }
+    
+    _, err = rascc(opt.Datfile, mli.dat, opt.Rng, opt.startCC, opt.startPwr,
+                   opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
+                   opt.Range.Min, opt.Range.Max, opt.Scale,
+                   opt.Exp, opt.LR, opt.raster)
+    
+    return err
 }
 
 /*
