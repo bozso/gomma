@@ -26,6 +26,7 @@ type (
     general struct {
         DataPath, OutputDir, Pol, Metafile string
         CachePath                          string `json:"CACHE_PATH"`
+        MasterImage                        string
         Looks                              RngAzi
     }
 
@@ -34,13 +35,15 @@ type (
         LowerLeft, UpperRight LatLon
         CheckZips             bool
     }
-
+    
     geocoding struct {
-        DEMPath         string
-        Iter, NPoly     int
-        DEMOverlap      RngAzi
-        OffsetWindows   RngAzi
-        DEMOverSampling LatLon
+        DEMPath                   string
+        Iter, NPoly, nPixel       int
+        LanczosOrder, MLIOversamp int
+        DEMOverlap, OffsetWindows RngAzi
+        DEMOverSampling           LatLon
+        AreaFactor, CCThresh      float64
+        BandwithFrac, RngOversamp float64
     }
 
     coreg struct {
@@ -80,6 +83,7 @@ var (
     steps = map[string]stepFun{
         "select": stepSelect,
         "import": stepImport,
+        "geoc": stepGeocode,
         "coreg":  stepCoreg,
     }
 
@@ -90,6 +94,7 @@ var (
             Pol: "vv",
             Metafile: "meta.json",
             OutputDir: ".",
+            MasterImage: "",
             Looks: RngAzi{
                 Rng: 1,
                 Azi: 1,
@@ -101,13 +106,20 @@ var (
         },
 
         Geocoding: geocoding{
-            DEMPath:            "/home/istvan/DEM/srtm.vrt",
+            DEMPath: "/home/istvan/DEM/srtm.vrt",
             Iter: 1,
+            nPixel: 8,
+            LanczosOrder: 5,
+            NPoly: 1,
+            MLIOversamp: 2,
+            CCThresh: 0.1,
+            BandwithFrac: 0.8,
+            AreaFactor: 20.0,
+            RngOversamp: 2,
             DEMOverlap: RngAzi{
                 Rng: 100,
                 Azi: 100,
             },
-            NPoly: 1,
             DEMOverSampling: LatLon{
                 Lat: 2.0,
                 Lon: 2.0,

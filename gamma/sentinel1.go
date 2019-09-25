@@ -470,7 +470,7 @@ func (s1 *S1Zip) RSLC(pol string) (ret S1SLC, err error) {
 
 var MLIFun = Gamma.selectFun("multi_look_ScanSAR", "multi_S1_TOPS")
 
-func (s1 *S1SLC) MLI(mli *MLI, opt MLIOpt) error {
+func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
     rng := opt.Looks.Rng
     
     if rng == 0 {
@@ -504,7 +504,7 @@ func (s1 *S1SLC) MLI(mli *MLI, opt MLIOpt) error {
     return nil
 }
 
-func (s1 *S1Zip) MLI(mode, pol string, opt MLIOpt) (ret MLI, err error) {
+func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
     path := fp.Join(s1.Root, mode)
 
     dat := fp.Join(path, fmt.Sprintf("%s.%s", pol, mode))

@@ -226,9 +226,7 @@ func (self *Lister) Quicklook() error {
         s1, err := NewS1Zip(line, cache)
 
         if err != nil {
-            return Handle(err,
-                "failed to parse Sentinel-1 '%s'",
-                s1.Path)
+            return Handle(err, "failed to parse Sentinel-1 '%s'", s1.Path)
         }
 
         image, err := s1.Quicklook(info)
@@ -243,6 +241,45 @@ func (self *Lister) Quicklook() error {
 
     return nil
 }
+
+func (l *Lister) MLI() error {
+    root := fp.Join(l.General.CachePath, "sentinel1")
+
+    path, pol := l.infile, l.General.Pol
+    file, err := NewReader(path)
+
+    if err != nil {
+        return Handle(err, "failed to create FileReader '%s'!", path)
+    }
+
+    defer file.Close()
+    
+    opt := &MLIOpt {
+        Looks: l.General.Looks,
+    }
+
+    for file.Scan() {
+        line := file.Text()
+
+        s1, err := NewS1Zip(line, root)
+
+        if err != nil {
+            return Handle(err, "failed to parse Sentinel-1 '%s'", s1.Path)
+        }
+
+        mli, err := s1.MLI("mli", pol, opt)
+
+        if err != nil {
+            return Handle(err, "failed to retreive MLI file for '%s'",
+                s1.Path)
+        }
+
+        fmt.Println(mli.dat)
+    }
+
+    return nil
+}
+
 
 func NewDisplayer(args []string) (ret Displayer, err error) {
     flag := fl.NewFlagSet("display", fl.ContinueOnError)

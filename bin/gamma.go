@@ -16,25 +16,7 @@ func main() {
     }
     mode := os.Args[1]
     
-    if mode == "ras" || mode == "dis" {
-        dis, err := gm.NewDisplayer(os.Args[1:])
-        
-        if err != nil {
-            fmt.Printf("failed to parse plot arguments: %s!\n", err)
-            return
-        }
-        
-        err = dis.Plot()
-        
-        if err != nil {
-            fmt.Printf("plotting failed: %s!\n", err)
-            return
-        }
-        return
-    }
-    
-    
-    switch os.Args[1] {
+    switch mode {
     case "proc":
         proc, err := gm.NewProcess(os.Args[2:])
         
@@ -101,6 +83,20 @@ func main() {
                 }
                 log.Printf(err, "Could not create config file: '%s'!", *path)
         */
+    case "ras", "dis":
+        dis, err := gm.NewDisplayer(os.Args[1:])
+        
+        if err != nil {
+            fmt.Printf("failed to parse plot arguments: %s!\n", err)
+            return
+        }
+        
+        err = dis.Plot()
+        
+        if err != nil {
+            fmt.Printf("plotting failed: %s!\n", err)
+            return
+        }
     default:
         fmt.Println("Expected 'proc', 'list' or 'init' subcommands!")
         return

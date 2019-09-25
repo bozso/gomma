@@ -61,6 +61,7 @@ type (
         disArgs
         avgFact, headerSize int
         Avg                 RngAzi
+        raster              string
     }
 )
 
@@ -70,7 +71,7 @@ func NewGammaParam(path string) Params {
 
 func NewDataFile(dat, par, ext string) (ret dataFile, err error) {
     if len(dat) == 0 {
-        err = Handle(err, "'dat' should not be an empty string", dat)
+        err = Handle(err, "'dat' should not be an empty string")
         return
     }
     
@@ -264,7 +265,67 @@ func (opt *rasArgs) Parse(dat DataFile) error {
     
     opt.Avg.Azi = azi
     
+    if len(opt.raster) == 0 {
+        opt.raster = fmt.Sprintf("%s.%s", opt.Datfile, Settings.RasExt)
+    }
+    
     return nil
+}
+
+var rasslc = Gamma.must("rasSLC")
+
+func (s *SLC) Raster(opt rasArgs) error {
+    err := opt.Parse(s)
+    
+    if err != nil {
+        return Handle(err, "failed to parse raster options")
+    }
+    
+    dtype := 0
+    
+    switch opt.ImgFmt {
+    case "FCOMPLEX":
+        dtype = 0
+    case "SCOMPLEX":
+        dtype = 1
+    default:
+        return Handle(nil, "unrecognized image format '%s'", opt.ImgFmt)
+    }
+    
+    _, err = rasslc(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+        opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
+        dtype, opt.headerSize, opt.raster)
+    
+    return err
+}
+
+var raspwr = Gamma.must("raspwr")
+
+func (m *MLI) Raster(opt rasArgs) error {
+    err := opt.Parse(m)
+    
+    if err != nil {
+        return Handle(err, "failed to parse raster options")
+    }
+    
+    dtype := 0
+    
+    switch opt.ImgFmt {
+    case "FLOAT":
+        dtype = 0
+    case "SHORT INTEGER":
+        dtype = 1
+    case "DOUBLE":
+        dtype = 2
+    default:
+        return Handle(nil, "unrecognized image format '%s'", opt.ImgFmt)
+    }
+    
+    _, err = raspwr(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+        opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
+        opt.LR, opt.raster, dtype, opt.headerSize)
+
+    return err
 }
 
 func Display(dat DataFile, opt disArgs) error {
@@ -298,28 +359,26 @@ func Raster(dat DataFile, opt rasArgs, sec string) (err error) {
     cmd := opt.Cmd
     fun := Gamma.must("ras" + cmd)
 
-    raster := fmt.Sprintf("%s.%s", dat.Datfile(), Settings.RasExt)
-
     if cmd == "SLC" {
         _, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
             opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
-            opt.ImgFmt, opt.headerSize, raster)
+            opt.ImgFmt, opt.headerSize, opt.raster)
 
     } else {
         if len(sec) == 0 {
             _, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                 opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
-                opt.LR, raster, opt.ImgFmt, opt.headerSize)
+                opt.LR, opt.raster, opt.ImgFmt, opt.headerSize)
 
         } else {
             _, err = fun(opt.Datfile, sec, opt.Rng, opt.Start, opt.Nlines,
                 opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
-                opt.LR, raster, opt.ImgFmt, opt.headerSize)
+                opt.LR, opt.raster, opt.ImgFmt, opt.headerSize, opt.raster)
         }
     }
     
     if err != nil {
-        return Handle(err, "failed to create rasterfile '%s'", raster)
+        return Handle(err, "failed to create rasterfile '%s'", opt.raster)
     }
     
     return nil

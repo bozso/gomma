@@ -48,6 +48,34 @@ func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err err
     return s1, IWs, nil
 }
 
+func loadS1(path, root string) (ret S1Zips, err error) {
+    file, err := NewReader(path)
+    
+    if err != nil {
+        err = Handle(err, "failed to open file '%s'", path)
+        return
+    }
+    
+    defer file.Close()
+    
+    var s1zip *S1Zip
+    
+    for file.Scan() {
+        line := file.Text()
+        s1zip, err = NewS1Zip(line, root)
+        
+        if err != nil {
+            err = Handle(err, "failed to parse zipfile '%s'", line)
+            return
+        }
+        
+        ret = append(ret, s1zip)
+    }
+    
+    return ret, nil
+}
+
+
 func (self *config) extOpt(satellite string) *ExtractOpt {
     return &ExtractOpt{pol: self.General.Pol, 
         root: fp.Join(self.General.CachePath, satellite)}
@@ -177,29 +205,15 @@ func stepImport(self *config) error {
     }
     
     extInfo := self.extOpt("sentinel1")
-    root := extInfo.root
     
+    root := extInfo.root
     path = self.infile
-    file, err := NewReader(path)
+    
+    zips, err := loadS1(path, root)
     
     if err != nil {
-        return Handle(err, "failed to open file '%s'", path)
+        return Handle(err, "failed to load zipfiles from '%s'", path)
     }
-    
-    defer file.Close()
-    
-    zips := S1Zips{}
-    
-    for file.Scan() {
-        line := file.Text()
-        s1zip, err := NewS1Zip(line, root)
-        
-        if err != nil {
-            return Handle(err, "failed to parse zipfile '%s'", line)
-        }
-        zips = append(zips, s1zip)
-    }
-    
     
     var (
         master *S1Zip
@@ -264,6 +278,72 @@ func stepImport(self *config) error {
     
     if err != nil {
         return Handle(err, "failed to write metadata to '%s'", path)
+    }
+    
+    return nil
+}
+
+
+func stepGeocode (c *config) error {
+    mzip := c.General.MasterImage
+    
+    root := fp.Join(c.General.CachePath, "sentinel1")
+    path, pol, outDir := c.infile, c.General.Pol, c.General.OutputDir
+    
+    zips, err := loadS1(path, root)
+    
+    if err != nil {
+        return Handle(err, "failed to load zipfiles from '%s'", path)
+    }
+    
+    var master *S1Zip
+    
+    if len(mzip) == 0 {
+        sort.Sort(ByDate(zips))
+        
+        master = zips[0]
+    } else {
+        master, err = NewS1Zip(mzip, root)
+        
+        if err != nil {
+            return Handle(err, "failed to parse master zipfile '%s'", mzip)
+        }
+    }
+    
+    mslc, err := master.SLC(pol)
+    
+    if err != nil {
+        return Handle(err, "failed to retreive master S1SLC")
+    }
+    
+    opt := &MLIOpt{
+        refTab: mslc.tab,
+        Looks: c.General.Looks,
+    }
+    
+    mmli, err := master.MLI("mli", pol, opt)
+    
+    if err != nil {
+        return Handle(err, "failed to retreive master MLI")
+    }
+    
+    geo := Geocoder{
+        geocoding: c.Geocoding,
+        mli: mmli,
+        outDir: outDir,
+    }
+    
+    geocode, err := geo.Run()
+    
+    if err != nil {
+        return Handle(err, "geocoding failed")
+    }
+    
+    // TODO: make geocode.json a setting in configuration file?
+    err = SaveJson(fp.Join(outDir, "geocode.json"), &geocode)
+    
+    if err != nil {
+        return Handle(err, "failed to save geocode data")
     }
     
     return nil
@@ -340,7 +420,7 @@ func stepCoreg(self *config) error {
             return Handle(err, "coregistration failed")
         }
         
-        fmt.Println("%s\n", err)
+        fmt.Printf("%s\n", err)
         
         if !ok {
             log.Printf("%s\n",
