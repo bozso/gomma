@@ -251,7 +251,7 @@ func (dem *DEM) radar2geo(infile, outfile string, opt CodeOpt) error {
         opt.order = 5
     }
     
-    _, err = g2r(infile, opt.inWidth, dem.lookup, outfile, opt.outWidth,
+    _, err = r2g(infile, opt.inWidth, dem.lookup, outfile, opt.outWidth,
                  opt.nlines, interp, opt.dtype, lrIn, lrOut, opt.order)
     
     return err

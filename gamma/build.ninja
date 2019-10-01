@@ -1,0 +1,9 @@
+lint =  golangci-lint run
+
+rule lint
+  command = golangci-lint run
+
+build LINT: lint command_line.go common.go config.go coreg.go datafile.go $
+date.go extract.go gamma_test.go geo.go interferogram.go plot.go $
+proc_steps.go sentinel1.go utils.go
+
