@@ -1,0 +1,17 @@
+rule go
+  command = go build ${in}
+  description = Build executable
+
+rule deploy
+  command = lxterminal -e "scp ${in} $
+      istvan@zafir.ggki.hu:/home/istvan/packages/usr/bin"
+  description = Deploy to server
+
+build gamma: go gamma.go | ../gamma/gamma_test.go ../gamma/utils.go $
+    ../gamma/common.go ../gamma/date.go ../gamma/sentinel1.go $
+    ../gamma/plot.go ../gamma/datafile.go ../gamma/extract.go $
+    ../gamma/command_line.go ../gamma/config.go ../gamma/coreg.go $
+    ../gamma/geo.go ../gamma/interferogram.go ../gamma/proc_steps.go
+
+build DEPLOY: deploy gamma
+

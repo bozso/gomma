@@ -85,3 +85,13 @@ func rasmph(opt rasArgs) error {
     
     return err
 }
+
+func (se *ScaleExp) Parse() {
+    if se.Scale == 0.0 {
+        se.Scale = 1.0
+    }
+    
+    if se.Exp == 0.0 {
+        se.Exp = 0.35
+    }
+}

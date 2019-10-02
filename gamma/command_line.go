@@ -17,7 +17,7 @@ type (
         config
     }
 
-    Lister struct {
+    Batcher struct {
         conf, Mode, infile string
         config
     }
@@ -36,7 +36,7 @@ type (
         GeoMeta
         CodeOpt
         infile, outfile, metafile, mode string
-    }        
+    }
 )
 
 var (
@@ -174,13 +174,18 @@ func InitParse(args []string) (ret string, err error) {
     return ret, nil
 }
 
-func NewLister(args []string) (ret Lister, err error) {
+func NewBatcher(args []string) (ret Batcher, err error) {
     flag := fl.NewFlagSet("list", fl.ContinueOnError)
-
+    
+    if len(args) == 0 {
+        err = Handle(nil, "at least one argument is required")
+        return
+    }
+    
     mode := args[0]
 
-    if mode != "quicklook" {
-        err = Handle(nil, "unrecognized lister mode '%s'", mode)
+    if mode != "quicklook" && mode != "mli" {
+        err = Handle(nil, "unrecognized Batcher mode '%s'", mode)
         return
     }
 
@@ -212,12 +217,12 @@ func NewLister(args []string) (ret Lister, err error) {
     return ret, nil
 }
 
-func (self *Lister) Quicklook() error {
-    cache := fp.Join(self.General.CachePath, "sentinel1")
+func (b *Batcher) Quicklook() error {
+    cache := fp.Join(b.General.CachePath, "sentinel1")
 
-    info := &ExtractOpt{root: cache, pol: self.General.Pol}
+    info := &ExtractOpt{root: cache, pol: b.General.Pol}
 
-    path := self.infile
+    path := b.infile
     file, err := NewReader(path)
 
     if err != nil {
@@ -248,10 +253,10 @@ func (self *Lister) Quicklook() error {
     return nil
 }
 
-func (l *Lister) MLI() error {
-    root := fp.Join(l.General.CachePath, "sentinel1")
+func (b *Batcher) MLI() error {
+    root := fp.Join(b.General.CachePath, "sentinel1")
 
-    path, pol := l.infile, l.General.Pol
+    path, pol := b.infile, b.General.Pol
     file, err := NewReader(path)
 
     if err != nil {
@@ -261,7 +266,7 @@ func (l *Lister) MLI() error {
     defer file.Close()
     
     opt := &MLIOpt {
-        Looks: l.General.Looks,
+        Looks: b.General.Looks,
     }
 
     for file.Scan() {
@@ -272,15 +277,39 @@ func (l *Lister) MLI() error {
         if err != nil {
             return Handle(err, "failed to parse Sentinel-1 '%s'", s1.Path)
         }
-
-        mli, err := s1.MLI("mli", pol, opt)
-
+        
+        dat, par := s1.Names("mli", pol)
+        mli, err := NewMLI(dat, par)
+        
+        if err != nil {
+            return Handle(err, "could not create MLI struct")
+        }
+        
+        exist, err := mli.Exist()
+        
+        if err != nil {
+            return Handle(err, "failed to check whether MLI file exists")
+        }
+        
+        if exist {
+            fmt.Printf("%s %s\n", mli.dat, mli.par)
+            continue
+        }
+        
+        slc, err := s1.SLC(pol)
+        
+        if err != nil {
+            return Handle(err, "failed to create S1SLC struct")
+        }
+        
+        err = slc.MLI(&mli, opt)
+        
         if err != nil {
             return Handle(err, "failed to retreive MLI file for '%s'",
                 s1.Path)
         }
 
-        fmt.Println(mli.dat)
+        fmt.Printf("%s %s\n", mli.dat, mli.par)
     }
 
     return nil

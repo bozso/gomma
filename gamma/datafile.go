@@ -58,38 +58,12 @@ func NewDataFile(dat, par, ext string) (ret dataFile, err error) {
     
     ret.dat = dat
     
-    exist, err := Exist(dat)
-    
-    if err != nil {
-        err = Handle(err, "failed to check whether datafile '%s' exists",
-            dat)
-        return
-    }
-    
-    if !exist {
-        err = Handle(nil, "datafile '%s' does not exist", dat)
-        return
-    }
-    
     if len(par) == 0 {
         par = "par"
     }
     
     if len(par) == 0 {
         par = fmt.Sprintf("%s.%s", dat, ext)
-    }
-    
-    exist, err = Exist(par)
-    
-    if err != nil {
-        err = Handle(err, "failed to check whether parfile '%s' exists",
-            dat)
-        return
-    }
-    
-    if !exist {
-        err = Handle(nil, "parfile '%s' does not exist", dat)
-        return
     }
     
     ret.Params = NewGammaParam(par)
@@ -251,6 +225,22 @@ func (opt *rasArgs) Parse(dat DataFile) error {
     }
     
     return nil
+}
+
+func (opt *MLIOpt) Parse() {
+    opt.ScaleExp.Parse()
+    
+    if len(opt.refTab) == 0 {
+        opt.refTab = "-"
+    }
+    
+    if opt.Looks.Rng == 0 {
+        opt.Looks.Rng = 1
+    }
+    
+    if opt.Looks.Azi == 0 {
+        opt.Looks.Azi = 1
+    }
 }
 
 func (s *SLC) Raster(opt rasArgs) error {

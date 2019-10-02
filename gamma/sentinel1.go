@@ -390,6 +390,15 @@ func IWAbsDiff(one, two IWInfos) (float64, error) {
     return math.Sqrt(sum), nil
 }
 
+func (s1 *S1Zip) Names(mode, pol string) (dat, par string) {
+    path := fp.Join(s1.Root, mode)
+    
+    dat = fp.Join(path, fmt.Sprintf("%s.%s", pol, mode))
+    par = dat + ".par"
+    
+    return
+}
+
 func (s1 *S1Zip) SLCNames(mode, pol string, ii int) (dat, par, TOPS string) {
     slcPath := fp.Join(s1.Root, mode)
 
@@ -471,17 +480,7 @@ func (s1 *S1Zip) RSLC(pol string) (ret S1SLC, err error) {
 var MLIFun = Gamma.selectFun("multi_look_ScanSAR", "multi_S1_TOPS")
 
 func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
-    rng := opt.Looks.Rng
-    
-    if rng == 0 {
-        rng = 1
-    }
-    
-    azi := opt.Looks.Azi
-    
-    if azi == 0 {
-        azi = 1
-    }
+    opt.Parse()
     
     wflag := 0
     
@@ -489,13 +488,8 @@ func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
         wflag = 1
     }
     
-    refTab := opt.refTab
-    
-    if len(refTab) == 0 {
-        refTab = "-"
-    }
-    
-    _, err := MLIFun(s1.tab, mli.dat, mli.par, rng, azi, wflag, refTab)
+    _, err := MLIFun(s1.tab, mli.dat, mli.par, opt.Looks.Rng, opt.Looks.Azi,
+                     wflag, opt.refTab)
     
     if err != nil {
         return Handle(err, "failed to create MLI file '%s'", mli.dat)

@@ -95,8 +95,6 @@ func MakeCmd(cmd string) CmdFun {
         out, err := exec.Command(cmd, arg...).CombinedOutput()
         result := string(out)
 
-        fmt.Printf("%s\n", result)
-
         if err != nil {
             return "", fmt.Errorf(cmdErr, cmd, result, err)
         }

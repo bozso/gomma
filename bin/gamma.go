@@ -55,24 +55,32 @@ func main() {
             return
         }
 
-    case "list":
-        list, err := gm.NewLister(os.Args[2:])
+    case "batch":
+        batch, err := gm.NewBatcher(os.Args[2:])
         if err != nil {
             log.Printf("failed to parse command line arguments: %s\n",
                 err)
             return
         }
 
-        switch list.Mode {
+        switch batch.Mode {
         case "quicklook":
-            err = list.Quicklook()
+            err = batch.Quicklook()
             
             if err != nil {
-                log.Printf("Error: %w", err)
+                log.Printf("Error: %w\n", err)
                 return
             }
+        case "mli":
+            err = batch.MLI()
+            
+            if err != nil {
+                log.Printf("Error: %s\n", err)
+                return
+            }
+        
         default:
-            log.Printf("unrecognized mode: '%s'! Choose from: %v", list.Mode,
+            log.Printf("unrecognized mode: '%s'! Choose from: %v", batch.Mode,
                 gm.ListModes)
             return
         }
