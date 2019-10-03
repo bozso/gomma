@@ -292,7 +292,7 @@ func (b *Batcher) MLI() error {
         }
         
         if exist {
-            fmt.Printf("%s %s\n", mli.dat, mli.par)
+            fmt.Printf("%s %s\n", mli.Dat, mli.Par)
             continue
         }
         
@@ -309,7 +309,7 @@ func (b *Batcher) MLI() error {
                 s1.Path)
         }
 
-        fmt.Printf("%s %s\n", mli.dat, mli.par)
+        fmt.Printf("%s %s\n", mli.Dat, mli.Par)
     }
 
     return nil
@@ -472,13 +472,13 @@ func NewCoder(args []string) (ret Coder, err error) {
 // geocode = geo2radar
 
 func (g *Coder) Geo2Radar() error {
-    return g.dem.geo2radar(g.infile, g.outfile, g.CodeOpt)
+    return g.Dem.geo2radar(g.infile, g.outfile, g.CodeOpt)
 }
 
 // geocode_back = radar2geo
 
 func (g *Coder) Radar2Geo() error {
-    return g.dem.radar2geo(g.infile, g.outfile, g.CodeOpt)
+    return g.Dem.radar2geo(g.infile, g.outfile, g.CodeOpt)
 }
 
 var PlotCmdFiles = map[string]Slice{

@@ -340,7 +340,7 @@ func stepGeocode (c *config) error {
     }
     
     // TODO: make geocode.json a setting in configuration file?
-    err = SaveJson(fp.Join(outDir, "geocode.json"), &geocode)
+    err = SaveJson(fp.Join(outDir, "geocode.json"), geocode)
     
     if err != nil {
         return Handle(err, "failed to save geocode data")
@@ -349,19 +349,83 @@ func stepGeocode (c *config) error {
     return nil
 }
 
-func stepCoreg(self *config) error {
-    path, pol := self.General.Metafile, self.General.Pol
-    
-    root, meta := fp.Join(self.General.CachePath, "sentinel1"), Meta{}
+
+func (c *config)stepCheckGeo() error {
+    meta := GeoMeta{}
+    path := fp.Join(c.General.OutputDir, "geocode.json")
     err := LoadJson(path, &meta)
     
     if err != nil {
-        return Handle(err, "failed to read metadata from '%s'", path)
+        return Handle(err, "failed to parse meta json file '%s'", path)
     }
     
-    midx := meta.MasterIdx
     
-    path = self.infile
+    geo, dem := meta.Geo, meta.Dem
+    
+    mrng, err := geo.MLI.Rng()
+    
+    if err != nil {
+        return Handle(err, "failed to retreive master MLI range samples")
+    }
+    
+    mazi, err := geo.MLI.Azi()
+    
+    if err != nil {
+        return Handle(err, "failed to retreive master MLI azimuth lines")
+    }
+
+    drng, err := dem.Rng()
+    
+    if err != nil {
+        return Handle(err, "failed to retreive DEM range samples")
+    }
+    
+
+    log.Printf("Geocoding DEM heights into image coordinates.\n")
+    
+    
+    opt := CodeOpt{
+        inWidth: drng,
+        outWidth: mrng,
+        nlines: mazi,
+        dtype: "FLOAT",
+        interpolMode: InvSquaredDist,
+    }
+    
+    
+    
+    dem.geo2radar(dem.Dat, geo.Hgt, opt)
+    
+    popt := rasArgs{}
+    
+    dem.Raster(Lookup, popt)
+    
+    // TODO: make gm.raster2
+    log.Printf("Creating quicklook hgt file.\n")
+    
+    popt2 := GeoPlotOpt{
+        rasArgs: popt
+        startHgt, startPwr int
+        cycle: 500.0
+    }
+    
+    geo.Raster(m_per_cycle=500.0)
+    
+    // geo.raster("gamma0")
+
+    // gp.dis2pwr(hgt.mli.dat, geo.gamma0, mrng, mrng)
+    
+    
+    return nil
+}
+
+
+func stepCoreg(self *config) error {
+    mzip, pol := self.General.MasterImage, self.General.Pol
+    
+    root := fp.Join(self.General.CachePath, "sentinel1")
+    
+    path := self.infile
     file, err := NewReader(path)
     
     if err != nil {
@@ -372,8 +436,22 @@ func stepCoreg(self *config) error {
     
     s1zips := S1Zips{}
     
+    ms1, err := NewS1Zip(mzip, root)
+    
+    if err != nil {
+        return Handle(err, "failed to parse S1Zip data from '%s'",
+            mzip)
+    }
+    
+    s1zips = append(s1zips, ms1)
+    
     for file.Scan() {
         line := file.Text()
+        
+        if line == mzip {
+            continue
+        }
+        
         s1, err := NewS1Zip(line, root)
         
         if err != nil {
@@ -384,11 +462,9 @@ func stepCoreg(self *config) error {
         s1zips = append(s1zips, s1)
     }
     
-    mzip := s1zips[midx]
+    fmt.Printf("Master date: %s\n", ms1.Center())
     
-    fmt.Printf("Master date: %s\n", mzip.Center())
-    
-    mslc, err := mzip.SLC(pol)
+    mslc, err := ms1.SLC(pol)
     
     if err != nil {
         return Handle(err, "failed to import master SLC data")
@@ -397,7 +473,7 @@ func stepCoreg(self *config) error {
     master := S1Coreg{
         pol: pol,
         tab: mslc.tab,
-        ID: date2str(mzip, short),
+        ID: date2str(ms1, short),
         coreg: self.Coreg,
         hgt: "0.1",
         poly1: "-",
@@ -406,6 +482,8 @@ func stepCoreg(self *config) error {
         clean: false,
         useInter: true, 
     }
+    
+    midx := 0
     
     var prev *S1Zip
     nzip := len(s1zips)

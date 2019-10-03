@@ -83,7 +83,7 @@ func TestGetParameter(t *test.T) {
     }
     
     
-    gots, err := pars.Par("image_format");
+    gots, err := pars.Param("image_format");
     if err != nil {
         t.Errorf("Failed to parse %s!", params)
     }

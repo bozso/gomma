@@ -488,11 +488,11 @@ func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
         wflag = 1
     }
     
-    _, err := MLIFun(s1.tab, mli.dat, mli.par, opt.Looks.Rng, opt.Looks.Azi,
+    _, err := MLIFun(s1.tab, mli.Dat, mli.Par, opt.Looks.Rng, opt.Looks.Azi,
                      wflag, opt.refTab)
     
     if err != nil {
-        return Handle(err, "failed to create MLI file '%s'", mli.dat)
+        return Handle(err, "failed to create MLI file '%s'", mli.Dat)
     }
     
     return nil

@@ -10,7 +10,7 @@ import (
 
 type (
     dataFile struct {
-        dat   string
+        Dat   string
         files []string
         Params
         date
@@ -47,7 +47,7 @@ type (
 )
 
 func NewGammaParam(path string) Params {
-    return Params{par: path, sep: ":", contents: nil}
+    return Params{Par: path, sep: ":", contents: nil}
 }
 
 func NewDataFile(dat, par, ext string) (ret dataFile, err error) {
@@ -56,10 +56,10 @@ func NewDataFile(dat, par, ext string) (ret dataFile, err error) {
         return
     }
     
-    ret.dat = dat
+    ret.Dat = dat
     
-    if len(par) == 0 {
-        par = "par"
+    if len(ext) == 0 {
+        ext = "par"
     }
     
     if len(par) == 0 {
@@ -116,11 +116,11 @@ func (d *dataFile) Move(path string) error {
 }
 
 func (d dataFile) Datfile() string {
-    return d.dat
+    return d.Dat
 }
 
 func (d dataFile) Parfile() string {
-    return d.par
+    return d.Par
 }
 
 func (d dataFile) Rng() (int, error) {
@@ -132,7 +132,7 @@ func (d dataFile) Azi() (int, error) {
 }
 
 func (d dataFile) ImageFormat() (string, error) {
-    return d.Par("image_format")
+    return d.Param("image_format")
 }
 
 func (d dataFile) PlotCmd() string {

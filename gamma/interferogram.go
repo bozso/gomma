@@ -77,7 +77,7 @@ func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
         return
     }
     
-    self.dat = dat
+    self.Dat = dat
     
     base := NoExt(dat)
     
@@ -115,7 +115,7 @@ func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
     simUnw := "%s.sim_unw"
     diff := "%s.diff"
     
-    par1, par2 := slc1.par, slc2.par
+    par1, par2 := slc1.Par, slc2.Par
     
     _, err = createOffset(par1, par2, off, opt.algo, rng, azi, inter)
     
@@ -127,7 +127,7 @@ func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
     slcRefPar := ""
     
     if ref != nil {
-        slcRefPar = ref.par
+        slcRefPar = ref.Par
     }
     
     _, err = phaseSimOrb(par1, par2, off, opt.hgt, simUnw, slcRefPar,
@@ -227,7 +227,7 @@ func (self *IFG) AdaptFilt(opt *AdaptFiltOpt ) (ret IFG, cc Coherence, err error
     }
     
     // TODO: figure out the name of the output files
-    ret, err = NewIFG(self.dat + ".filt", "", "", "", "")
+    ret, err = NewIFG(self.Dat + ".filt", "", "", "", "")
     
     if err != nil {
         err = Handle(err, "failed to create new interferogram struct")
@@ -256,7 +256,7 @@ func (self *IFG) AdaptFilt(opt *AdaptFiltOpt ) (ret IFG, cc Coherence, err error
         return
     }
     
-    _, err = adf(self.dat, ret.dat, cc.dat, rng, opt.alpha, opt.FFTWindow,
+    _, err = adf(self.Dat, ret.Dat, cc.Dat, rng, opt.alpha, opt.FFTWindow,
                  opt.cohWindow, step, opt.offset.Azi, opt.offset.Rng,
                  opt.frac)
     
@@ -288,7 +288,7 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
     slope := ".cpx"
     
     // parameters: xmin, xmax, ymin, ymax not yet given
-    _, err = phaseSlope(self.dat, slope, opt.SlopeWindow,
+    _, err = phaseSlope(self.Dat, slope, opt.SlopeWindow,
                         opt.SlopeCorrelationThresh)
     
     if err != nil {
@@ -300,7 +300,7 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
     
     mli1, mli2 := "", ""
     
-    _, err = CCAdaptive(self.dat, mli1, mli2, slope, nil, ret.dat, width,
+    _, err = CCAdaptive(self.Dat, mli1, mli2, slope, nil, ret.Dat, width,
                         opt.Box.Min, opt.Box.Max, weightFlag)
     
     if err != nil {
@@ -328,7 +328,7 @@ func (c *Coherence) Raster(mli *MLI, opt CCPlotOpt) error {
         opt.Range.Min = 0.9
     }
     
-    _, err = rascc(opt.Datfile, mli.dat, opt.Rng, opt.startCC, opt.startPwr,
+    _, err = rascc(opt.Datfile, mli.Dat, opt.Rng, opt.startCC, opt.startPwr,
                    opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
                    opt.Range.Min, opt.Range.Max, opt.Scale,
                    opt.Exp, opt.LR, opt.raster)

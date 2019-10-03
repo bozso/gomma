@@ -22,7 +22,7 @@ type (
     }
 
     Params struct {
-        par, sep string
+        Par, sep string
         contents []string
     }
 
@@ -89,7 +89,7 @@ func MakeCmd(cmd string) CmdFun {
             }
         }
 
-        //fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
+        fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
         //os.Exit(0)
 
         out, err := exec.Command(cmd, arg...).CombinedOutput()
@@ -139,16 +139,16 @@ func ReadFile(path string) (ret []byte, err error) {
 }
 
 func FromString(params, sep string) Params {
-    return Params{par: "", sep: sep, contents: str.Split(params, "\n")}
+    return Params{Par: "", sep: sep, contents: str.Split(params, "\n")}
 }
 
-func (self *Params) Par(name string) (ret string, err error) {
+func (self *Params) Param(name string) (ret string, err error) {
     if self.contents == nil {
         var file *os.File
-        file, err = os.Open(self.par)
+        file, err = os.Open(self.Par)
 
         if err != nil {
-            err = Handle(err, "failed to open file '%s'", self.par)
+            err = Handle(err, "failed to open file '%s'", self.Par)
             return
         }
 
@@ -169,7 +169,7 @@ func (self *Params) Par(name string) (ret string, err error) {
         }
     }
 
-    err = Handle(nil, "failed to find parameter '%s' in '%s'", name, self.par)
+    err = Handle(nil, "failed to find parameter '%s' in '%s'", name, self.Par)
     return
 }
 
@@ -196,7 +196,7 @@ func toFloat(par string, idx int) (ret float64, err error) {
 }
 
 func (self Params) Int(name string) (int, error) {
-    data, err := self.Par(name)
+    data, err := self.Param(name)
 
     if err != nil {
         return 0, err
@@ -206,7 +206,7 @@ func (self Params) Int(name string) (int, error) {
 }
 
 func (self Params) Float(name string) (float64, error) {
-    data, err := self.Par(name)
+    data, err := self.Param(name)
 
     if err != nil {
         return 0.0, err

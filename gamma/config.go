@@ -106,7 +106,7 @@ var (
         },
 
         Geocoding: geocoding{
-            DEMPath: "/home/istvan/DEM/srtm.vrt",
+            DEMPath: "/mnt/storage_B/szucs_e/SRTMGL1/SRTM.vrt",
             Iter: 1,
             nPixel: 8,
             LanczosOrder: 5,
@@ -115,7 +115,7 @@ var (
             CCThresh: 0.1,
             BandwithFrac: 0.8,
             AreaFactor: 20.0,
-            RngOversamp: 2,
+            RngOversamp: 2.0,
             DEMOverlap: RngAzi{
                 Rng: 100,
                 Azi: 100,
@@ -123,6 +123,10 @@ var (
             DEMOverSampling: LatLon{
                 Lat: 2.0,
                 Lon: 2.0,
+            },
+            OffsetWindows: RngAzi{
+                Rng: 500,
+                Azi: 500,
             },
         },
 
