@@ -64,11 +64,13 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
         return true, nil
     }
     
+    var out string
+    
     if true {
         if ref == nil {
             log.Printf("Coregistering: '%s'", slc2Tab)
             
-            _, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
+            out, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
                               self.Looks.Rng, self.Looks.Azi, self.poly1,
                               self.poly2, self.CoherenceThresh,
                               self.FractionThresh, self.PhaseStdevThresh,
@@ -78,6 +80,8 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
                 err = Handle(err, "coregistration failed")
                 return
             }
+            
+            fmt.Println(out)
         } else {
             var REFSLC S1SLC
             REFSLC, err = ref.RSLC(pol)
@@ -92,7 +96,7 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
             log.Printf("Coregistering: '%s'. Reference: '%s'", slc2Tab,
                 rslcRefTab)
             
-            _, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
+            out, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
                               self.Looks.Rng, self.Looks.Azi, self.poly1,
                               self.poly2, self.CoherenceThresh,
                               self.FractionThresh, self.PhaseStdevThresh,
@@ -102,6 +106,7 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
                 err = Handle(err, "coregistration failed")
                 return
             }
+            fmt.Println(out)
         }
     }
     
