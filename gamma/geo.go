@@ -2,6 +2,7 @@ package gamma
 
 import (
     "log"
+    "fmt"
     "os"
     fp "path/filepath"
     str "strings"
@@ -343,21 +344,28 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
 }
 
 func (d *DEM) Raster(mode DEMPlot, opt rasArgs) error {
-    err := opt.Parse(d)
-    
-    if err != nil {
-        return Handle(err, "failed to parse raster options")
-    }
     
     switch mode {
     case Lookup:
         opt.disArgs.Datfile = d.Lookup
         opt.ImgFmt = "FCOMPLEX"
         
+        err := opt.Parse(d)
+        
+        if err != nil {
+            return Handle(err, "failed to parse raster options")
+        }
+        
         return rasmph(opt)
     case Dem:
         opt.disArgs.Datfile = d.Dat
-        // TODO: implement
+        opt.ImgFmt = "FLOAT"
+        
+        err := opt.Parse(d)
+        
+        if err != nil {
+            return Handle(err, "failed to parse raster options")
+        }
     default:
         return Handle(nil, "unrecognized plot mode")
     }
@@ -378,6 +386,14 @@ func (opt *GeoPlotOpt) Parse(d DataFile) error {
         return Handle(err, "failed to parse plotting options")
     }
     
+    if opt.startPwr == 0 {
+        opt.startPwr = 1
+    }
+    
+    if opt.startHgt == 0 {
+        opt.startHgt = 1
+    }
+    
     if opt.cycle == 0 {
         opt.cycle = 160.0
     }
@@ -388,11 +404,14 @@ func (opt *GeoPlotOpt) Parse(d DataFile) error {
 var rashgt = Gamma.must("rashgt")
 
 func (geo *Geocode) Raster(opt GeoPlotOpt) error {
+    opt.rasArgs.raster = fmt.Sprintf("%s.%s", geo.Hgt, Settings.RasExt)
+    
     err := opt.Parse(geo)
     
     if err != nil {
         return Handle(err, "failed to parse plot arguments")
     }
+    
     
     _, err = rashgt(geo.Hgt, geo.MLI.Dat, opt.Rng, opt.startHgt, opt.startPwr,
                     opt.Nlines, opt.Avg.Rng, opt.Avg.Azi, opt.cycle, opt.Scale,

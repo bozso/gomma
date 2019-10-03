@@ -9,7 +9,7 @@ import (
     //"time"
     fp "path/filepath"
     //conv "strconv"
-    //str "strings"
+    str "strings"
 )
 
 type(
@@ -350,7 +350,7 @@ func stepGeocode (c *config) error {
 }
 
 
-func (c *config)stepCheckGeo() error {
+func stepCheckGeo(c *config) error {
     meta := GeoMeta{}
     path := fp.Join(c.General.OutputDir, "geocode.json")
     err := LoadJson(path, &meta)
@@ -359,8 +359,9 @@ func (c *config)stepCheckGeo() error {
         return Handle(err, "failed to parse meta json file '%s'", path)
     }
     
-    
     geo, dem := meta.Geo, meta.Dem
+    geo.MLI.sep = ":"
+    dem.sep = ":"
     
     mrng, err := geo.MLI.Rng()
     
@@ -373,7 +374,7 @@ func (c *config)stepCheckGeo() error {
     if err != nil {
         return Handle(err, "failed to retreive master MLI azimuth lines")
     }
-
+    
     drng, err := dem.Rng()
     
     if err != nil {
@@ -392,24 +393,34 @@ func (c *config)stepCheckGeo() error {
         interpolMode: InvSquaredDist,
     }
     
+    err = dem.geo2radar(dem.Dat, geo.Hgt, opt)
     
-    
-    dem.geo2radar(dem.Dat, geo.Hgt, opt)
+    if err != nil {
+        return Handle(err,
+            "failed to geocode from geographic to radar coordinates")
+    }
     
     popt := rasArgs{}
     
-    dem.Raster(Lookup, popt)
+    err = dem.Raster(Lookup, popt)
+    
+    if err != nil {
+        return Handle(err, "raster generation for DEM failed")
+    }
     
     // TODO: make gm.raster2
     log.Printf("Creating quicklook hgt file.\n")
     
     popt2 := GeoPlotOpt{
-        rasArgs: popt
-        startHgt, startPwr int
-        cycle: 500.0
+        rasArgs: popt,
+        cycle: 500.0,
     }
     
-    geo.Raster(m_per_cycle=500.0)
+    err = geo.Raster(popt2)
+    
+    if err != nil {
+        return Handle(err, "raster generation for HGT file failed")
+    }
     
     // geo.raster("gamma0")
 
@@ -446,7 +457,7 @@ func stepCoreg(self *config) error {
     s1zips = append(s1zips, ms1)
     
     for file.Scan() {
-        line := file.Text()
+        line := str.TrimSpace(file.Text())
         
         if line == mzip {
             continue
@@ -470,12 +481,20 @@ func stepCoreg(self *config) error {
         return Handle(err, "failed to import master SLC data")
     }
     
+    meta := GeoMeta{}
+    path = fp.Join(self.General.OutputDir, "geocode.json")
+    err = LoadJson(path, &meta)
+    
+    if err != nil {
+        return Handle(err, "failed to parse meta json file '%s'", path)
+    }
+    
     master := S1Coreg{
         pol: pol,
         tab: mslc.tab,
         ID: date2str(ms1, short),
         coreg: self.Coreg,
-        hgt: "0.1",
+        hgt: meta.Geo.Hgt,
         poly1: "-",
         poly2: "-",
         Looks: self.General.Looks,

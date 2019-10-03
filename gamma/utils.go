@@ -173,6 +173,7 @@ func (self *Params) Param(name string) (ret string, err error) {
     return
 }
 
+/*
 func toInt(par string, idx int) (ret int, err error) {
     ret, err = conv.Atoi(str.Split(par, " ")[idx])
 
@@ -194,8 +195,25 @@ func toFloat(par string, idx int) (ret float64, err error) {
 
     return ret, nil
 }
+*/
 
-func (self Params) Int(name string) (int, error) {
+func (self Params) Int(name string) (ret int, err error) {
+    data, err := self.Param(name)
+    
+    if err != nil {
+        return ret, err
+    }
+    
+    ret, err = conv.Atoi(data)
+
+    if err != nil {
+        err = Handle(err, "failed to convert string '%s' to int", data)
+        return
+    }
+
+    return ret, nil
+    
+    /*
     data, err := self.Param(name)
 
     if err != nil {
@@ -203,9 +221,26 @@ func (self Params) Int(name string) (int, error) {
     }
 
     return toInt(data, 0)
+    */
 }
 
-func (self Params) Float(name string) (float64, error) {
+func (self Params) Float(name string) (ret float64, err error) {
+    data, err := self.Param(name)
+    
+    if err != nil {
+        return 0.0, err
+    }
+    
+    ret, err = conv.ParseFloat(data, 64)
+
+    if err != nil {
+        err = Handle(err, "failed to convert string '%s' to float", data)
+        return
+    }
+
+    return ret, nil
+    
+    /*
     data, err := self.Param(name)
 
     if err != nil {
@@ -213,6 +248,7 @@ func (self Params) Float(name string) (float64, error) {
     }
 
     return toFloat(data, 0)
+    */
 }
 
 func TmpFile() (ret string, err error) {
