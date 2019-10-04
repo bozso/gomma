@@ -134,7 +134,8 @@ func rasslc(opt rasArgs) error {
     case "SCOMPLEX":
         dtype = 1
     default:
-        return Handle(nil, "unrecognized image format '%s'", opt.ImgFmt)
+        return Handle(nil, "unrecognized image format '%s' for rasslc",
+            opt.ImgFmt)
     }
     
     _, err := _rasslc(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
@@ -157,7 +158,8 @@ func raspwr(opt rasArgs) error {
     case "DOUBLE":
         dtype = 2
     default:
-        return Handle(nil, "unrecognized image format '%s'", opt.ImgFmt)
+        return Handle(nil, "unrecognized image format '%s' for raspwr",
+            opt.ImgFmt)
     }
     
     _, err := _raspwr(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
@@ -178,7 +180,8 @@ func rasmph(opt rasArgs) error {
     case "SCOMPLEX":
         dtype = 1
     default:
-        return Handle(nil, "unrecognized image format '%s'", opt.ImgFmt)
+        return Handle(nil, "unrecognized image format '%s' for rasmph",
+            opt.ImgFmt)
     }
     
     _, err := _rasmph(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,

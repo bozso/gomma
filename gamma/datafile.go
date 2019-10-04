@@ -204,6 +204,8 @@ func Display(dat DataFile, opt disArgs) error {
     return nil
 }
 
+
+// TODO: implement proper selection of plot command
 func Raster(dat DataFile, opt rasArgs, sec string) (err error) {
     err = opt.Parse(dat)
     
@@ -213,7 +215,30 @@ func Raster(dat DataFile, opt rasArgs, sec string) (err error) {
     
     cmd := opt.Cmd
     fun := Gamma.must("ras" + cmd)
-
+    
+    switch cmd {
+        case "SLC":
+            err = rasslc(opt)
+            
+            if err != nil {
+                return
+            }
+            
+        case "MLI":
+            err = raspwr(opt)
+            
+            if err != nil {
+                return
+            }
+        
+        default:
+            err = Handle(nil, "unrecognized command type '%s'", cmd)
+            return
+    }
+    
+    
+    
+    
     if cmd == "SLC" {
         _, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
             opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
