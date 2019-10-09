@@ -177,7 +177,7 @@ def img_fmt(self):
 func (self *IFG) CheckQuality() (ret bool, err error) {
     qual := self.quality
     
-    file, err := os.Create(qual)
+    file, err := os.Open(qual)
     
     if err != nil {
         err = Handle(err, "failed to open file '%s'", qual)

@@ -516,16 +516,11 @@ func stepCoreg(self *config) error {
             return Handle(err, "coregistration failed")
         }
         
-        fmt.Printf("%s\n", err)
-        
         if !ok {
-            log.Printf("%s\n",
-                Handle(err, "coregistration of '%s' failed", curr.Path))
-            log.Fatalf("First.\n")
+            log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
+                curr.Center())
             continue
         }
-        
-        log.Fatalf("First.\n")
         
         prev = curr
     }
@@ -543,8 +538,8 @@ func stepCoreg(self *config) error {
         }
         
         if !ok {
-            log.Printf("%s\n", Handle(err, "coregistration of '%s' failed!",
-                curr.Center()))
+            log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
+                curr.Center())
             continue
         }
         
