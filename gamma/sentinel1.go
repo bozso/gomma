@@ -5,13 +5,14 @@ import (
     "log"
     "math"
     "os"
+    "time"
     fp "path/filepath"
     str "strings"
 )
 
 const (
     nMaxBurst = 10
-    nIW       = 3
+    maxIW     = 3
     burstTpl  = "burst_asc_node_%d"
     nTemplate = 6
 )
@@ -60,19 +61,20 @@ type (
         bursts [nMaxBurst]float64
     }
     
-    IWInfos [nIW]IWInfo
+    IWInfos [maxIW]IWInfo
 
     S1IW struct {
         dataFile
         TOPS_par Params
     }
 
-    IWs [nIW]S1IW
+    IWs [maxIW]S1IW
 
     S1SLC struct {
-        date
-        IWs IWs
+        nIW int
         tab string
+        time.Time
+        IWs
     }
 )
 
@@ -197,7 +199,7 @@ func NewIW(dat, par, TOPS_par string) (ret S1IW, err error) {
 
     if err != nil {
         err = Handle(err,
-            "Failed to create DataFile with dat: '%s' and par '%s'!",
+            "failed to create DataFile with dat: '%s' and par '%s'",
             dat, par)
         return
     }
@@ -209,6 +211,44 @@ func NewIW(dat, par, TOPS_par string) (ret S1IW, err error) {
     ret.TOPS_par = NewGammaParam(TOPS_par)
     ret.files = []string{dat, par, TOPS_par}
 
+    return ret, nil
+}
+
+func FromTabfile(tab string) (ret S1SLC, err error) {
+    file, err := NewReader(tab)
+    
+    if err != nil {
+        err = Handle(err, "failed to open file '%s' for reading", tab)
+        return
+    }
+    
+    defer file.Close()
+
+    ret.nIW = 0
+    
+    for file.Scan() {
+        line := file.Text()
+        split := str.Split(line, " ")
+        
+        ret.IWs[ret.nIW], err = NewIW(split[0], split[1], split[2])
+        
+        if err != nil {
+            err = Handle(err, "failed to parse IW files from line '%s'", line)
+            return
+        }
+        
+        ret.nIW++
+    }
+    
+    ret.tab = tab
+        
+    ret.Time, err = ret.IWs[0].Date()
+    
+    if err != nil {
+        err = Handle(err, "failed to retreive date for '%s'", tab)
+        return
+    }
+    
     return ret, nil
 }
 
@@ -227,6 +267,71 @@ func (s1 *S1SLC) Exist() (ret bool, err error) {
         }
     }
     return true, nil
+}
+
+func (iw *S1IW) Move(dir string) error {
+    slc, par, TOPS_par := iw.dataFile.Dat, iw.dataFile.Params.Par, iw.TOPS_par.Par
+    
+    dst := fp.Join(dir, slc)
+    err := os.Rename(slc, dst)
+
+    if err != nil {
+        return Handle(err, "failed to move file '%s' to '%s'", slc, dst)
+    }
+    
+    iw.dataFile.Dat = dst
+
+    
+    dst = fp.Join(dir, par)
+    err = os.Rename(par, dst)
+
+    if err != nil {
+        return Handle(err, "failed to move file '%s' to '%s'", par, dst)
+    }
+    
+    iw.dataFile.Params.Par = dst
+    
+    dst = fp.Join(dir, TOPS_par)
+    err = os.Rename(TOPS_par, dst)
+
+    if err != nil {
+        return Handle(err, "failed to move file '%s' to '%s'", TOPS_par, dst)
+    }
+    
+    iw.TOPS_par.Par = dst
+    
+    return nil
+}
+
+func (s1 *S1SLC) Move(dir string) error {
+    newtab := fp.Join(dir, s1.tab)
+    
+    file, err := os.Create(newtab)
+    
+    if err != nil {
+        return Handle(err, "failed to open file '%s'", newtab)
+    }
+    
+    defer file.Close()
+    
+    for ii := 0; ii < s1.nIW; ii++ {
+        IW := &s1.IWs[ii]
+        
+        err := IW.Move(dir)
+        
+        if err != nil {
+            return Handle(err, "failed to move IW%d for S1SLC '%s'", ii + 1, s1.tab)
+        }
+        
+        line := fmt.Sprintf("%s %s %s\n", IW.Dat, IW.Par, IW.TOPS_par.Par)
+        
+        _, err = file.WriteString(line)
+        
+        if err != nil {
+            return Handle(err, "failed to write to file_'%s'", newtab)
+        }
+    }
+    return nil
 }
 
 func makePoint(info Params, max bool) (ret Point, err error) {

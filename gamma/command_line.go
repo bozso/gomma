@@ -18,7 +18,7 @@ type (
     }
 
     Batcher struct {
-        conf, Mode, infile string
+        conf, Mode, infile, OutDir string
         config
     }
 
@@ -194,6 +194,7 @@ func NewBatcher(args []string) (ret Batcher, err error) {
     flag.StringVar(&ret.conf, "config", "gamma.json",
         "Processing configuration file")
     flag.StringVar(&ret.infile, "file", "", "Inputfile.")
+    flag.StringVar(&ret.OutDir, "out", ".", "Output directory.")
 
     err = flag.Parse(args[1:])
 
@@ -254,9 +255,7 @@ func (b *Batcher) Quicklook() error {
 }
 
 func (b *Batcher) MLI() error {
-    root := fp.Join(b.General.CachePath, "sentinel1")
-
-    path, pol := b.infile, b.General.Pol
+    path := b.infile
     file, err := NewReader(path)
 
     if err != nil {
@@ -268,18 +267,26 @@ func (b *Batcher) MLI() error {
     opt := &MLIOpt {
         Looks: b.General.Looks,
     }
-
+    
+    mliDir := b.OutDir
+    
+    err = os.MkdirAll(mliDir, os.ModePerm)
+    
+    if err != nil {
+        return Handle(err, "failed to create directory '%s'", mliDir)
+    }
+    
     for file.Scan() {
         line := file.Text()
 
-        s1, err := NewS1Zip(line, root)
+        s1, err := FromTabfile(line)
 
         if err != nil {
-            return Handle(err, "failed to parse Sentinel-1 '%s'", s1.Path)
+            return Handle(err, "failed to parse S1SLC tabfile '%s'", line)
         }
         
-        dat, par := s1.Names("mli", pol)
-        mli, err := NewMLI(dat, par)
+        dat := fp.Join(mliDir, s1.Format(DateShort) + ".mli")
+        mli, err := NewMLI(dat, "")
         
         if err != nil {
             return Handle(err, "could not create MLI struct")
@@ -296,17 +303,11 @@ func (b *Batcher) MLI() error {
             continue
         }
         
-        slc, err := s1.SLC(pol)
-        
-        if err != nil {
-            return Handle(err, "failed to create S1SLC struct")
-        }
-        
-        err = slc.MLI(&mli, opt)
+        err = s1.MLI(&mli, opt)
         
         if err != nil {
             return Handle(err, "failed to retreive MLI file for '%s'",
-                s1.Path)
+                line)
         }
 
         fmt.Printf("%s %s\n", mli.Dat, mli.Par)

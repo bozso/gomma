@@ -4,8 +4,10 @@ import (
     "fmt"
     "os"
 
-    //"time"
+    "time"
     fp "path/filepath"
+    str "strings"
+    conv "strconv"
 )
 
 type (
@@ -133,6 +135,86 @@ func (d dataFile) Azi() (int, error) {
 
 func (d dataFile) ImageFormat() (string, error) {
     return d.Param("image_format")
+}
+
+func (d dataFile) Date() (ret time.Time, err error) {
+
+    dateStr, err := d.Param("date")
+    
+    if err != nil {
+        err = Handle(err, "failed to retreive date from '%s'", d.Par)
+        return
+    }
+    
+    split := str.Fields(dateStr)
+    
+    year, err := conv.Atoi(split[0])
+    
+    if err != nil {
+        err = Handle(err, "failed retreive year from date string '%s'", dateStr)
+        return
+    }
+    
+    var month time.Month
+    
+    switch split[1] {
+    case "01":
+        month = time.January
+    case "02":
+        month = time.February
+    case "03":
+        month = time.March
+    case "04":
+        month = time.April
+    case "05":
+        month = time.May
+    case "06":
+        month = time.June
+    case "07":
+        month = time.July
+    case "08":
+        month = time.August
+    case "09":
+        month = time.September
+    case "10":
+        month = time.October
+    case "11":
+        month = time.November
+    case "12":
+        month = time.December
+    }
+    
+    day, err := conv.Atoi(split[2])
+        
+    if err != nil {
+        err = Handle(err, "failed retreive day from date string '%s'", dateStr)
+        return
+    }
+    
+    hour, err := conv.Atoi(split[3])
+        
+    if err != nil {
+        err = Handle(err, "failed retreive hour from date string '%s'", dateStr)
+        return
+    }
+    
+    min, err := conv.Atoi(split[4])
+        
+    if err != nil {
+        err = Handle(err, "failed retreive minute from date string '%s'", dateStr)
+        return
+    }
+    
+    sec, err := conv.ParseFloat(split[5], 64)
+        
+    if err != nil {
+        err = Handle(err, "failed retreive seconds from string '%s'", dateStr)
+        return
+    }
+        
+    // TODO: parse nanoseconds
+    
+    return time.Date(year, month, day, hour, min, int(sec), 0, time.UTC), nil
 }
 
 func (d dataFile) PlotCmd() string {

@@ -318,12 +318,30 @@ func stepImport(self *config) error {
             return Handle(err, "failed to import zipfile '%s'", s1zip.Path)
         }
         
-        err = moveSLC(date, pol, slcDir, nIWs)
+        base := fmt.Sprintf("%s.%s", date, pol)
+        
+        slc := S1SLC{
+            tab: base + ".SLC_tab",
+            nIW: nIWs,
+        }
+        
+        
+        for ii := 0; ii < nIWs; ii++ {
+            dat := fmt.Sprintf("%s.slc.iw%d", base, ii + 1)
+            
+            slc.IWs[ii].dataFile.Dat = dat
+            slc.IWs[ii].dataFile.Params = NewGammaParam(dat + ".par")
+            slc.IWs[ii].TOPS_par = NewGammaParam(dat + ".TOPS_par")
+        }
+        
+        err = slc.Move(slcDir)
         
         if err != nil {
             return Handle(err, "failed to move S1SLC")
         }
         
+        fmt.Println(slc.tab)
+                
         /*
         if err != nil {
             return Handle(err, "failed to parse S1Zip data from '%s'",
@@ -369,9 +387,8 @@ func stepImport(self *config) error {
 
 /*
 func stepGeocode (c *config) error {
-    mzip := c.General.MasterImage
+    mzip := c.General.MasterDate
     
-    root := fp.Join(c.General.CachePath, "sentinel1")
     path, pol, outDir := c.infile, c.General.Pol, c.General.OutputDir
     
     zips, err := loadS1(path, root)
