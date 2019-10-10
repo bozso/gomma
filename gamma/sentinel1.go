@@ -47,7 +47,7 @@ type (
         DTID          string    `json:"-"`
         UID           string    `json:"-"`
         Templates     templates `json:"templates"`
-        date          `json:"date"`
+        date                    `json:"date"`
     }
     
     
@@ -143,7 +143,7 @@ func NewS1Zip(zipPath, root string) (ret *S1Zip, err error) {
         err = os.MkdirAll(path, os.ModePerm)
         
         if err != nil {
-            err = Handle(err, "Failed to create directory '%s'!", path)
+            err = Handle(err, "failed to create directory '%s'", path)
             return
         }
     }
@@ -238,12 +238,12 @@ func makePoint(info Params, max bool) (ret Point, err error) {
         tpl_lon, tpl_lat = "Min_Lon", "Min_Lat"
     }
 
-    if ret.X, err = info.Float(tpl_lon); err != nil {
+    if ret.X, err = info.Float(tpl_lon, 0); err != nil {
         err = Handle(err, "Could not get Longitude value!")
         return
     }
 
-    if ret.Y, err = info.Float(tpl_lat); err != nil {
+    if ret.Y, err = info.Float(tpl_lat, 0); err != nil {
         err = Handle(err, "Could not get Latitude value!")
         return
     }
@@ -295,7 +295,7 @@ func iwInfo(path string) (ret IWInfo, err error) {
     info := FromString(_info, ":")
     TOPS := NewGammaParam(TOPS_par)
 
-    nburst, err := TOPS.Int("number_of_bursts")
+    nburst, err := TOPS.Int("number_of_bursts", 0)
 
     if err != nil {
         err = Handle(err, "Could not retreive number of bursts!")
@@ -307,7 +307,7 @@ func iwInfo(path string) (ret IWInfo, err error) {
     for ii := 1; ii < nburst+1; ii++ {
         tpl := fmt.Sprintf(burstTpl, ii)
 
-        numbers[ii-1], err = TOPS.Float(tpl)
+        numbers[ii-1], err = TOPS.Float(tpl, 0)
 
         if err != nil {
             err = Handle(err, "Could not get burst number: '%s'", tpl)

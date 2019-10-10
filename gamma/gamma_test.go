@@ -62,7 +62,7 @@ func TestGetParameter(t *test.T) {
     
     pars := FromString(params, ":");
     
-    got, err := pars.Int("range_samples");
+    got, err := pars.Int("range_samples", 0);
     
     if err != nil {
         t.Errorf("Failed to parse %s!", params)
@@ -72,7 +72,7 @@ func TestGetParameter(t *test.T) {
         t.Errorf("Expected %v for range_samples got %v", rng, got);
     }
     
-    got, err = pars.Int("azimuth_lines");
+    got, err = pars.Int("azimuth_lines", 0);
     
     if err != nil {
         t.Errorf("Failed to parse %s!", params)

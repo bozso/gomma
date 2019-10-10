@@ -21,8 +21,8 @@ type (
         Parfile() string
         Rng() (int, error)
         Azi() (int, error)
-        Int(string) (int, error)
-        Float(string) (float64, error)
+        Int(string, int) (int, error)
+        Float(string, int) (float64, error)
         PlotCmd() string
         ImageFormat() (string, error)
         //Display(disArgs) error
@@ -124,11 +124,11 @@ func (d dataFile) Parfile() string {
 }
 
 func (d dataFile) Rng() (int, error) {
-    return d.Int("range_samples")
+    return d.Int("range_samples", 0)
 }
 
 func (d dataFile) Azi() (int, error) {
-    return d.Int("azimuth_lines")
+    return d.Int("azimuth_lines", 0)
 }
 
 func (d dataFile) ImageFormat() (string, error) {

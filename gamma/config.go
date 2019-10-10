@@ -15,6 +15,10 @@ type (
         Min, Max float64
     }
     
+    iminmax struct {
+        Min, Max int
+    }
+    
     LatLon struct {
         Lat, Lon float64
     }
@@ -24,10 +28,11 @@ type (
     }
     
     general struct {
-        DataPath, OutputDir, Pol, Metafile string
-        CachePath                          string `json:"CACHE_PATH"`
-        MasterImage                        string
-        Looks                              RngAzi
+        DataPath, OutputDir, Pol string
+        MasterDate               string
+        CachePath                string `json:"CACHE_PATH"`
+        Looks                    RngAzi
+        IWs                      [3]iminmax
     }
 
     preselect struct {
@@ -83,9 +88,9 @@ var (
     steps = map[string]stepFun{
         "select": stepSelect,
         "import": stepImport,
-        "geo": stepGeocode,
-        "check_geo": stepCheckGeo,
-        "coreg":  stepCoreg,
+        //"geo": stepGeocode,
+        //"check_geo": stepCheckGeo,
+        // "coreg":  stepCoreg,
     }
 
     stepList []string
@@ -93,9 +98,9 @@ var (
     defaultConfig = config{
         General: general{
             Pol: "vv",
-            Metafile: "meta.json",
             OutputDir: ".",
-            MasterImage: "",
+            MasterDate: "",
+            CachePath: "/mnt/storage_A/istvan/cache",
             Looks: RngAzi{
                 Rng: 1,
                 Azi: 1,

@@ -118,11 +118,11 @@ func NewDEM(dat, par, lookup, lookupOld string) (ret DEM, err error) {
 }
 
 func (dem DEM) Rng() (int, error) {
-    return dem.Int("width")
+    return dem.Int("width", 0)
 }
 
 func (dem DEM) Azi() (int, error) {
-    return dem.Int("nlines")
+    return dem.Int("nlines", 0)
 }
 
 func (opt *CodeOpt) Parse() (lrIn int, lrOut int, err error) {

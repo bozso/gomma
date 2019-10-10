@@ -89,8 +89,8 @@ func MakeCmd(cmd string) CmdFun {
             }
         }
 
-        fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
-        //os.Exit(0)
+        // fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
+        // os.Exit(0)
 
         out, err := exec.Command(cmd, arg...).CombinedOutput()
         result := string(out)
@@ -197,12 +197,14 @@ func toFloat(par string, idx int) (ret float64, err error) {
 }
 */
 
-func (self Params) Int(name string) (ret int, err error) {
+func (self Params) Int(name string, idx int) (ret int, err error) {
     data, err := self.Param(name)
     
     if err != nil {
         return ret, err
     }
+    
+    data = str.Split(data, " ")[idx]
     
     ret, err = conv.Atoi(data)
 
@@ -224,12 +226,14 @@ func (self Params) Int(name string) (ret int, err error) {
     */
 }
 
-func (self Params) Float(name string) (ret float64, err error) {
+func (self Params) Float(name string, idx int) (ret float64, err error) {
     data, err := self.Param(name)
     
     if err != nil {
         return 0.0, err
     }
+    
+    data = str.Split(data, " ")[idx]
     
     ret, err = conv.ParseFloat(data, 64)
 
