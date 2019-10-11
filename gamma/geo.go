@@ -337,7 +337,7 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
     return ret, nil
 }
 
-func (d *DEM) Raster(mode DEMPlot, opt *rasArgs) error {
+func (d *DEM) Raster(mode DEMPlot, opt rasArgs) error {
     
     switch mode {
     case Lookup:

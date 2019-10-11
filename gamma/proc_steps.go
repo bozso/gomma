@@ -423,9 +423,7 @@ func stepCheckGeo(c *config) error {
             "failed to geocode from geographic to radar coordinates")
     }
     
-    popt := rasArgs{}
-    
-    err = dem.Raster(Lookup, &popt)
+    err = dem.Raster(Lookup, rasArgs{})
     
     if err != nil {
         return Handle(err, "raster generation for DEM failed")
@@ -550,7 +548,7 @@ func stepCoreg(self *config) error {
             continue
         }
         
-        err = ifg.Raster(&mli, opt)
+        err = ifg.Raster(mli.Dat, opt)
         
         if err != nil {
             return Handle(err, "failed to create raster image for interferogram '%s",
@@ -578,7 +576,7 @@ func stepCoreg(self *config) error {
             continue
         }
         
-        err = ifg.Raster(&mli, opt)
+        err = ifg.Raster(mli.Dat, opt)
         
         if err != nil {
             return Handle(err, "failed to create raster image for interferogram '%s",

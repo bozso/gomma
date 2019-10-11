@@ -233,7 +233,7 @@ func (opt *MLIOpt) Parse() {
     }
 }
 
-func (s *SLC) Raster(opt *rasArgs) error {
+func (s *SLC) Raster(opt rasArgs) error {
     err := opt.Parse(s)
     
     if err != nil {
@@ -243,7 +243,7 @@ func (s *SLC) Raster(opt *rasArgs) error {
     return rasslc(opt)
 }
 
-func (m *MLI) Raster(opt *rasArgs) error {
+func (m *MLI) Raster(opt rasArgs) error {
     err := opt.Parse(m)
     
     if err != nil {
@@ -253,7 +253,7 @@ func (m *MLI) Raster(opt *rasArgs) error {
     return raspwr(opt)
 }
 
-func Display(dat DataFile, opt *disArgs) error {
+func Display(dat DataFile, opt disArgs) error {
     err := opt.Parse(dat)
     
     if err != nil {
@@ -276,7 +276,7 @@ func Display(dat DataFile, opt *disArgs) error {
 
 
 // TODO: implement proper selection of plot command
-func Raster(dat DataFile, opt *rasArgs, sec string) (err error) {
+func Raster(dat DataFile, opt rasArgs, sec string) (err error) {
     err = opt.Parse(dat)
     
     if err != nil {

@@ -18,9 +18,9 @@ type (
     }
 
     Batcher struct {
-        conf, Mode, infile, OutDir, filetype string
+        conf, Mode, infile, OutDir, filetype, mli string
         config
-        rasArgs
+        ifgPlotOpt
     }
 
     Meta struct {
@@ -211,7 +211,14 @@ func NewBatcher(args []string) (ret Batcher, err error) {
     flag.StringVar(&ret.OutDir, "out", ".", "Output directory.")
     flag.StringVar(&ret.filetype, "ftype", "", "Type of files located in infile.")
     
-    addRasArgsFlags(&ret.rasArgs, flag)
+    addRasArgsFlags(&ret.ifgPlotOpt.rasArgs, flag)
+    
+    flag.StringVar(&ret.mli, "mli", "", "MLI datafile used for background.")
+    flag.IntVar(&ret.startCC, "startCC", 1, "Start coherence lines.")
+    flag.IntVar(&ret.startPwr, "startPwr", 1, "Start power lines.")
+    flag.IntVar(&ret.startCpx, "startCpx", 1, "Start complex lines.")
+    flag.Float64Var(&ret.Range.Min, "min", 0.0, "Minimum value.")
+    flag.Float64Var(&ret.Range.Max, "max", 0.0, "Maximum value.")
     
     err = flag.Parse(args[1:])
 
@@ -333,6 +340,7 @@ func (b *Batcher) MLI() error {
     return nil
 }
 
+
 func (b *Batcher) Raster() error {
     path := b.infile
     file, err := NewReader(path)
@@ -343,44 +351,27 @@ func (b *Batcher) Raster() error {
 
     defer file.Close()
     
-    opt := &b.rasArgs
-    
-    for file.Scan() {
-        line := file.Text()
-        split := str.Fields(line)
+    switch b.filetype {
+    case "mli", "MLI":
+        err := b.PlotMLIs(&file)
         
-        log.Printf("Processing: %s\n", line)
-        
-        switch b.filetype {
-        case "mli", "MLI":
-            mli, err := NewMLI(split[0], split[1])
-            
-            if err != nil {
-                return Handle(err, "failed to parse MLI file from line '%s'", line)
-            }
-            
-            opt.raster = fmt.Sprintf("%s.%s", mli.Dat, Settings.RasExt)
-            
-            err = mli.Raster(opt)
-            
-            if err != nil {
-                return Handle(err, "failed to create raster for '%s'", line)
-            }
-        case "slc", "SLC":
-            slc, err := NewSLC(split[0], split[1])
-            
-            if err != nil {
-                return Handle(err, "failed to parse SLC file from line '%s'", line)
-            }
-            
-            err = slc.Raster(opt)
-            
-            if err != nil {
-                return Handle(err, "failed to create raster for '%s'", line)
-            }
-        default:
-            return fmt.Errorf("unrecognized filetype '%s'", b.filetype) 
+        if err != nil {
+            return Handle(err, "plotting of MLI datafiles failed")
         }
+    case "slc", "SLC":
+        err := b.PlotSLCs(&file)
+        
+        if err != nil {
+            return Handle(err, "plotting of SLC datafiles failed")
+        }
+    case "ifg", "IFG":
+        err := b.PlotIFGs(&file)
+        
+        if err != nil {
+            return Handle(err, "plotting of IFG datafiles failed")
+        }
+    default:
+        return fmt.Errorf("unrecognized filetype '%s'", b.filetype) 
     }
     
     return nil
@@ -448,14 +439,14 @@ func (dis *Displayer) Plot() error {
     
     switch dis.mode {
     case "dis":
-        err := Display(dat,  &dis.rasArgs.disArgs)
+        err := Display(dat,  dis.rasArgs.disArgs)
         
         if err != nil {
             return Handle(err, "failed to execute display")
         }
     
     case "ras":
-        err := Raster(dat,  &dis.rasArgs, dis.sec)
+        err := Raster(dat,  dis.rasArgs, dis.sec)
         
         if err != nil {
             return Handle(err, "failed to execute raster")
@@ -542,4 +533,111 @@ var PlotCmdFiles = map[string]Slice{
     "SLC": Slice{"slc", "rslc"},
     "mph": Slice{"sbi", "sm", "diff", "lookup", "lt"},
     "hgt": Slice{"hgt", "rdc"},
+}
+
+func (b *Batcher) PlotMLIs(file *FileReader) error {
+    opt := b.ifgPlotOpt.rasArgs
+    
+    for file.Scan() {
+        line := file.Text()
+        
+        if len(line) == 0 {
+            continue
+        }
+        
+        split := str.Fields(line)
+        
+        log.Printf("Processing: %s\n", line)
+        
+        mli, err := NewMLI(split[0], split[1])
+        
+        if err != nil {
+            return Handle(err, "failed to parse MLI file from line '%s'", line)
+        }
+            
+        err = mli.Raster(opt)
+        
+        if err != nil {
+            return Handle(err, "failed to create raster for '%s'", line)
+        }
+    }
+    return nil
+}
+
+func (b *Batcher) PlotSLCs(file *FileReader) error {
+    opt := b.ifgPlotOpt.rasArgs
+    
+    for file.Scan() {
+        line := file.Text()
+        
+        if len(line) == 0 {
+            continue
+        }
+        
+        split := str.Fields(line)
+        
+        log.Printf("Processing: %s\n", line)
+        
+        slc, err := NewSLC(split[0], split[1])
+        
+        if err != nil {
+            return Handle(err, "failed to parse SLC file from line '%s'", line)
+        }
+            
+        err = slc.Raster(opt)
+        
+        if err != nil {
+            return Handle(err, "failed to create raster for '%s'", line)
+        }
+    }
+    return nil
+}
+
+func (b *Batcher) PlotIFGs(file *FileReader) error {
+    opt := b.ifgPlotOpt
+    mli := b.mli
+    
+    for file.Scan() {
+        line := file.Text()
+        
+        if len(line) == 0 {
+            continue
+        }
+        
+        split := str.Fields(line)
+        
+        log.Printf("Processing: %s\n", line)
+        
+        dat := split[0]
+        par, diffPar, simUnwrap, quality := "", "", "", ""
+        
+        if len(split) > 2 {
+            par = split[1]
+        }
+        
+        if len(split) > 3 {
+            simUnwrap = split[2]
+        }
+        
+        if len(split) > 4 {
+            diffPar = split[3]
+        }
+        
+        if len(split) > 5 {
+            quality = split[4]
+        }
+        
+        ifg, err := NewIFG(dat, par, simUnwrap, diffPar, quality)
+        
+        if err != nil {
+            return Handle(err, "failed to parse IFG file from line '%s'", line)
+        }
+            
+        err = ifg.Raster(mli, opt)
+        
+        if err != nil {
+            return Handle(err, "failed to create raster for '%s'", line)
+        }
+    }
+    return nil
 }

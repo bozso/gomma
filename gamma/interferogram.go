@@ -228,7 +228,7 @@ func (opt *ifgPlotOpt) Parse(ifg *IFG) error {
 
 var rasmph_pwr24 = Gamma.must("rasmph_pwr24")
 
-func (ifg *IFG) Raster(mli *MLI, opt ifgPlotOpt) error {
+func (ifg *IFG) Raster(mli string, opt ifgPlotOpt) error {
     err := opt.Parse(ifg)
     
     if err != nil {
@@ -240,7 +240,7 @@ func (ifg *IFG) Raster(mli *MLI, opt ifgPlotOpt) error {
     cc := opt.cc
     
     if cc == nil {
-        _, err := rasmph_pwr24(opt.Datfile, mli.Dat, opt.Rng, opt.startCpx,
+        _, err := rasmph_pwr24(opt.Datfile, mli, opt.Rng, opt.startCpx,
                                opt.startPwr, opt.Nlines, opt.Avg.Rng,
                                opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
                                opt.raster)
@@ -250,7 +250,7 @@ func (ifg *IFG) Raster(mli *MLI, opt ifgPlotOpt) error {
         }
     } else {
         
-        _, err := rasmph_pwr24(opt.Datfile, mli.Dat, opt.Rng, opt.startCpx,
+        _, err := rasmph_pwr24(opt.Datfile, mli, opt.Rng, opt.startCpx,
                                opt.startPwr, opt.Nlines, opt.Avg.Rng,
                                opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
                                opt.raster, *cc, opt.startCC, opt.Range.Min)
@@ -326,7 +326,7 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
     return ret, nil
 }
 
-func (self *IFG) AdaptFilt(opt *AdaptFiltOpt ) (ret IFG, cc Coherence, err error) {
+func (self *IFG) AdaptFilt(opt AdaptFiltOpt) (ret IFG, cc Coherence, err error) {
     step := float64(opt.FFTWindow) / 8.0
     
     if opt.step > 0.0 {
@@ -375,7 +375,7 @@ func (self *IFG) AdaptFilt(opt *AdaptFiltOpt ) (ret IFG, cc Coherence, err error
     return ret, cc, nil
 }
 
-func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
+func (self *IFG) Coherence(opt CoherenceOpt) (ret Coherence, err error) {
     weightFlag := CoherenceWeight[opt.WeightType]
     var width int
     
@@ -420,7 +420,7 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
 
 var rascc = Gamma.must("rascc")
 
-func (c *Coherence) Raster(mli *MLI, opt *ifgPlotOpt) error {
+func (c *Coherence) Raster(mli *MLI, opt ifgPlotOpt) error {
     err := opt.rasArgs.Parse(c)
     
     if err != nil {
