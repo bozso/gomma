@@ -95,17 +95,8 @@ var (
     }
     
     S1DirPaths = [4]string{"slc", "rslc", "mli", "rmli"}
+    
 )
-
-func init() {
-    var ok bool
-
-    if burstCorner, ok = Gamma["ScanSAR_burst_corners"]; !ok {
-        if burstCorner, ok = Gamma["SLC_burst_corners"]; !ok {
-            log.Fatalf("No Fun.")
-        }
-    }
-}
 
 func NewS1Zip(zipPath, root string) (ret *S1Zip, err error) {
     const rexTemplate = "%s-iw%%d-slc-%%s-.*"
@@ -215,6 +206,8 @@ func NewIW(dat, par, TOPS_par string) (ret S1IW, err error) {
 }
 
 func FromTabfile(tab string) (ret S1SLC, err error) {
+    fmt.Printf("Parsing tabfile: '%s'.\n", tab)
+    
     file, err := NewReader(tab)
     
     if err != nil {
@@ -230,6 +223,8 @@ func FromTabfile(tab string) (ret S1SLC, err error) {
         line := file.Text()
         split := str.Split(line, " ")
         
+        log.Printf("Parsing IW%d\n", ret.nIW + 1)
+        
         ret.IWs[ret.nIW], err = NewIW(split[0], split[1], split[2])
         
         if err != nil {
@@ -239,6 +234,8 @@ func FromTabfile(tab string) (ret S1SLC, err error) {
         
         ret.nIW++
     }
+    
+    fmt.Printf("nIW: %d\n", ret.nIW)
     
     ret.tab = tab
         
@@ -272,7 +269,7 @@ func (s1 *S1SLC) Exist() (ret bool, err error) {
 func (iw *S1IW) Move(dir string) error {
     slc, par, TOPS_par := iw.dataFile.Dat, iw.dataFile.Params.Par, iw.TOPS_par.Par
     
-    dst := fp.Join(dir, slc)
+    dst := fp.Join(dir, fp.Base(slc))
     err := os.Rename(slc, dst)
 
     if err != nil {
@@ -280,9 +277,8 @@ func (iw *S1IW) Move(dir string) error {
     }
     
     iw.dataFile.Dat = dst
-
     
-    dst = fp.Join(dir, par)
+    dst = fp.Join(dir, fp.Base(par))
     err = os.Rename(par, dst)
 
     if err != nil {
@@ -291,7 +287,7 @@ func (iw *S1IW) Move(dir string) error {
     
     iw.dataFile.Params.Par = dst
     
-    dst = fp.Join(dir, TOPS_par)
+    dst = fp.Join(dir, fp.Base(TOPS_par))
     err = os.Rename(TOPS_par, dst)
 
     if err != nil {
@@ -304,7 +300,7 @@ func (iw *S1IW) Move(dir string) error {
 }
 
 func (s1 *S1SLC) Move(dir string) error {
-    newtab := fp.Join(dir, s1.tab)
+    newtab := fp.Join(dir, fp.Base(s1.tab))
     
     file, err := os.Create(newtab)
     
@@ -331,6 +327,8 @@ func (s1 *S1SLC) Move(dir string) error {
             return Handle(err, "failed to write to file_'%s'", newtab)
         }
     }
+    
+    s1.tab = newtab
     return nil
 }
 
@@ -545,39 +543,44 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
     return ret, nil
 }
 
-func (s1 *S1Zip) RSLC(pol string) (ret S1SLC, err error) {
-    const mode = "rslc"
-    tab := s1.tabName(mode, pol)
+func (s1 *S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
+    tab := fp.Join(outDir, str.ReplaceAll(fp.Base(s1.tab), "SLC_tab", "RSLC_tab"))
 
     file, err := os.Create(tab)
 
     if err != nil {
-        err = Handle(err, "Failed to create file '%s'!", tab)
+        err = Handle(err, "failed to create file '%s'!", tab)
         return
     }
     
     defer file.Close()
 
-    for ii := 1; ii < 4; ii++ {
-        dat, par, TOPS_par := s1.SLCNames(mode, pol, ii)
-        ret.IWs[ii-1], err = NewIW(dat, par, TOPS_par)
+    for ii := 0; ii < s1.nIW; ii++ {
+        IW := s1.IWs[ii]
+        
+        dat := fp.Join(outDir, str.ReplaceAll(fp.Base(IW.Dat), "slc", "rslc"))
+        par := dat + ".par"
+        TOPS_par := dat + ".TOPS_par"
+        
+        ret.IWs[ii], err = NewIW(dat, par, TOPS_par)
 
         if err != nil {
-            err = Handle(err, "Could not create new IW!")
+            err = Handle(err, "failed to create new IW")
             return
         }
+        
         line := fmt.Sprintf("%s %s %s\n", dat, par, TOPS_par)
 
         _, err = file.WriteString(line)
 
         if err != nil {
-            err = Handle(err, "Failed to write line '%s' to file'%s'!",
+            err = Handle(err, "failed to write line '%s' to file '%s'",
                 line, tab)
             return
         }
     }
 
-    ret.tab = tab
+    ret.tab, ret.nIW = tab, s1.nIW
 
     return ret, nil
 }

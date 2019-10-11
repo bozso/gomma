@@ -1,7 +1,7 @@
 package gamma
 
 import (
-    //"os"
+    "os"
     "fmt"
     "log"
     fp "path/filepath"
@@ -10,7 +10,7 @@ import (
 
 type (
     S1Coreg struct {
-        pol, tab, ID string
+        tab, ID, outDir, rslcPath, ifgPath string
         hgt, poly1, poly2 string
         Looks RngAzi
         clean, useInter bool
@@ -20,8 +20,7 @@ type (
 
 var coregFun = Gamma.must("S1_coreg_TOPS")
 
-func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
-    pol := self.pol
+func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret bool, RSLC S1SLC, ifg IFG, err error) {
     ret = false
     cleaning, flag1 := 0, 0
     
@@ -33,20 +32,13 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
         flag1 = 1
     }
     
-    SLC, err := slc.SLC(pol)
-    
-    if err != nil {
-        err = Handle(err, "failed to retreive slave SLC")
-        return
-    }
-    
     slc1Tab, slc1ID := self.tab, self.ID
-    slc2Tab, slc2ID := SLC.tab, date2str(slc, short)
+    slc2Tab, slc2ID := slc.tab, slc.Format(DateShort)
     
     // TODO: parse opt.hgt
     hgt := self.hgt
     
-    RSLC, err := slc.RSLC(pol)
+    RSLC, err = slc.RSLC(self.outDir)
     
     if err != nil {
         err = Handle(err, "failed to create RSLC")
@@ -61,59 +53,53 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
     }
     
     if exist {
-        return true, nil
+        log.Printf("Coregistered RSLC already exists, moving it to directory.")
+        
+        err = RSLC.Move(self.rslcPath)
+        
+        if err != nil {
+            err = Handle(err, "failed to move '%s' to RSLC directory", RSLC.tab)
+            return
+        }
+        
+        return true, RSLC, ifg, nil
     }
     
-    var out string
-    
-    if true {
-        if ref == nil {
-            log.Printf("Coregistering: '%s'", slc2Tab)
-            
-            out, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
-                              self.Looks.Rng, self.Looks.Azi, self.poly1,
-                              self.poly2, self.CoherenceThresh,
-                              self.FractionThresh, self.PhaseStdevThresh,
-                              cleaning, flag1)
-            
-            if err != nil {
-                err = Handle(err, "coregistration failed")
-                return
-            }
-            
-            fmt.Println(out)
-        } else {
-            var REFSLC S1SLC
-            REFSLC, err = ref.RSLC(pol)
-            
-            if err != nil {
-                err = Handle(err, "failed to create RSLC")
-                return
-            }
-            
-            rslcRefTab, rslcRefID := REFSLC.tab, date2str(ref, short)
-            
-            log.Printf("Coregistering: '%s'. Reference: '%s'", slc2Tab,
-                rslcRefTab)
-            
-            out, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
-                              self.Looks.Rng, self.Looks.Azi, self.poly1,
-                              self.poly2, self.CoherenceThresh,
-                              self.FractionThresh, self.PhaseStdevThresh,
-                              cleaning, flag1, rslcRefTab, rslcRefID)
-            
-            if err != nil {
-                err = Handle(err, "coregistration failed")
-                return
-            }
-            fmt.Println(out)
+    if ref == nil {
+        log.Printf("Coregistering: '%s'", slc2Tab)
+        
+        _, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
+                          self.Looks.Rng, self.Looks.Azi, self.poly1,
+                          self.poly2, self.CoherenceThresh,
+                          self.FractionThresh, self.PhaseStdevThresh,
+                          cleaning, flag1)
+        
+        if err != nil {
+            err = Handle(err, "coregistration failed")
+            return
+        }
+    } else {
+        rslcRefTab, rslcRefID := ref.tab, ref.Format(DateShort)
+        
+        log.Printf("Coregistering: '%s'. Reference: '%s'", slc2Tab,
+            rslcRefTab)
+        
+        _, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, RSLC.tab, hgt,
+                          self.Looks.Rng, self.Looks.Azi, self.poly1,
+                          self.poly2, self.CoherenceThresh,
+                          self.FractionThresh, self.PhaseStdevThresh,
+                          cleaning, flag1, rslcRefTab, rslcRefID)
+        
+        if err != nil {
+            err = Handle(err, "coregistration failed")
+            return
         }
     }
     
     ID := fmt.Sprintf("%s_%s", slc1ID, slc2ID)
     
-    ifg, err := NewIFG(ID + ".diff", ID + ".off", "", ID + ".diff_par",
-        ID + ".coreg_quality")
+    ifg, err = NewIFG(ID + ".diff", ID + ".off", "", ID + ".diff_par",
+        ID + ".results")
     
     if err != nil {
         err = Handle(err, "failed to create IFG '%s'", ID + ".diff")
@@ -129,15 +115,56 @@ func (self *S1Coreg) Coreg(slc, ref *S1Zip) (ret bool, err error) {
     }
     
     if !ok {
-        return false, nil
+        return false, RSLC, ifg, nil
     }
     
-    err = ifg.Move(fp.Join(slc.Safe, "rslc"))
+    err = RSLC.Move(self.rslcPath)
     
     if err != nil {
-        err = Handle(err, "failed to move interferogram")
+        err = Handle(err, "failed to move '%s' to RSLC directory", RSLC.tab)
         return
     }
     
-    return true, nil
+    err = ifg.Move(self.ifgPath)
+    
+    if err != nil {
+        err = Handle(err, "failed to move interferogram '%s' to IFG directory",
+            ifg.Dat)
+        return
+    }
+    
+    glob, err := fp.Glob(fp.Join(self.outDir, slc1ID + "*"))
+    
+    if err != nil {
+        err = Handle(err, "globbing for leftover files from coregistration failed")
+        return
+    }
+    
+    for _, file := range glob {
+        err = os.Remove(file)
+        
+        if err != nil {
+            err = Handle(err, "failed to remove file '%s'", file)
+            return
+        }
+    }
+    
+    
+    glob, err = fp.Glob(fp.Join(self.outDir, slc2ID + "*"))
+    
+    if err != nil {
+        err = Handle(err, "globbing for leftover files from coregistration failed")
+        return
+    }
+    
+    for _, file := range glob {
+        err = os.Remove(file)
+        
+        if err != nil {
+            err = Handle(err, "failed to remove file '%s'", file)
+            return
+        }
+    }
+    
+    return true, RSLC, ifg, nil
 }

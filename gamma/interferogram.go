@@ -24,7 +24,14 @@ type (
     Coherence struct {
         dataFile
     }
-        
+    
+    ifgPlotOpt struct {
+        rasArgs
+        cc *Coherence
+        startCC, startPwr, startCpx int
+        Range minmax 
+    }
+    
     ifgOpt struct {
         Looks RngAzi
         interact bool
@@ -39,12 +46,6 @@ type (
     }
     
     CoherenceOpt coherence
-    
-    CCPlotOpt struct {
-        rasArgs
-        startCC, startPwr int
-        Range minmax 
-    }
 )
 
 const (
@@ -100,7 +101,41 @@ func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
     return self, nil
 }
     
+
+func (ifg *IFG) Move(dir string) error {
+    err := Move(&ifg.dataFile.Dat, dir)
     
+    if err != nil {
+        return Handle(err, "failed to move IFG datafile")
+    }
+    
+    err = Move(&ifg.dataFile.Par, dir)
+    
+    if err != nil {
+        return Handle(err, "failed to move IFG parfile")
+    }
+    
+    err = Move(&ifg.diffPar.Par, dir)
+    
+    if err != nil {
+        return Handle(err, "failed to move IFG diff file")
+    }
+    
+    err = Move(&ifg.quality, dir)
+    
+    if err != nil {
+        return Handle(err, "failed to move IFG quality file")
+    }
+    
+    err = Move(&ifg.simUnwrap, dir)
+    
+    if err != nil {
+        return Handle(err, "failed to move IFG simulated unwrapped phase file")
+    }
+    
+    return nil
+}
+
 func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
     inter := 0
     
@@ -160,19 +195,85 @@ func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
     return ret, nil
 }
 
-/*
-TODO: translate these functions
-def rng(self):
-    return self.int("interferogram_width")
 
-def azi(self):
-    return self.int("interferogram_azimuth_lines")
+func (opt *ifgPlotOpt) Parse(ifg *IFG) error {
+    err := opt.rasArgs.Parse(ifg)
+    
+    if err != nil {
+        return err
+    }
+    
+    if opt.Range.Min == 0.0 {
+        opt.Range.Min = 0.1
+    }
+    
+    if opt.Range.Max == 0.0 {
+        opt.Range.Min = 0.9
+    }
+    
+    if opt.startCC == 0 {
+        opt.startCC = 1
+    }
+    
+    if opt.startPwr == 0 {
+        opt.startPwr = 1
+    }
+    
+    if opt.startCpx == 0 {
+        opt.startCpx = 1
+    }
+    
+    return nil
+}
 
-def img_fmt(self):
-    return "FCOMPLEX"
-*/
+var rasmph_pwr24 = Gamma.must("rasmph_pwr24")
 
+func (ifg *IFG) Raster(mli *MLI, opt ifgPlotOpt) error {
+    err := opt.Parse(ifg)
+    
+    if err != nil {
+        return Handle(err, "failed to parse IFG raster arguments")
+    }
+    
+    
+    
+    cc := opt.cc
+    
+    if cc == nil {
+        _, err := rasmph_pwr24(opt.Datfile, mli.Dat, opt.Rng, opt.startCpx,
+                               opt.startPwr, opt.Nlines, opt.Avg.Rng,
+                               opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
+                               opt.raster)
+        if err != nil {
+            return Handle(err, "failed to create raster for interferogram '%s'",
+                ifg.Dat)
+        }
+    } else {
+        
+        _, err := rasmph_pwr24(opt.Datfile, mli.Dat, opt.Rng, opt.startCpx,
+                               opt.startPwr, opt.Nlines, opt.Avg.Rng,
+                               opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
+                               opt.raster, *cc, opt.startCC, opt.Range.Min)
+        if err != nil {
+            return Handle(err, "failed to create raster for interferogram '%s'",
+                ifg.Dat)
+        }
+    }
+    
+    return nil
+}
 
+func (ifg *IFG) Rng() (int, error) {
+    return ifg.Int("interferogram_width", 0)
+}
+
+func (ifg *IFG) Azi() (int, error) {
+    return ifg.Int("interferogram_azimuth_lines", 0)
+}
+
+func (ifg *IFG) ImageFormat() (string, error) {
+    return "FCOMPLEX", nil
+}
 
 func (self *IFG) CheckQuality() (ret bool, err error) {
     qual := self.quality
@@ -194,13 +295,19 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
     
     for scanner.Scan() {
         line := scanner.Text()
-        if str.HasPrefix(line, "azimuth_pixel_offset") {
-            split := str.Split(line, " ")[1]
-            
-            diff, err = conv.ParseFloat(split, 64)
+        
+        if len(line) == 0 {
+            continue
+        }
+        
+        split := str.Fields(line)
+        
+        if split[0] == "azimuth_pixel_offset" {
+            diff, err = conv.ParseFloat(split[1], 64)
             
             if err != nil {
-                err = Handle(err, "failed to parse: '%s' into float64", split)
+                err = Handle(err, "failed to parse: '%s' into float64",
+                    split[1])
                 return
             }
             
@@ -210,7 +317,7 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
     
     log.Printf("Sum of azimuth offsets in %s is %f pixel.\n", qual, offs)
     
-    if isclose(offs, 0.0) {
+    if offs > 0.0 || offs < 0.0 {
         ret = true
     } else {
         ret = false
@@ -313,19 +420,11 @@ func (self *IFG) Coherence(opt *CoherenceOpt) (ret Coherence, err error) {
 
 var rascc = Gamma.must("rascc")
 
-func (c *Coherence) Raster(mli *MLI, opt CCPlotOpt) error {
+func (c *Coherence) Raster(mli *MLI, opt *ifgPlotOpt) error {
     err := opt.rasArgs.Parse(c)
     
     if err != nil {
         return Handle(err, "failed to parse plot arguments")
-    }
-    
-    if opt.Range.Min == 0.0 {
-        opt.Range.Min = 0.1
-    }
-    
-    if opt.Range.Max == 0.0 {
-        opt.Range.Min = 0.9
     }
     
     _, err = rascc(opt.Datfile, mli.Dat, opt.Rng, opt.startCC, opt.startPwr,
@@ -337,11 +436,6 @@ func (c *Coherence) Raster(mli *MLI, opt CCPlotOpt) error {
 }
 
 /*
-func (self *IFG) raster(args RasArgs) {
-    args = parseRasArgs(args)
-    
-    
-}
 def raster(self, start_cpx=1, start_pwr=1, start_cc=1, cc_min=0.2,
            **kwargs):
     mli = kwargs.pop("mli")

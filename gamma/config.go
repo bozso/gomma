@@ -49,10 +49,12 @@ type (
         DEMOverSampling           LatLon
         AreaFactor, CCThresh      float64
         BandwithFrac, RngOversamp float64
+        Master                    MLI
     }
 
     coreg struct {
         CoherenceThresh, FractionThresh, PhaseStdevThresh float64
+        MasterIdx                                         int
     }
 
     ifgSelect struct {
@@ -88,9 +90,9 @@ var (
     steps = map[string]stepFun{
         "select": stepSelect,
         "import": stepImport,
-        //"geo": stepGeocode,
-        //"check_geo": stepCheckGeo,
-        // "coreg":  stepCoreg,
+        "geo": stepGeocode,
+        "check_geo": stepCheckGeo,
+        "coreg":  stepCoreg,
     }
 
     stepList []string

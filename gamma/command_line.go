@@ -1,7 +1,7 @@
 package gamma
 
 import (
-    //"log"
+    "log"
     "encoding/json"
     "fmt"
     "os"
@@ -18,8 +18,9 @@ type (
     }
 
     Batcher struct {
-        conf, Mode, infile, OutDir string
+        conf, Mode, infile, OutDir, filetype string
         config
+        rasArgs
     }
 
     Meta struct {
@@ -40,7 +41,7 @@ type (
 )
 
 var (
-    ListModes = []string{"quicklook"}
+    BatchModes = []string{"quicklook", "mli / MLI", "ras"}
 )
 
 
@@ -174,6 +175,26 @@ func InitParse(args []string) (ret string, err error) {
     return ret, nil
 }
 
+func addRasArgsFlags(args *rasArgs, flag *fl.FlagSet) {
+    flag.IntVar(&args.Rng, "rng", 0, "Range samples of datafile.")
+    flag.IntVar(&args.Azi, "Azi", 0, "Azimuth lines of datafile.")
+    
+    flag.BoolVar(&args.Flip, "flip", false,
+        "Should the output image be flipped.")
+    
+    flag.StringVar(&args.Cmd, "cmd", "", "Plot command type to be used.")
+    
+    flag.IntVar(&args.Start, "start", 0, "Starting lines.")
+    flag.IntVar(&args.Nlines, "nline", 0, "Number of lines to plot.")
+    
+    flag.Float64Var(&args.Scale, "scale", 1.0, "Display scale factor.")
+    flag.Float64Var(&args.Exp, "exp", 0.35, "Display exponent.")
+    
+    flag.IntVar(&args.avgFact, "avg", 1000, "Averaging factor of pixels.")
+    flag.IntVar(&args.headerSize, "header", 0, "Header size?.")
+}
+
+
 func NewBatcher(args []string) (ret Batcher, err error) {
     flag := fl.NewFlagSet("list", fl.ContinueOnError)
     
@@ -182,20 +203,16 @@ func NewBatcher(args []string) (ret Batcher, err error) {
         return
     }
     
-    mode := args[0]
-
-    if mode != "quicklook" && mode != "mli" {
-        err = Handle(nil, "unrecognized Batcher mode '%s'", mode)
-        return
-    }
-
-    ret.Mode = mode
+    ret.Mode = args[0]
 
     flag.StringVar(&ret.conf, "config", "gamma.json",
         "Processing configuration file")
     flag.StringVar(&ret.infile, "file", "", "Inputfile.")
     flag.StringVar(&ret.OutDir, "out", ".", "Output directory.")
-
+    flag.StringVar(&ret.filetype, "ftype", "", "Type of files located in infile.")
+    
+    addRasArgsFlags(&ret.rasArgs, flag)
+    
     err = flag.Parse(args[1:])
 
     if err != nil {
@@ -316,6 +333,59 @@ func (b *Batcher) MLI() error {
     return nil
 }
 
+func (b *Batcher) Raster() error {
+    path := b.infile
+    file, err := NewReader(path)
+
+    if err != nil {
+        return Handle(err, "failed to create FileReader '%s'!", path)
+    }
+
+    defer file.Close()
+    
+    opt := &b.rasArgs
+    
+    for file.Scan() {
+        line := file.Text()
+        split := str.Fields(line)
+        
+        log.Printf("Processing: %s\n", line)
+        
+        switch b.filetype {
+        case "mli", "MLI":
+            mli, err := NewMLI(split[0], split[1])
+            
+            if err != nil {
+                return Handle(err, "failed to parse MLI file from line '%s'", line)
+            }
+            
+            opt.raster = fmt.Sprintf("%s.%s", mli.Dat, Settings.RasExt)
+            
+            err = mli.Raster(opt)
+            
+            if err != nil {
+                return Handle(err, "failed to create raster for '%s'", line)
+            }
+        case "slc", "SLC":
+            slc, err := NewSLC(split[0], split[1])
+            
+            if err != nil {
+                return Handle(err, "failed to parse SLC file from line '%s'", line)
+            }
+            
+            err = slc.Raster(opt)
+            
+            if err != nil {
+                return Handle(err, "failed to create raster for '%s'", line)
+            }
+        default:
+            return fmt.Errorf("unrecognized filetype '%s'", b.filetype) 
+        }
+    }
+    
+    return nil
+}
+
 
 func NewDisplayer(args []string) (ret Displayer, err error) {
     flag := fl.NewFlagSet("display", fl.ContinueOnError)
@@ -328,22 +398,7 @@ func NewDisplayer(args []string) (ret Displayer, err error) {
     
     flag.StringVar(&ret.sec, "sec", "", "Secondary input datafile.")
     
-    flag.IntVar(&ret.Rng, "rng", 0, "Range samples of datafile.")
-    flag.IntVar(&ret.Azi, "Azi", 0, "Azimuth lines of datafile.")
-    
-    flag.BoolVar(&ret.Flip, "flip", false,
-        "Should the output image be flipped.")
-    
-    flag.StringVar(&ret.Cmd, "cmd", "", "Plot command type to be used.")
-    
-    flag.IntVar(&ret.Start, "start", 0, "Starting lines.")
-    flag.IntVar(&ret.Nlines, "nline", 0, "Number of lines to plot.")
-    
-    flag.Float64Var(&ret.Scale, "scale", 1.0, "Display scale factor.")
-    flag.Float64Var(&ret.Exp, "exp", 0.35, "Display exponent.")
-    
-    flag.IntVar(&ret.rasArgs.avgFact, "avg", 1000, "Averaging factor of pixels.")
-    flag.IntVar(&ret.rasArgs.headerSize, "header", 0, "Header size?.")
+    addRasArgsFlags(&ret.rasArgs, flag)    
     
     err = flag.Parse(args[1:])
     
@@ -393,14 +448,14 @@ func (dis *Displayer) Plot() error {
     
     switch dis.mode {
     case "dis":
-        err := Display(dat,  dis.rasArgs.disArgs)
+        err := Display(dat,  &dis.rasArgs.disArgs)
         
         if err != nil {
             return Handle(err, "failed to execute display")
         }
     
     case "ras":
-        err := Raster(dat,  dis.rasArgs, dis.sec)
+        err := Raster(dat,  &dis.rasArgs, dis.sec)
         
         if err != nil {
             return Handle(err, "failed to execute raster")

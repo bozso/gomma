@@ -45,12 +45,6 @@ type (
         cycle float64
     }
     
-    Geocoder struct {
-        geocoding
-        mli MLI
-        outDir string
-    }
-    
     GeoMeta struct {
         Dem, DemOrig DEM
         Geo Geocode
@@ -343,7 +337,7 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
     return ret, nil
 }
 
-func (d *DEM) Raster(mode DEMPlot, opt rasArgs) error {
+func (d *DEM) Raster(mode DEMPlot, opt *rasArgs) error {
     
     switch mode {
     case Lookup:
@@ -431,10 +425,8 @@ var (
     gcMapFine = Gamma.must("gc_map_fine")
 )
 
-func (g* Geocoder) Run() (ret GeoMeta, err error) {
-    out := g.outDir
-    
-    geodir := fp.Join(out, "geo")
+func (g* geocoding) Run(outDir string) (ret GeoMeta, err error) {
+    geodir := fp.Join(outDir, "geo")
     
     err = os.MkdirAll(geodir, os.ModePerm)
     
@@ -481,7 +473,12 @@ func (g* Geocoder) Run() (ret GeoMeta, err error) {
         return
     }
     
-    mli := g.mli
+    mli, err := NewMLI(g.Master.Dat, g.Master.Par)
+    
+    if err != nil {
+        err = Handle(err, "failed to parse master MLI file")
+        return
+    }
     
     if !ex {
         log.Printf("Creating DEM from %s\n", vrtPath)

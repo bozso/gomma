@@ -10,7 +10,7 @@ import (
     // "time"
     fp "path/filepath"
     //conv "strconv"
-    // str "strings"
+    str "strings"
 )
 
 type(
@@ -341,37 +341,6 @@ func stepImport(self *config) error {
         }
         
         fmt.Println(slc.tab)
-                
-        /*
-        if err != nil {
-            return Handle(err, "failed to parse S1Zip data from '%s'",
-                s1zip.Path)
-        }
-        
-        if checkBurstNum(masterIW, iw) {
-            log.Printf("S1Zip '%s' does not have the same number of " + 
-                "bursts in every IW as the master image.", s1zip.Path)
-            continue
-        }
-        
-        diff, err := IWAbsDiff(masterIW, iw)
-        
-        if err != nil {
-            return Handle(err,
-            "failed to calculate burst number differences between " +
-            "master and '%s'", s1zip.Path)
-        }
-        
-        if !(math.RoundToEven(diff) > 0.0) {
-            err = s1zip.ImportSLC(extInfo)
-            
-            if err != nil {
-                return Handle(err, "failed to import S1SLC files")
-            }
-            
-            fmt.Printf("%s\n", s1zip.Path)
-        }
-        */
     }
     
     // TODO: save master idx?
@@ -384,57 +353,10 @@ func stepImport(self *config) error {
     return nil
 }
 
-
-/*
 func stepGeocode (c *config) error {
-    mzip := c.General.MasterDate
+    outDir := c.General.OutputDir
     
-    path, pol, outDir := c.infile, c.General.Pol, c.General.OutputDir
-    
-    zips, err := loadS1(path, root)
-    
-    if err != nil {
-        return Handle(err, "failed to load zipfiles from '%s'", path)
-    }
-    
-    var master *S1Zip
-    
-    if len(mzip) == 0 {
-        sort.Sort(ByDate(zips))
-        
-        master = zips[0]
-    } else {
-        master, err = NewS1Zip(mzip, root)
-        
-        if err != nil {
-            return Handle(err, "failed to parse master zipfile '%s'", mzip)
-        }
-    }
-    
-    mslc, err := master.SLC(pol)
-    
-    if err != nil {
-        return Handle(err, "failed to retreive master S1SLC")
-    }
-    
-    opt := &MLIOpt{
-        refTab: mslc.tab,
-        Looks: c.General.Looks,
-    }
-    
-    mmli, err := master.MLI("mli", pol, opt)
-    
-    if err != nil {
-        return Handle(err, "failed to retreive master MLI")
-    }
-    
-    geo := Geocoder{
-        geocoding: c.Geocoding,
-        mli: mmli,
-        outDir: outDir,
-    }
-    
-    geocode, err := geo.Run()
+    geocode, err := c.Geocoding.Run(outDir)
     
     if err != nil {
         return Handle(err, "geocoding failed")
@@ -503,7 +425,7 @@ func stepCheckGeo(c *config) error {
     
     popt := rasArgs{}
     
-    err = dem.Raster(Lookup, popt)
+    err = dem.Raster(Lookup, &popt)
     
     if err != nil {
         return Handle(err, "raster generation for DEM failed")
@@ -513,7 +435,7 @@ func stepCheckGeo(c *config) error {
     log.Printf("Creating quicklook hgt file.\n")
     
     popt2 := GeoPlotOpt{
-        rasArgs: popt,
+        rasArgs: rasArgs{},
         cycle: 500.0,
     }
     
@@ -530,148 +452,167 @@ func stepCheckGeo(c *config) error {
     
     return nil
 }
-*/
 
-//func stepCoreg(self *config) error {
-    //mzip, pol := self.General.MasterImage, self.General.Pol
+func stepCoreg(self *config) error {
+    outDir := self.General.OutputDir
     
-    //root := fp.Join(self.General.CachePath, "sentinel1")
+    path := self.infile
+    file, err := NewReader(path)
     
-    //path := self.infile
-    //file, err := NewReader(path)
+    if err != nil {
+        return Handle(err, "failed to open file '%s'", path)
+    }
     
-    //if err != nil {
-        //return Handle(err, "failed to open file '%s'", path)
-    //}
+    defer file.Close()
     
-    //defer file.Close()
+    S1SLCs := []S1SLC{}
     
-    //s1zips := S1Zips{}
-    
-    //ms1, err := NewS1Zip(mzip, root)
-    
-    //if err != nil {
-        //return Handle(err, "failed to parse S1Zip data from '%s'",
-            //mzip)
-    //}
-    
-    //s1zips = append(s1zips, ms1)
-    
-    //for file.Scan() {
-        //line := str.TrimSpace(file.Text())
+    for file.Scan() {
+        line := str.TrimSpace(file.Text())
         
-        //if line == mzip {
-            //continue
-        //}
+        s1, err := FromTabfile(line)
         
-        //s1, err := NewS1Zip(line, root)
+        if err != nil {
+            return Handle(err, "failed to parse S1SLC file from '%s'",
+                line)
+        }
         
-        //if err != nil {
-            //return Handle(err, "failed to parse S1Zip data from '%s'",
-                //line)
-        //}
+        S1SLCs = append(S1SLCs, s1)
+    }
+    
+    midx := self.Coreg.MasterIdx - 1
+    
+    mslc := S1SLCs[midx]
+    mdate := mslc.Format(DateShort)
+    
+    fmt.Printf("Master date: %s\n", mdate)
+    
+    meta := GeoMeta{}
+    path = fp.Join(self.General.OutputDir, "geocode.json")
+    err = LoadJson(path, &meta)
+    
+    if err != nil {
+        return Handle(err, "failed to parse meta json file '%s'", path)
+    }
+    
+    mli, err := NewMLI(meta.Geo.Dat, meta.Geo.Par)
+    
+    if err != nil {
+        return Handle(err, "failed to make master MLI struct")
+    }
+    
+    rslc, ifg := fp.Join(outDir, "RSLC"), fp.Join(outDir, "IFG")
+    
+    err = os.MkdirAll(rslc, os.ModePerm)
+    
+    if err != nil {
+        return Handle(err, "failed to create directory '%s'", rslc)
+    }
+    
+    err = os.MkdirAll(ifg, os.ModePerm)
+    
+    if err != nil {
+        return Handle(err, "failed to create directory '%s'", ifg)
+    }
+    
+    master := S1Coreg{
+        tab: mslc.tab,
+        ID: mdate,
+        coreg: self.Coreg,
+        hgt: meta.Geo.Hgt,
+        poly1: "-",
+        poly2: "-",
+        Looks: self.General.Looks,
+        clean: false,
+        useInter: true,
+        outDir: outDir,
+        rslcPath: rslc,
+        ifgPath: ifg,
+    }
+    
+    var prev *S1SLC = nil
+    nzip := len(S1SLCs)
+    
+    opt := ifgPlotOpt{}
+    
+    for ii := midx + 1; ii < nzip; ii++ {
+        curr := &S1SLCs[ii]
         
-        //s1zips = append(s1zips, s1)
-    //}
-    
-    //fmt.Printf("Master date: %s\n", ms1.Center())
-    
-    //mslc, err := ms1.SLC(pol)
-    
-    //if err != nil {
-        //return Handle(err, "failed to import master SLC data")
-    //}
-    
-    //meta := GeoMeta{}
-    //path = fp.Join(self.General.OutputDir, "geocode.json")
-    //err = LoadJson(path, &meta)
-    
-    //if err != nil {
-        //return Handle(err, "failed to parse meta json file '%s'", path)
-    //}
-    
-    //master := S1Coreg{
-        //pol: pol,
-        //tab: mslc.tab,
-        //ID: date2str(ms1, short),
-        //coreg: self.Coreg,
-        //hgt: meta.Geo.Hgt,
-        //poly1: "-",
-        //poly2: "-",
-        //Looks: self.General.Looks,
-        //clean: false,
-        //useInter: true, 
-    //}
-    
-    //midx := 0
-    
-    //var prev *S1Zip
-    //nzip := len(s1zips)
-    
-    //for ii := midx + 1; ii < nzip; ii++ {
-        //curr := s1zips[ii]
+        ok, rslc, ifg, err := master.Coreg(curr, prev)
         
-        //ok, err := master.Coreg(curr, prev)
+        if err != nil {
+            return Handle(err, "coregistration failed")
+        }
         
-        //if err != nil {
-            //return Handle(err, "coregistration failed")
-        //}
+        if !ok {
+            log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
+                curr.Format(DateShort))
+            continue
+        }
         
-        //if !ok {
-            //log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
-                //curr.Center())
-            //continue
-        //}
+        err = ifg.Raster(&mli, opt)
         
-        //prev = curr
-    //}
+        if err != nil {
+            return Handle(err, "failed to create raster image for interferogram '%s",
+                ifg.Dat)
+        }
+        
+        prev = &rslc
+    }
     
     
-    //prev = nil
+    prev = nil
     
-    //for ii := midx - 1; ii > -1; ii-- {
-        //curr := s1zips[ii]
+    for ii := midx - 1; ii > -1; ii-- {
+        curr := &S1SLCs[ii]
         
-        //ok, err := master.Coreg(curr, prev)
+        ok, rslc, ifg, err := master.Coreg(curr, prev)
         
-        //if err != nil {
-            //return Handle(err, "coregistration failed")
-        //}
+        if err != nil {
+            return Handle(err, "coregistration failed")
+        }
         
-        //if !ok {
-            //log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
-                //curr.Center())
-            //continue
-        //}
+        if !ok {
+            log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
+                curr.Format(DateShort))
+            continue
+        }
         
-        //prev = curr
-    //}
+        err = ifg.Raster(&mli, opt)
+        
+        if err != nil {
+            return Handle(err, "failed to create raster image for interferogram '%s",
+                ifg.Dat)
+        }
+        
+        prev = &rslc
+    }
     
-    ///*
+    /*
     
-    //for ii, S1 := range s1zips {
-        //if ii == midx {
-            //continue
-        //}
+    for ii, S1 := range s1zips {
+        if ii == midx {
+            continue
+        }
         
-        //date1 := S1.Center()
-        //date2 := s1zips[0].Center()
+        date1 := S1.Center()
+        date2 := s1zips[0].Center()
         
-        //idx, diff1 := 0, math.Abs(float64(date1.Sub(date2)))
+        idx, diff1 := 0, math.Abs(float64(date1.Sub(date2)))
         
-        //for jj := 1; jj < nzip; jj++ {
-            //diff2 := math.Abs(float64(date1.Sub(s1zips[jj].Center())))
+        for jj := 1; jj < nzip; jj++ {
+            diff2 := math.Abs(float64(date1.Sub(s1zips[jj].Center())))
             
-            //if diff2 < diff1 {
-                //idx = jj
-            //}
-        //}
+            if diff2 < diff1 {
+                idx = jj
+            }
+        }
         
-        //// S1Coreg(mslc, )
-    //}
-    //*/
-    //return nil
-//}
+        // S1Coreg(mslc, )
+    }
+    */
+    return nil
+}
 
 
 func Search(s1 *S1Zip, zips []*S1Zip) *S1Zip {
@@ -731,66 +672,6 @@ func toZiplist(name string, one, two *S1Zip) error {
             }
         }
     }
-    return nil
-}
-
-func moveSLC(date, pol, slcDir string, nIWs int) error {
-    base := fmt.Sprintf("%s.%s", date, pol)
-    
-    tab := fp.Join(slcDir, base + ".SLC_tab")
-    
-    file, err := os.Create(tab)
-    
-    if err != nil {
-        return Handle(err, "could not open tabfile '%s'", tab)
-    }
-    
-    defer file.Close()
-    
-    for ii := 0; ii < nIWs; ii++ {
-        slc := fmt.Sprintf("%s.slc.iw%d", base, ii + 1)
-        par := slc + ".par"
-        TOPS_par := slc + ".TOPS_par"
-        
-        dst := fp.Join(slcDir, slc)
-        err := os.Rename(slc, dst)
-
-        if err != nil {
-            return Handle(err, "failed to move file '%s' to '%s'", slc, dst)
-        }
-        
-        slc = dst
-
-        
-        dst = fp.Join(slcDir, par)
-        err = os.Rename(par, dst)
-
-        if err != nil {
-            return Handle(err, "failed to move file '%s' to '%s'", par, dst)
-        }
-        
-        par = dst
-        
-        
-        dst = fp.Join(slcDir, TOPS_par)
-        err = os.Rename(TOPS_par, dst)
-
-        if err != nil {
-            return Handle(err, "failed to move file '%s' to '%s'", TOPS_par, dst)
-        }
-        
-        TOPS_par = dst
-        
-        
-        line := fmt.Sprintf("%s %s %s\n", slc, par, TOPS_par)
-        
-        _, err = file.WriteString(line)
-        
-        if err != nil {
-            return Handle(err, "failed to write to tabfile '%s'", tab)
-        }
-    }
-    
     return nil
 }
 

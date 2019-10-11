@@ -7,13 +7,16 @@ import (
     gm "../gamma"
 )
 
+var commands = []string{"proc", "list", "init", "batch", "ras", "dis"}
+
 func main() {
     defer gm.RemoveTmp()
 
     if len(os.Args) < 2 {
-        fmt.Println("Expected 'proc', 'list' or 'init' subcommands!")
+        fmt.Printf("Expected on of the following subcommands: %v!\n", commands)
         os.Exit(1)
     }
+    
     mode := os.Args[1]
     
     switch mode {
@@ -71,7 +74,7 @@ func main() {
                 log.Printf("Error: %w\n", err)
                 return
             }
-        case "mli":
+        case "mli", "MLI":
             err = batch.MLI()
             
             if err != nil {
@@ -79,18 +82,18 @@ func main() {
                 return
             }
         
+        case "ras", "raster", "plot":
+            err = batch.Raster()
+            
+            if err != nil {
+                log.Printf("Error: %s\n", err)
+                return
+            }
         default:
             log.Printf("unrecognized mode: '%s'! Choose from: %v", batch.Mode,
-                gm.ListModes)
+                gm.BatchModes)
             return
         }
-        
-        /*
-                if err != nil {
-                    return
-                }
-                log.Printf(err, "Could not create config file: '%s'!", *path)
-        */
     case "ras", "dis":
         dis, err := gm.NewDisplayer(os.Args[1:])
         
@@ -106,7 +109,7 @@ func main() {
             return
         }
     default:
-        fmt.Println("Expected 'proc', 'list' or 'init' subcommands!")
+        fmt.Printf("Expected on of the following subcommands: %v!\n", commands)
         return
     }
 

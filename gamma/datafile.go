@@ -2,9 +2,8 @@ package gamma
 
 import (
     "fmt"
-    "os"
-
     "time"
+    "os"
     fp "path/filepath"
     str "strings"
     conv "strconv"
@@ -17,7 +16,7 @@ type (
         Params
         date
     }
-
+    
     DataFile interface {
         Datfile() string
         Parfile() string
@@ -28,7 +27,7 @@ type (
         PlotCmd() string
         ImageFormat() (string, error)
         //Display(disArgs) error
-        //Raster(rasArgs) error
+        //Raster(Args) error
     }
 
     SLC struct {
@@ -74,6 +73,11 @@ func NewDataFile(dat, par, ext string) (ret dataFile, err error) {
     return ret, nil
 }
 
+func FromLine(line string) (ret DataFile, err error) {
+    
+    return ret, nil
+}
+
 func NewSLC(dat, par string) (ret SLC, err error) {
     ret.dataFile, err = NewDataFile(dat, par, "par")
     return
@@ -99,22 +103,6 @@ func (d *dataFile) Exist() (ret bool, err error) {
         }
     }
     return true, nil
-}
-
-func (d *dataFile) Move(path string) error {
-    for _, file := range d.files {
-        if len(file) == 0 {
-            continue
-        }
-
-        dst := fp.Join(path, file)
-        err := os.Rename(file, dst)
-
-        if err != nil {
-            return Handle(err, "failed to move file '%s' to '%s'", file, dst)
-        }
-    }
-    return nil
 }
 
 func (d dataFile) Datfile() string {
@@ -245,7 +233,7 @@ func (opt *MLIOpt) Parse() {
     }
 }
 
-func (s *SLC) Raster(opt rasArgs) error {
+func (s *SLC) Raster(opt *rasArgs) error {
     err := opt.Parse(s)
     
     if err != nil {
@@ -255,7 +243,7 @@ func (s *SLC) Raster(opt rasArgs) error {
     return rasslc(opt)
 }
 
-func (m *MLI) Raster(opt rasArgs) error {
+func (m *MLI) Raster(opt *rasArgs) error {
     err := opt.Parse(m)
     
     if err != nil {
@@ -265,7 +253,7 @@ func (m *MLI) Raster(opt rasArgs) error {
     return raspwr(opt)
 }
 
-func Display(dat DataFile, opt disArgs) error {
+func Display(dat DataFile, opt *disArgs) error {
     err := opt.Parse(dat)
     
     if err != nil {
@@ -288,7 +276,7 @@ func Display(dat DataFile, opt disArgs) error {
 
 
 // TODO: implement proper selection of plot command
-func Raster(dat DataFile, opt rasArgs, sec string) (err error) {
+func Raster(dat DataFile, opt *rasArgs, sec string) (err error) {
     err = opt.Parse(dat)
     
     if err != nil {
@@ -342,6 +330,21 @@ func Raster(dat DataFile, opt rasArgs, sec string) (err error) {
     if err != nil {
         return Handle(err, "failed to create rasterfile '%s'", opt.raster)
     }
+    
+    return nil
+}
+
+func Move(path *string, dir string) error {
+    src := *path
+    dst := fp.Join(dir, fp.Base(src))
+    
+    err := os.Rename(src, dst)
+
+    if err != nil {
+        return Handle(err, "failed to move file '%s' to '%s'", src, dst)
+    }
+    
+    *path = dst
     
     return nil
 }

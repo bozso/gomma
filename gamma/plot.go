@@ -125,7 +125,7 @@ func (opt *rasArgs) Parse(dat DataFile) error {
 
 var _rasslc = Gamma.must("rasSLC")
 
-func rasslc(opt rasArgs) error {
+func rasslc(opt *rasArgs) error {
     dtype := 0
     
     switch opt.ImgFmt {
@@ -147,7 +147,7 @@ func rasslc(opt rasArgs) error {
 
 var _raspwr = Gamma.must("raspwr")
 
-func raspwr(opt rasArgs) error {
+func raspwr(opt *rasArgs) error {
     dtype := 0
     
     switch opt.ImgFmt {
@@ -171,7 +171,7 @@ func raspwr(opt rasArgs) error {
 
 var _rasmph = Gamma.must("rasmph")
 
-func rasmph(opt rasArgs) error {
+func rasmph(opt *rasArgs) error {
     dtype := 0
     
     switch opt.ImgFmt {
@@ -218,7 +218,7 @@ func (opt *shdArgs) Parse(d DataFile) error {
     
 }
 
-func rasshd(opt shdArgs) error {
+func rasshd(opt *shdArgs) error {
     dtype := 0
     
     switch opt.ImgFmt {
