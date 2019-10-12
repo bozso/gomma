@@ -17,6 +17,23 @@ type (
         date
     }
     
+    FakeDataFile struct {
+        Dat string
+        RngAzi
+    }
+    
+    FakeMLI struct {
+        FakeDataFile
+    }
+    
+    FakeSLC struct {
+        FakeDataFile
+    }
+    
+    FakeFloat struct {
+        FakeDataFile
+    }
+    
     DataFile interface {
         Datfile() string
         Parfile() string
@@ -35,6 +52,10 @@ type (
     }
 
     MLI struct {
+        dataFile
+    }
+    
+    Float struct {
         dataFile
     }
     

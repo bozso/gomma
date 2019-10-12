@@ -12,6 +12,7 @@ import (
 type (
     CohWeight int
     OffsetAlgo int
+    CpxToReal  int
     
     IFG struct {
         dataFile
@@ -51,6 +52,14 @@ type (
 const (
     IntensityCoherence OffsetAlgo = iota
     FingeVisibility
+)
+
+const (
+    Real CpxToReal = iota
+    Imaginary
+    Intensity
+    Magnitude
+    Phase
 )
 
 var (
@@ -195,6 +204,50 @@ func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
     return ret, nil
 }
 
+var cpxToReal = Gamma.must("cpx_to_real")
+
+func (ifg *IFG) ToReal(out string, mode CpxToReal) (ret FakeFloat, err error) {
+    ret.Rng, err = ifg.Rng()
+    
+    if err != nil {
+        err = Handle(err, "failed to retreive interferogram range samples")
+        return
+    }
+    
+    ret.Azi, err = ifg.Azi()
+    
+    if err != nil {
+        err = Handle(err, "failed to retreive interferogram azimuth lines")
+        return
+    }
+    
+    Mode := 0
+    
+    switch (mode) {
+    case Real:
+        Mode = 0
+    case Imaginary:
+        Mode = 1
+    case Intensity:
+        Mode = 2
+    case Magnitude:
+        Mode = 3
+    case Phase:
+        Mode = 4
+    default:
+        return ret, Handle(nil, "Unrecognized mode!")
+    }
+    
+    _, err = cpxToReal(ifg.Dat, out, ret.Rng, Mode)
+    
+    if err != nil {
+        err = Handle(err, "cpx_to_real failed")
+        return
+    }
+    
+    ret.Dat = out
+    return ret, nil
+}
 
 func (opt *ifgPlotOpt) Parse(ifg *IFG) error {
     err := opt.rasArgs.Parse(ifg)

@@ -536,26 +536,26 @@ func stepCoreg(self *config) error {
     for ii := midx + 1; ii < nzip; ii++ {
         curr := &S1SLCs[ii]
         
-        ok, rslc, ifg, err := master.Coreg(curr, prev)
+        out, err := master.Coreg(curr, prev)
         
         if err != nil {
             return Handle(err, "coregistration failed")
         }
         
-        if !ok {
+        if !out.ok {
             log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
                 curr.Format(DateShort))
             continue
         }
         
-        err = ifg.Raster(mli.Dat, opt)
+        err = out.ifg.Raster(mli.Dat, opt)
         
         if err != nil {
             return Handle(err, "failed to create raster image for interferogram '%s",
-                ifg.Dat)
+                out.ifg.Dat)
         }
         
-        prev = &rslc
+        prev = &out.rslc
     }
     
     
@@ -564,26 +564,26 @@ func stepCoreg(self *config) error {
     for ii := midx - 1; ii > -1; ii-- {
         curr := &S1SLCs[ii]
         
-        ok, rslc, ifg, err := master.Coreg(curr, prev)
+        out, err := master.Coreg(curr, prev)
         
         if err != nil {
             return Handle(err, "coregistration failed")
         }
         
-        if !ok {
+        if !out.ok {
             log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
                 curr.Format(DateShort))
             continue
         }
         
-        err = ifg.Raster(mli.Dat, opt)
+        err = out.ifg.Raster(mli.Dat, opt)
         
         if err != nil {
             return Handle(err, "failed to create raster image for interferogram '%s",
-                ifg.Dat)
+                out.ifg.Dat)
         }
         
-        prev = &rslc
+        prev = &out.rslc
     }
     
     /*
