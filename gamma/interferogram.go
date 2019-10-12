@@ -207,14 +207,14 @@ func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
 var cpxToReal = Gamma.must("cpx_to_real")
 
 func (ifg *IFG) ToReal(out string, mode CpxToReal) (ret FakeFloat, err error) {
-    ret.Rng, err = ifg.Rng()
+    ret.RngAzi.Rng, err = ifg.Rng()
     
     if err != nil {
         err = Handle(err, "failed to retreive interferogram range samples")
         return
     }
     
-    ret.Azi, err = ifg.Azi()
+    ret.RngAzi.Azi, err = ifg.Azi()
     
     if err != nil {
         err = Handle(err, "failed to retreive interferogram azimuth lines")
@@ -245,7 +245,7 @@ func (ifg *IFG) ToReal(out string, mode CpxToReal) (ret FakeFloat, err error) {
         return
     }
     
-    ret.Dat = out
+    ret.Dat, ret.ImgFmt = out, "FLOAT"
     return ret, nil
 }
 

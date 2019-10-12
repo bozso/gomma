@@ -18,7 +18,7 @@ type (
     }
     
     FakeDataFile struct {
-        Dat string
+        Dat, ImgFmt string
         RngAzi
     }
     
@@ -236,6 +236,18 @@ func (d SLC) PlotCmd() string {
 
 func (d MLI) PlotCmd() string {
     return "MLI"
+}
+
+func (d FakeDataFile) Rng() (int, error) {
+    return d.RngAzi.Rng, nil
+}
+
+func (d FakeDataFile) Azi() (int, error) {
+    return d.RngAzi.Azi, nil
+}
+
+func (d FakeDataFile) ImageFormat() (string, error) {
+    return d.ImgFmt, nil
 }
 
 func (opt *MLIOpt) Parse() {
