@@ -1,6 +1,1 @@
 package gamma
-
-import (
-    "fmt"
-)
-

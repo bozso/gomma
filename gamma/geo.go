@@ -425,7 +425,7 @@ var (
     gcMapFine = Gamma.must("gc_map_fine")
 )
 
-func (g* geocoding) Run(outDir string) (ret GeoMeta, err error) {
+func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
     geodir := fp.Join(outDir, "geo")
     
     err = os.MkdirAll(geodir, os.ModePerm)

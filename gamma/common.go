@@ -16,8 +16,8 @@ type (
 
     settings struct {
         RasExt    string
-        path      string
-        modules   []string
+        Path      string
+        Modules   []string
     }
 
     Point struct {
@@ -37,9 +37,10 @@ const (
 )
 
 var (
-    versions = map[string]string{
-        "20181130": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
-    }
+    // TODO: deprecate
+    //versions = map[string]string{
+    //    "20181130": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
+    //}
 
     Pols = [4]string{"vv", "hh", "hv", "vh"}
 
@@ -51,22 +52,27 @@ var (
         "DOUBLE":    2,
     }
     
-    Gamma = makeGamma()
     Imv   = MakeCmd("eog")
 
-    Settings = settings{
-        RasExt:  "bmp",
-        path:    versions[useVersion],
-        modules: []string{"DIFF", "DISP", "ISP", "LAT", "IPTA"},
-    }
+    Settings = loadSettings("settings.json")
+    Gamma = makeGamma()
 )
 
+func loadSettings(path string) (ret settings) {
+    if err := LoadJson(path, &ret); err != nil {
+        log.Fatalf("Failed to load Gamma settings from '%s'\nError:'%s'\n!",
+            path, err)
+    }
+    
+    return
+}
+
 func makeGamma() GammaFun {
-    Path := Settings.path
+    Path := Settings.Path
 
     result := make(map[string]CmdFun)
 
-    for _, module := range Settings.modules {
+    for _, module := range Settings.Modules {
         for _, dir := range [2]string{"bin", "scripts"} {
 
             _path := fp.Join(Path, module, dir, "*")
@@ -102,7 +108,7 @@ func (self GammaFun) selectFun(name1, name2 string) CmdFun {
     return ret
 }
 
-func (self GammaFun) must(name string) (ret CmdFun) {
+func (self GammaFun) Must(name string) (ret CmdFun) {
     ret, ok := self[name]
     
     if !ok {

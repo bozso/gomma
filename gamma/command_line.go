@@ -14,12 +14,12 @@ type (
     Process struct {
         Conf, Step, Start, Stop, Log, CachePath string
         Skip, Show                              bool
-        config
+        Config
     }
 
     Batcher struct {
         conf, Mode, infile, OutDir, filetype, mli string
-        config
+        Config
         ifgPlotOpt
     }
 
@@ -135,7 +135,7 @@ func (proc *Process) Parse() (istart int, istop int, err error) {
         return
     }
 
-    if err = json.Unmarshal(data, &proc.config); err != nil {
+    if err = json.Unmarshal(data, &proc.Config); err != nil {
         err = Handle(err, "failed to parse json data '%s'", data)
         return
     }
@@ -150,7 +150,7 @@ func (proc *Process) RunSteps(start, stop int) error {
 
         delim(fmt.Sprintf("START: %s", name), "*")
 
-        if err := step(&proc.config); err != nil {
+        if err := step(&proc.Config); err != nil {
             return Handle(err, "error while running step '%s'",
                 name)
         }
@@ -232,7 +232,7 @@ func NewBatcher(args []string) (ret Batcher, err error) {
     }
 
     path := ret.conf
-    err = LoadJson(path, &ret.config)
+    err = LoadJson(path, &ret.Config)
 
     if err != nil {
         err = Handle(err, "failed to parse json file '%s'", path)

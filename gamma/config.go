@@ -27,7 +27,7 @@ type (
         Rng, Azi int
     }
     
-    general struct {
+    GeneralOpt struct {
         DataPath, OutputDir, Pol string
         MasterDate               string
         CachePath                string `json:"CACHE_PATH"`
@@ -35,13 +35,13 @@ type (
         IWs                      [3]iminmax
     }
 
-    preselect struct {
+    PreSelectOpt struct {
         DateStart, DateStop   string
         LowerLeft, UpperRight LatLon
         CheckZips             bool
     }
     
-    geocoding struct {
+    GeocodeOpt struct {
         DEMPath                   string
         Iter, NPoly, nPixel       int
         LanczosOrder, MLIOversamp int
@@ -52,34 +52,34 @@ type (
         Master                    MLI
     }
 
-    coreg struct {
+    CoregOpt struct {
         CoherenceThresh, FractionThresh, PhaseStdevThresh float64
         MasterIdx                                         int
     }
 
-    ifgSelect struct {
+    IfgSelectOpt struct {
         Bperp  minmax
         DeltaT minmax
     }
 
-    coherence struct {
+    CoherenceOpt struct {
         WeightType             string
         Box                    minmax
         SlopeCorrelationThresh float64
         SlopeWindow            int
     }
 
-    config struct {
-        infile    string
-        General   general
-        PreSelect preselect
-        Geocoding geocoding
-        Coreg     coreg
-        IFGSelect ifgSelect
-        Coherence coherence
+    Config struct {
+        infile        string
+        General       GeneralOpt
+        PreSelect     PreSelectOpt
+        Geocoding     GeocodeOpt
+        Coreg         CoregOpt
+        IFGSelect     IfgSelectOpt
+        CalcCoherence CoherenceOpt
     }
 
-    stepFun func(*config) error
+    stepFun func(*Config) error
 )
 
 const (
@@ -97,8 +97,8 @@ var (
 
     stepList []string
 
-    defaultConfig = config{
-        General: general{
+    defaultConfig = Config{
+        General: GeneralOpt{
             Pol: "vv",
             OutputDir: ".",
             MasterDate: "",
@@ -109,11 +109,11 @@ var (
             },
         },
 
-        PreSelect: preselect{
+        PreSelect: PreSelectOpt{
             CheckZips:  false,
         },
 
-        Geocoding: geocoding{
+        Geocoding: GeocodeOpt{
             DEMPath: "/mnt/storage_B/szucs_e/SRTMGL1/SRTM.vrt",
             Iter: 1,
             nPixel: 8,
@@ -138,18 +138,18 @@ var (
             },
         },
 
-        Coreg: coreg{
+        Coreg: CoregOpt{
             CoherenceThresh:  0.8,
             FractionThresh:   0.01,
             PhaseStdevThresh: 0.8,
         },
 
-        IFGSelect: ifgSelect{
+        IFGSelect: IfgSelectOpt{
             Bperp:  minmax{Min: 0.0, Max: 150.0},
             DeltaT: minmax{Min: 0.0, Max: 15.0},
         },
 
-        Coherence: coherence{
+        CalcCoherence: CoherenceOpt{
             WeightType:             "gaussian",
             Box:                    minmax{Min: 3.0, Max: 9.0},
             SlopeCorrelationThresh: 0.4,
@@ -169,6 +169,16 @@ func init() {
     }
 }
 
+func (ra *RngAzi) Default() {
+    if ra.Rng == 0 {
+        ra.Rng = 1
+    }
+    
+    if ra.Azi == 0 {
+        ra.Azi = 1
+    }
+}
+
 func delim(msg, sym string) {
     msg = fmt.Sprintf("%s %s %s", sym, msg, sym)
     syms := str.Repeat(sym, len(msg))
@@ -177,20 +187,24 @@ func delim(msg, sym string) {
 }
 
 
-func MakeDefaultConfig(path string) error {
-    out, err := json.MarshalIndent(defaultConfig, "", "    ")
+func MakeDefaultConfig(path string) (err error) {
+    var (
+        f *os.File
+        out []byte
+    )
+    
+    out, err = json.MarshalIndent(defaultConfig, "", "    ")
     if err != nil {
         return Handle(err, "failed to json encode default configuration")
     }
-
-    f, err := os.Create(path)
-    if err != nil {
+    
+    if f, err = os.Create(path); err != nil {
         return Handle(err, "failed to create file: %s", path)
     }
     defer f.Close()
 
-    _, err = f.Write(out)
-    if err != nil {
+    
+    if _, err = f.Write(out); err != nil {
         return Handle(err, "failed to write to file '%s'", path)
     }
 

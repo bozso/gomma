@@ -72,7 +72,7 @@ type (
 
     S1SLC struct {
         nIW int
-        tab string
+        Tab string
         time.Time
         IWs
     }
@@ -235,9 +235,7 @@ func FromTabfile(tab string) (ret S1SLC, err error) {
         ret.nIW++
     }
     
-    fmt.Printf("nIW: %d\n", ret.nIW)
-    
-    ret.tab = tab
+    ret.Tab = tab
         
     ret.Time, err = ret.IWs[0].Date()
     
@@ -300,7 +298,7 @@ func (iw *S1IW) Move(dir string) error {
 }
 
 func (s1 *S1SLC) Move(dir string) error {
-    newtab := fp.Join(dir, fp.Base(s1.tab))
+    newtab := fp.Join(dir, fp.Base(s1.Tab))
     
     file, err := os.Create(newtab)
     
@@ -316,7 +314,7 @@ func (s1 *S1SLC) Move(dir string) error {
         err := IW.Move(dir)
         
         if err != nil {
-            return Handle(err, "failed to move IW%d for S1SLC '%s'", ii + 1, s1.tab)
+            return Handle(err, "failed to move IW%d for S1SLC '%s'", ii + 1, s1.Tab)
         }
         
         line := fmt.Sprintf("%s %s %s\n", IW.Dat, IW.Par, IW.TOPS_par.Par)
@@ -328,8 +326,90 @@ func (s1 *S1SLC) Move(dir string) error {
         }
     }
     
-    s1.tab = newtab
+    s1.Tab = newtab
     return nil
+}
+
+type MosaicOpts struct {
+    Looks RngAzi
+    BurstWindowFlag bool
+    RefTab string
+}
+
+var mosaic = Gamma.must("SLC_mosaic_S1_TOPS")
+
+func (s1 *S1SLC) Mosaic(slc *SLC, opts MosaicOpts) error {
+    opts.Looks.Default()
+    
+    bflg := 0
+    
+    if opts.BurstWindowFlag {
+        bflg = 1
+    }
+    
+    ref := "-"
+    
+    if len(opts.RefTab) == 0 {
+        ref = opts.RefTab
+    }
+    
+    _, err := mosaic(s1.Tab, slc.Dat, slc.Par, opts.Looks.Rng, opts.Looks.Azi,
+                     bflg, ref)
+    
+    if err != nil {
+        return Handle(err, "failed to mosaic '%s'", s1.Tab)
+    }
+    
+    return nil
+}
+
+var derampRef = Gamma.must("S1_deramp_TOPS_reference")
+
+func (s1 *S1SLC) DerampRef() (ret S1SLC, err error) {
+    tab := s1.Tab
+    
+    if _, err = derampRef(tab); err != nil {
+        err = Handle(err, "failed to deramp reference S1SLC '%s'", tab)
+        return
+    }
+    
+    tab += ".deramp"
+    
+    if ret, err = FromTabfile(tab); err != nil {
+        err = Handle(err, "failed to import S1SLC from tab '%s'", tab)
+        return
+    }
+    return ret, nil
+}
+
+var derampSlave = Gamma.must("S1_deramp_TOPS_slave")
+
+func (s1 *S1SLC) DerampSlave(ref *S1SLC, looks RngAzi, keep bool) (ret S1SLC, err error) {
+    looks.Default()
+    
+    reftab, tab, id := ref.Tab, s1.Tab, s1.Format(DateShort)
+    
+    clean := 1
+    
+    if keep {
+        clean = 0
+    }
+    
+    _, err = derampSlave(tab, id, reftab, looks.Rng, looks.Azi, clean)
+    
+    if err != nil {
+        err = Handle(err, "failed to deramp slave S1SLC '%s', reference: '%s'",
+            tab, reftab)
+        return
+    }
+    
+    tab += ".deramp"
+    
+    if ret, err = FromTabfile(tab); err != nil {
+        err = Handle(err, "failed to import S1SLC from tab '%s'", tab)
+        return
+    }
+    return ret, nil
 }
 
 func makePoint(info Params, max bool) (ret Point, err error) {
@@ -538,13 +618,13 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
         }
     }
 
-    ret.tab = tab
+    ret.Tab = tab
 
     return ret, nil
 }
 
 func (s1 *S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
-    tab := fp.Join(outDir, str.ReplaceAll(fp.Base(s1.tab), "SLC_tab", "RSLC_tab"))
+    tab := fp.Join(outDir, str.ReplaceAll(fp.Base(s1.Tab), "SLC_tab", "RSLC_tab"))
 
     file, err := os.Create(tab)
 
@@ -580,7 +660,7 @@ func (s1 *S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
         }
     }
 
-    ret.tab, ret.nIW = tab, s1.nIW
+    ret.Tab, ret.nIW = tab, s1.nIW
 
     return ret, nil
 }
@@ -596,7 +676,7 @@ func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
         wflag = 1
     }
     
-    _, err := MLIFun(s1.tab, mli.Dat, mli.Par, opt.Looks.Rng, opt.Looks.Azi,
+    _, err := MLIFun(s1.Tab, mli.Dat, mli.Par, opt.Looks.Rng, opt.Looks.Azi,
                      wflag, opt.refTab)
     
     if err != nil {

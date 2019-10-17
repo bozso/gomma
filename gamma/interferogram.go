@@ -45,8 +45,6 @@ type (
         alpha, step, frac    float64
         FFTWindow, cohWindow int
     }
-    
-    CoherenceOpt coherence
 )
 
 const (

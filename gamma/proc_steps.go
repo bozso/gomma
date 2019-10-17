@@ -77,12 +77,12 @@ func loadS1(path, root string) (ret S1Zips, err error) {
 }
 
 
-func (self *config) extOpt(satellite string) *ExtractOpt {
+func (self *Config) extOpt(satellite string) *ExtractOpt {
     return &ExtractOpt{pol: self.General.Pol, 
         root: fp.Join(self.General.CachePath, satellite)}
 }
 
-func stepSelect(self *config) error {
+func stepSelect(self *Config) error {
     dataPath := self.General.DataPath
     Select := self.PreSelect
     
@@ -196,7 +196,7 @@ func stepSelect(self *config) error {
 
 var s1Import = Gamma.must("S1_import_SLC_from_zipfiles")
 
-func stepImport(self *config) error {
+func stepImport(self *Config) error {
     const (
         tpl = "iw%d_number_of_bursts: %d\niw%d_first_burst: %f\niw%d_last_burst: %f\n"
         burst_table = "burst_number_table"
@@ -321,7 +321,7 @@ func stepImport(self *config) error {
         base := fmt.Sprintf("%s.%s", date, pol)
         
         slc := S1SLC{
-            tab: base + ".SLC_tab",
+            Tab: base + ".SLC_tab",
             nIW: nIWs,
         }
         
@@ -340,7 +340,7 @@ func stepImport(self *config) error {
             return Handle(err, "failed to move S1SLC")
         }
         
-        fmt.Println(slc.tab)
+        fmt.Println(slc.Tab)
     }
     
     // TODO: save master idx?
@@ -353,7 +353,7 @@ func stepImport(self *config) error {
     return nil
 }
 
-func stepGeocode (c *config) error {
+func stepGeocode (c *Config) error {
     outDir := c.General.OutputDir
     
     geocode, err := c.Geocoding.Run(outDir)
@@ -373,7 +373,7 @@ func stepGeocode (c *config) error {
 }
 
 
-func stepCheckGeo(c *config) error {
+func stepCheckGeo(c *Config) error {
     meta := GeoMeta{}
     path := fp.Join(c.General.OutputDir, "geocode.json")
     err := LoadJson(path, &meta)
@@ -451,7 +451,7 @@ func stepCheckGeo(c *config) error {
     return nil
 }
 
-func stepCoreg(self *config) error {
+func stepCoreg(self *Config) error {
     outDir := self.General.OutputDir
     
     path := self.infile
@@ -514,18 +514,18 @@ func stepCoreg(self *config) error {
     }
     
     master := S1Coreg{
-        tab: mslc.tab,
+        Tab: mslc.Tab,
         ID: mdate,
-        coreg: self.Coreg,
-        hgt: meta.Geo.Hgt,
-        poly1: "-",
-        poly2: "-",
+        CoregOpt: self.Coreg,
+        Hgt: meta.Geo.Hgt,
+        Poly1: "-",
+        Poly2: "-",
         Looks: self.General.Looks,
-        clean: false,
-        useInter: true,
-        outDir: outDir,
-        rslcPath: rslc,
-        ifgPath: ifg,
+        Clean: false,
+        UseInter: true,
+        OutDir: outDir,
+        RslcPath: rslc,
+        IfgPath: ifg,
     }
     
     var prev *S1SLC = nil
@@ -542,20 +542,20 @@ func stepCoreg(self *config) error {
             return Handle(err, "coregistration failed")
         }
         
-        if !out.ok {
+        if !out.Ok {
             log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
                 curr.Format(DateShort))
             continue
         }
         
-        err = out.ifg.Raster(mli.Dat, opt)
+        err = out.Ifg.Raster(mli.Dat, opt)
         
         if err != nil {
             return Handle(err, "failed to create raster image for interferogram '%s",
-                out.ifg.Dat)
+                out.Ifg.Dat)
         }
         
-        prev = &out.rslc
+        prev = &out.Rslc
     }
     
     
@@ -570,20 +570,20 @@ func stepCoreg(self *config) error {
             return Handle(err, "coregistration failed")
         }
         
-        if !out.ok {
+        if !out.Ok {
             log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
                 curr.Format(DateShort))
             continue
         }
         
-        err = out.ifg.Raster(mli.Dat, opt)
+        err = out.Ifg.Raster(mli.Dat, opt)
         
         if err != nil {
             return Handle(err, "failed to create raster image for interferogram '%s",
-                out.ifg.Dat)
+                out.Ifg.Dat)
         }
         
-        prev = &out.rslc
+        prev = &out.Rslc
     }
     
     /*
