@@ -12,31 +12,43 @@ import (
 
 type (
     Process struct {
-        Conf, Step, Start, Stop, Log, CachePath string
-        Skip, Show                              bool
+        Conf        string `name:"conf" default:"gamma.conf"`
+        Step        string `name:"step" default:""`
+        Start       string `name:"start" default:""`
+        Stop        string `name:"stop" default:""` 
+        Log         string `name:"log" default:""`
+        CachePath   string `name:"cache" default:""`
+        Skip        bool   `name:"skip" default:""`
+        Show        bool   `name:"show" default:""`
         Config
     }
 
     Batcher struct {
-        conf, Mode, infile, OutDir, filetype, mli string
+        Conf     string `name:"conf" default:"gamma.conf"`
+        Mode     string `name:"" default:""`
+        Infile   string `name:"file" default:""`
+        OutDir   string `name:"out" default:"."`
+        Filetype string `name:"ftype" default:""`
+        Mli      string `name:"mli" default:""`
         Config
         ifgPlotOpt
     }
 
-    Meta struct {
-        MasterIdx  int
-        MasterDate string
-    }
-    
     Displayer struct {
-        dat, par, mode, sec string
+        Dat  string `pos:"1"`
+        Par  string `name:"par" default:""`
+        Mode string `pos:"0"`
+        Sec  string `name:"sec" default:""`
         rasArgs
     }
     
     Coder struct {
         GeoMeta
         CodeOpt
-        infile, outfile, metafile, mode string
+        infile   string `pos:"0"`
+        outfile  string `name:"out" default:""`
+        metafile string `name:"meta" default:"geocode.json"`
+        mode     string `name:"mode" default:""`
     }
 )
 
@@ -205,15 +217,15 @@ func NewBatcher(args []string) (ret Batcher, err error) {
     
     ret.Mode = args[0]
 
-    flag.StringVar(&ret.conf, "config", "gamma.json",
+    flag.StringVar(&ret.Conf, "config", "gamma.json",
         "Processing configuration file")
-    flag.StringVar(&ret.infile, "file", "", "Inputfile.")
+    flag.StringVar(&ret.Infile, "file", "", "Inputfile.")
     flag.StringVar(&ret.OutDir, "out", ".", "Output directory.")
-    flag.StringVar(&ret.filetype, "ftype", "", "Type of files located in infile.")
+    flag.StringVar(&ret.Filetype, "ftype", "", "Type of files located in infile.")
     
     addRasArgsFlags(&ret.ifgPlotOpt.rasArgs, flag)
     
-    flag.StringVar(&ret.mli, "mli", "", "MLI datafile used for background.")
+    flag.StringVar(&ret.Mli, "mli", "", "MLI datafile used for background.")
     flag.IntVar(&ret.startCC, "startCC", 1, "Start coherence lines.")
     flag.IntVar(&ret.startPwr, "startPwr", 1, "Start power lines.")
     flag.IntVar(&ret.startCpx, "startCpx", 1, "Start complex lines.")
@@ -231,7 +243,7 @@ func NewBatcher(args []string) (ret Batcher, err error) {
         return
     }
 
-    path := ret.conf
+    path := ret.Conf
     err = LoadJson(path, &ret.Config)
 
     if err != nil {
@@ -351,7 +363,7 @@ func (b *Batcher) Raster() error {
 
     defer file.Close()
     
-    switch b.filetype {
+    switch b.Filetype {
     case "mli", "MLI":
         err := b.PlotMLIs(&file)
         
@@ -371,7 +383,7 @@ func (b *Batcher) Raster() error {
             return Handle(err, "plotting of IFG datafiles failed")
         }
     default:
-        return fmt.Errorf("unrecognized filetype '%s'", b.filetype) 
+        return fmt.Errorf("unrecognized filetype '%s'", b.Filetype) 
     }
     
     return nil
@@ -381,13 +393,13 @@ func (b *Batcher) Raster() error {
 func NewDisplayer(args []string) (ret Displayer, err error) {
     flag := fl.NewFlagSet("display", fl.ContinueOnError)
 
-    ret.mode = args[0]
+    ret.Mode = args[0]
     
-    flag.StringVar(&ret.dat, "dat", "",
+    flag.StringVar(&ret.Dat, "dat", "",
         "Datafile containing data to plot.")
-    flag.StringVar(&ret.par, "par", "", "Parfile describing datafile.")
+    flag.StringVar(&ret.Par, "par", "", "Parfile describing datafile.")
     
-    flag.StringVar(&ret.sec, "sec", "", "Secondary input datafile.")
+    flag.StringVar(&ret.Sec, "sec", "", "Secondary input datafile.")
     
     addRasArgsFlags(&ret.rasArgs, flag)    
     
@@ -398,12 +410,12 @@ func NewDisplayer(args []string) (ret Displayer, err error) {
         return
     }
     
-    if len(ret.dat) == 0 {
+    if len(ret.Dat) == 0 {
         err = Handle(nil, "dat should be valied path not empty string")
         return
     }
     
-    split := str.Split(ret.dat, ".")
+    split := str.Split(ret.Dat, ".")
     ext := split[len(split)-1]
     
     if len(ret.Cmd) == 0 {
@@ -425,10 +437,10 @@ func NewDisplayer(args []string) (ret Displayer, err error) {
 }
 
 func (dis *Displayer) Plot() error {
-    dat, err := NewDataFile(dis.dat, dis.par, "par")
+    dat, err := NewDataFile(dis.Dat, dis.Par, "par")
     
     if err != nil {
-        return Handle(err, "failed to parse datafile '%s'", dis.dat)
+        return Handle(err, "failed to parse datafile '%s'", dis.Dat)
     }
     
     err = dis.disArgs.Parse(dat)
@@ -437,7 +449,7 @@ func (dis *Displayer) Plot() error {
         return Handle(err, "failed to parse plotting options")
     }
     
-    switch dis.mode {
+    switch dis.Mode {
     case "dis":
         err := Display(dat,  dis.rasArgs.disArgs)
         
@@ -446,7 +458,7 @@ func (dis *Displayer) Plot() error {
         }
     
     case "ras":
-        err := Raster(dat,  dis.rasArgs, dis.sec)
+        err := Raster(dat,  dis.rasArgs, dis.Sec)
         
         if err != nil {
             return Handle(err, "failed to execute raster")
@@ -595,7 +607,7 @@ func (b *Batcher) PlotSLCs(file *FileReader) error {
 
 func (b *Batcher) PlotIFGs(file *FileReader) error {
     opt := b.ifgPlotOpt
-    mli := b.mli
+    mli := b.Mli
     
     for file.Scan() {
         line := file.Text()

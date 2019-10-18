@@ -10,6 +10,7 @@ import (
     fp "path/filepath"
     conv "strconv"
     str "strings"
+    ref "reflect"
 )
 
 type (
@@ -35,6 +36,123 @@ type (
         parts []string
     }
 )
+
+
+type Args struct {
+    opt map[string]string
+    pos []string
+}
+
+func NewArgs(args []string) (ret Args) {
+    ret.opt = make(map[string]string)
+    
+    for _, arg := range args {
+        if str.Contains(arg, "=") {
+            split := str.Split(arg, "=")
+            
+            ret.opt[split[0]] = split[1]
+        } else {
+            ret.pos = append(ret.pos, arg)
+        }
+    }
+    return
+}
+
+func StringToVal(v ref.Value, kind ref.Kind, in string) error {
+    switch kind {
+    case ref.Int:
+        set, err := conv.Atoi(in)
+        if err != nil {
+            return Handle(err, "failed to parse '%s' into an int", in)
+        }
+        
+        v.SetInt(int64(set))
+    case ref.Float32:
+        set, err := conv.ParseFloat(in, 32)
+        
+        if err != nil {
+            return Handle(err, "failed to parse '%s' into a float32", in)
+        }
+        
+        v.SetFloat(set)
+    case ref.Float64:
+        set, err := conv.ParseFloat(in, 64)
+        
+        if err != nil {
+            return Handle(err, "failed to parse '%s' into a float64", in)
+        }
+        
+        v.SetFloat(set)
+    case ref.Bool:
+        v.SetBool(true)
+    case ref.String:
+        v.SetString(in)
+    }
+    return nil
+}
+
+func (h *Args) ParseStruct(s interface{}) error {
+    vv := ref.ValueOf(s)
+    kind := vv.Kind()
+    
+    if kind != ref.Ptr {
+        return Handle(nil, "expected a pointer to struct not '%v'", kind)
+    }
+    
+    v := vv.Elem()
+    t := v.Type()
+    
+    
+    for ii := 0; ii < v.NumField(); ii++ {
+        field := t.Field(ii)
+        tag, sfield := field.Tag, v.Field(ii)
+        kind := field.Type.Kind()
+        
+        if tag == "" {
+            continue
+        }
+        
+        pos := tag.Get("pos")
+        npos := len(pos)
+
+        if npos > 0 {
+            idx, err := conv.Atoi(pos)
+            
+            if err != nil {
+                return Handle(err, "failed to parse '%s' into an int", pos)
+            }
+            
+            if idx > npos {
+                return Handle(nil, 
+                    "index %d is out of the bounds of positional arguments",
+                    idx)
+            }
+            
+            if err = StringToVal(sfield, kind, h.pos[idx]); err != nil {
+                return Handle(err, "failed to set struct field")
+            }
+        }
+        
+        name := tag.Get("name")
+        
+        if name == "" || name == "-" {
+            name = field.Name
+        }
+        
+        val, ok := h.opt[name]
+        
+        if !ok {
+            val = tag.Get("default")
+        }
+        
+        if err := StringToVal(sfield, kind, val); err != nil {
+            return Handle(err, "failed to set struct field")
+        }
+    }
+    
+    return nil
+}
+
 
 const cmdErr = `Command '%v' failed!
 Output of command is: %v

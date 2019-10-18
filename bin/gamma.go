@@ -5,33 +5,58 @@ import (
     "log"
     "os"
     gm "../gamma"
+    ref "reflect"
 )
 
 var commands = []string{"proc", "list", "init", "batch", "ras", "dis", "iono"}
 
+func pp(ptr interface{}) error {
+    vv := ref.ValueOf(ptr)
+    kind := vv.Kind()
+    
+    if kind != ref.Ptr {
+        return gm.Handle(nil, "expected a pointer to struct not '%v'", kind)
+    }
+    
+    v := vv.Elem()
+    t := v.Type()
+    
+    
+    for ii := 0; ii < v.NumField(); ii++ {
+        field := t.Field(ii)
+        tag := field.Tag
+        
+        fmt.Printf("Tag: %s\n", tag)
+    }
+    
+    return nil
+}
+
+const (
+    parseErr = "failed to parse command line arguments: %s\n"
+)
+
 func main() {
     defer gm.RemoveTmp()
     
-    args := os.Args
-    
-    if len(args) < 2 {
+    if len(os.Args) < 2 {
         fmt.Printf("Expected on of the following subcommands: %v!\n", commands)
-        os.Exit(1)
+        return
     }
     
-    mode := args[1]
+    mode := os.Args[1]    
+    args := gm.NewArgs(os.Args[2:])
+    
+    //args.ParseStruct(&gm.SLC{})
+    
     
     switch mode {
     case "proc":
-        proc, err := gm.NewProcess(args[2:])
+        proc := gm.Process{}
         
-        if err != nil {
-            log.Printf("failed to parse command line arguments: %s\n", err)
-            return
-        }
+        args.ParseStruct(&proc)
         
         start, stop, err := proc.Parse()
-    
         if err != nil {
             log.Printf("failed to  parse processing steps: %s\n", err)
             return
@@ -48,46 +73,39 @@ func main() {
     case "init":
         init, err := gm.InitParse(args[2:])
         if err != nil {
-            log.Printf("failed to parse command line arguments: %s\n",
-                err)
+            log.Printf(parseErr, err)
             return
         }
 
         err = gm.MakeDefaultConfig(init)
         if err != nil {
-            log.Printf("failed tocreate config file '%s'!: %s\n",
+            log.Printf("failed to create config file '%s'!: %s\n",
                 init, err)
             return
         }
 
     case "batch":
-        batch, err := gm.NewBatcher(args[2:])
-        if err != nil {
-            log.Printf("failed to parse command line arguments: %s\n",
-                err)
+        batch := gm.Batcher{}
+        
+        if err = args.ParseStruct(&bath); err != nil {
+            log.Printf(parseErr, err)
             return
         }
 
         switch batch.Mode {
         case "quicklook":
-            err = batch.Quicklook()
-            
-            if err != nil {
+            if err = batch.Quicklook(); err != nil {
                 log.Printf("Error: %w\n", err)
                 return
             }
         case "mli", "MLI":
-            err = batch.MLI()
-            
-            if err != nil {
+            if err = batch.MLI(); err != nil {
                 log.Printf("Error: %s\n", err)
                 return
             }
         
         case "ras", "raster", "plot":
-            err = batch.Raster()
-            
-            if err != nil {
+            if err = batch.Raster(); err != nil {
                 log.Printf("Error: %s\n", err)
                 return
             }
@@ -235,7 +253,6 @@ func iono() error {
         return gm.Handle(err, "SSI_INT failed")
     }
     
-    /*
     if err = ssiOut.ifg.Move("."); err != nil {
         return gm.Handle(err, "failed to move SSI IFG")
     }
@@ -243,7 +260,5 @@ func iono() error {
     if err = ssiOut.unw.Move("."); err != nil {
         return gm.Handle(err, "failed to move SSI unwrapped IFG")
     }
-    */
-    
     return nil
 }
