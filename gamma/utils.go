@@ -273,7 +273,7 @@ func TmpFile() (ret string, err error) {
 }
 
 func TmpFileExt(ext string) (ret string, err error) {
-    file, err := io.TempFile("", "*."+ext)
+    file, err := io.TempFile("", "*." + ext)
 
     if err != nil {
         err = Handle(err, "failed to create a temporary file")

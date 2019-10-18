@@ -10,30 +10,6 @@ import (
 )
 
 type (
-    dataFile struct {
-        Dat   string
-        files []string
-        Params
-        date
-    }
-    
-    FakeDataFile struct {
-        Dat, ImgFmt string
-        RngAzi
-    }
-    
-    FakeMLI struct {
-        FakeDataFile
-    }
-    
-    FakeSLC struct {
-        FakeDataFile
-    }
-    
-    FakeFloat struct {
-        FakeDataFile
-    }
-    
     DataFile interface {
         Datfile() string
         Parfile() string
@@ -46,25 +22,21 @@ type (
         //Display(disArgs) error
         //Raster(Args) error
     }
-
-    SLC struct {
-        dataFile
-    }
-
-    MLI struct {
-        dataFile
+    
+    dataFile struct {
+        Dat   string
+        files []string
+        Params
+        time.Time
     }
     
-    Float struct {
-        dataFile
+    FakeDataFile struct {
+        Dat, ImgFmt string
+        RngAzi
     }
     
-    // TODO: add loff, nlines
-    MLIOpt struct {
-        refTab string
-        Looks RngAzi
-        windowFlag bool
-        ScaleExp
+    Subset struct {
+        Begin, Nlines int
     }
 )
 
@@ -90,23 +62,19 @@ func NewDataFile(dat, par, ext string) (ret dataFile, err error) {
     
     ret.Params = NewGammaParam(par)
     ret.files = []string{dat, par}
-
-    return ret, nil
-}
-
-func FromLine(line string) (ret DataFile, err error) {
+    
+    if ret.Time ,err = ret.Date(); err != nil {
+        err = Handle(err, "failed to retreive date from '%s'", par)
+        return
+    }
     
     return ret, nil
 }
 
-func NewSLC(dat, par string) (ret SLC, err error) {
-    ret.dataFile, err = NewDataFile(dat, par, "par")
-    return
-}
-
-func NewMLI(dat, par string) (ret MLI, err error) {
-    ret.dataFile, err = NewDataFile(dat, par, "par")
-    return
+// TODO: implement
+func FromLine(line string) (ret DataFile, err error) {
+    
+    return ret, nil
 }
 
 func (d *dataFile) Exist() (ret bool, err error) {
@@ -230,13 +198,232 @@ func (d dataFile) PlotCmd() string {
     return ""
 }
 
+type (
+    SLC struct {
+        dataFile
+    }
+    
+    MLI struct {
+        dataFile
+    }
+    
+    Float struct {
+        dataFile
+    }
+)
+
+func NewSLC(dat, par string) (ret SLC, err error) {
+    ret.dataFile, err = NewDataFile(dat, par, "par")
+    return
+}
+
+var multiLook = Gamma.Must("multi_look")
+
+type (
+    // TODO: add loff, nlines
+    MLIOpt struct {
+        Subset
+        refTab string
+        Looks RngAzi
+        windowFlag bool
+        ScaleExp
+    }
+)
+
+func (opt *MLIOpt) Parse() {
+    opt.ScaleExp.Parse()
+    
+    if len(opt.refTab) == 0 {
+        opt.refTab = "-"
+    }
+    
+    opt.Looks.Default()
+}
+
+func (s *SLC) MakeMLI(opt MLIOpt) (ret MLI, err error) {
+    opt.Parse()
+    
+    tmp := ""
+    
+    if tmp, err = TmpFileExt("mli"); err != nil {
+        err = Handle(err, "failed to create tmp file")
+        return
+    }
+    
+    if ret, err = NewMLI(tmp, ""); err != nil {
+        err = Handle(err, "failed to create MLI struct")
+        return
+    }
+    
+    _, err = multiLook(s.Dat, s.Par, ret.Dat, ret.Par,
+                       opt.Looks.Rng, opt.Looks.Azi,
+                       opt.Subset.Begin, opt.Subset.Nlines,
+                       opt.ScaleExp.Scale, opt.ScaleExp.Exp)
+    
+    if err != nil {
+        err = Handle(err, "multi_look failed")
+        return
+    }
+    
+    return ret, nil
+}
+
+type (
+    SBIOpt struct {
+        NormSquintDiff float64
+        Looks RngAzi
+        InvWeight, Keep  bool
+    }
+    
+    SBIOut struct {
+        ifg IFG
+        mli MLI
+    }
+)
+
+
+var sbiInt = Gamma.Must("SBI_INT")
+
+func (opt *SBIOpt) Default() {
+    opt.Looks.Default()
+    
+    if opt.NormSquintDiff == 0.0 {
+        opt.NormSquintDiff = 0.5
+    }
+}
+
+func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (ret SBIOut, err error) {
+    opt.Default()
+    
+    tmp := ""
+    
+    if tmp, err = TmpFile(); err != nil {
+        err = Handle(err, "failed to create tmp file")
+        return
+    }
+    
+    if ret.ifg, err = NewIFG(tmp + ".diff", "", "", "", ""); err != nil {
+        err = Handle(err, "failed to create IFG struct")
+        return
+    }
+    
+    if ret.mli, err = NewMLI(tmp + ".mli", ""); err != nil {
+        err = Handle(err, "failed to create MLI struct")
+        return
+    }
+    
+    iwflg, cflg := 0, 0
+    if opt.InvWeight { iwflg = 1 }
+    if opt.Keep { cflg = 1 }
+    
+    _, err = sbiInt(ref.Dat, ref.Par, slave.Dat, slave.Par,
+                    ret.ifg.Dat, ret.ifg.Par, ret.mli.Dat, ret.mli.Par, 
+                    opt.NormSquintDiff, opt.Looks.Rng, opt.Looks.Azi,
+                    iwflg, cflg)
+    
+    if err != nil {
+        err = Handle(err, "SBI_INT failed")
+        return
+    }
+    
+    return ret, nil
+}
+
+type (
+    SSIMode int
+    
+    SSIOpt struct {
+        Hgt, LtFine, OutDir string
+        Mode SSIMode
+        Keep bool
+    }
+    
+    SSIOut struct {
+        Ifg IFG
+        Unw FakeFloat
+    }
+)
+
+const (
+    Ifg           SSIMode = iota
+    IfgUnwrapped
+)
+
+var ssiInt = Gamma.Must("SSI_INT")
+
+func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err error) {
+    mode := 1
+    
+    if opt.Mode == IfgUnwrapped {
+        mode = 2
+    }
+    
+    cflg := 1
+    if opt.Keep { cflg = 0 }
+    
+    mID, sID := ref.Format(DateShort), slave.Format(DateShort)
+    ID := fmt.Sprintf("%s_%s", mID, sID)
+    
+    _, err = ssiInt(ref.Dat, ref.Par, mli.Dat, mli.Par, opt.Hgt, opt.LtFine,
+                    slave.Dat, slave.Par, mode, mID, sID, ID, opt.OutDir, cflg)
+    
+    if err != nil {
+        err = Handle(err, "SSI_INT failed")
+        return
+    }
+    
+    // TODO: figure out the name of the output files
+    
+    return ret, nil
+}
+
+
 func (d SLC) PlotCmd() string {
     return "SLC"
+}
+
+func (s *SLC) Raster(opt rasArgs) error {
+    err := opt.Parse(s)
+    
+    if err != nil {
+        return Handle(err, "failed to parse raster options")
+    }
+    
+    return rasslc(opt)
+}
+
+func NewMLI(dat, par string) (ret MLI, err error) {
+    ret.dataFile, err = NewDataFile(dat, par, "par")
+    return
 }
 
 func (d MLI) PlotCmd() string {
     return "MLI"
 }
+
+func (m *MLI) Raster(opt rasArgs) error {
+    err := opt.Parse(m)
+    
+    if err != nil {
+        return Handle(err, "failed to parse raster options")
+    }
+    
+    return raspwr(opt)
+}
+
+type (
+    FakeMLI struct {
+        FakeDataFile
+    }
+    
+    FakeSLC struct {
+        FakeDataFile
+    }
+    
+    FakeFloat struct {
+        FakeDataFile
+    }
+)
 
 func (d FakeDataFile) Rng() (int, error) {
     return d.RngAzi.Rng, nil
@@ -250,41 +437,6 @@ func (d FakeDataFile) ImageFormat() (string, error) {
     return d.ImgFmt, nil
 }
 
-func (opt *MLIOpt) Parse() {
-    opt.ScaleExp.Parse()
-    
-    if len(opt.refTab) == 0 {
-        opt.refTab = "-"
-    }
-    
-    if opt.Looks.Rng == 0 {
-        opt.Looks.Rng = 1
-    }
-    
-    if opt.Looks.Azi == 0 {
-        opt.Looks.Azi = 1
-    }
-}
-
-func (s *SLC) Raster(opt rasArgs) error {
-    err := opt.Parse(s)
-    
-    if err != nil {
-        return Handle(err, "failed to parse raster options")
-    }
-    
-    return rasslc(opt)
-}
-
-func (m *MLI) Raster(opt rasArgs) error {
-    err := opt.Parse(m)
-    
-    if err != nil {
-        return Handle(err, "failed to parse raster options")
-    }
-    
-    return raspwr(opt)
-}
 
 func Display(dat DataFile, opt disArgs) error {
     err := opt.Parse(dat)
@@ -294,7 +446,7 @@ func Display(dat DataFile, opt disArgs) error {
     }
     
     cmd := opt.Cmd
-    fun := Gamma.must("dis" + cmd)
+    fun := Gamma.Must("dis" + cmd)
     
     if cmd == "SLC" {
         _, err := fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines, opt.Scale,
@@ -307,7 +459,6 @@ func Display(dat DataFile, opt disArgs) error {
     return nil
 }
 
-
 // TODO: implement proper selection of plot command
 func Raster(dat DataFile, opt rasArgs, sec string) (err error) {
     err = opt.Parse(dat)
@@ -317,7 +468,7 @@ func Raster(dat DataFile, opt rasArgs, sec string) (err error) {
     }
     
     cmd := opt.Cmd
-    fun := Gamma.must("ras" + cmd)
+    fun := Gamma.Must("ras" + cmd)
     
     switch cmd {
         case "SLC":
@@ -338,9 +489,6 @@ func Raster(dat DataFile, opt rasArgs, sec string) (err error) {
             err = Handle(nil, "unrecognized command type '%s'", cmd)
             return
     }
-    
-    
-    
     
     if cmd == "SLC" {
         _, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,

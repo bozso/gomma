@@ -159,7 +159,7 @@ func (opt *CodeOpt) Parse() (lrIn int, lrOut int, err error) {
     return lrIn, lrOut, nil
 }
 
-var g2r = Gamma.must("geocode")
+var g2r = Gamma.Must("geocode")
 
 func (dem *DEM) geo2radar(infile, outfile string, opt CodeOpt) error {
     lrIn, lrOut, err := opt.Parse()
@@ -219,7 +219,7 @@ func (dem *DEM) geo2radar(infile, outfile string, opt CodeOpt) error {
     return err
 }
 
-var r2g = Gamma.must("geocode_back")
+var r2g = Gamma.Must("geocode_back")
 
 func (dem *DEM) radar2geo(infile, outfile string, opt CodeOpt) error {
     lrIn, lrOut, err := opt.Parse()
@@ -292,7 +292,7 @@ func (dem *DEM) radar2geo(infile, outfile string, opt CodeOpt) error {
     return err
 }
 
-var coord2sarpix = Gamma.must("coord_to_sarpix")
+var coord2sarpix = Gamma.Must("coord_to_sarpix")
 
 func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
     const par = "corrected SLC/MLI range, azimuth pixel (int)"
@@ -395,7 +395,7 @@ func (opt *GeoPlotOpt) Parse(d DataFile) error {
     return nil
 }
 
-var rashgt = Gamma.must("rashgt")
+var rashgt = Gamma.Must("rashgt")
 
 func (geo *Geocode) Raster(opt GeoPlotOpt) error {
     opt.rasArgs.raster = fmt.Sprintf("%s.%s", geo.Hgt, Settings.RasExt)
@@ -415,14 +415,14 @@ func (geo *Geocode) Raster(opt GeoPlotOpt) error {
 
 
 var (
-    createDiffPar = Gamma.must("create_diff_par")
-    vrt2dem = Gamma.must("vrt2dem")
-    //gcMap = Gamma.must("gc_map2")
-    gcMap = Gamma.must("gc_map")
-    pixelArea = Gamma.must("pixel_area")
-    offsetPwrm = Gamma.must("offset_pwrm")
-    offsetFitm = Gamma.must("offset_fitm")
-    gcMapFine = Gamma.must("gc_map_fine")
+    createDiffPar = Gamma.Must("create_diff_par")
+    vrt2dem = Gamma.Must("vrt2dem")
+    //gcMap = Gamma.Must("gc_map2")
+    gcMap = Gamma.Must("gc_map")
+    pixelArea = Gamma.Must("pixel_area")
+    offsetPwrm = Gamma.Must("offset_pwrm")
+    offsetFitm = Gamma.Must("offset_fitm")
+    gcMapFine = Gamma.Must("gc_map_fine")
 )
 
 func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {

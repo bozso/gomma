@@ -1,10 +1,10 @@
 package gamma
 
 import (
-    //"os"
+    "os"
     "fmt"
     "log"
-    //fp "path/filepath"
+    fp "path/filepath"
     //str "strings"
 )
 
@@ -18,13 +18,14 @@ type (
     }
     
     CoregOut struct {
+        RSLC SLC
         Rslc S1SLC
         Ifg IFG
         Ok bool
     }
 )
 
-var coregFun = Gamma.must("S1_coreg_TOPS")
+var coregFun = Gamma.Must("S1_coreg_TOPS")
 
 func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
     ret.Ok = false
@@ -105,6 +106,11 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
         }
     }
     
+    if ret.RSLC, err = NewSLC(slc2ID + ".rslc", ""); err != nil {
+        err = Handle(err, "failed to create SLC struct")
+        return
+    }
+    
     ID := fmt.Sprintf("%s_%s", slc1ID, slc2ID)
     
     ret.Ifg, err = NewIFG(ID + ".diff", ID + ".off", "", ID + ".diff_par",
@@ -115,9 +121,7 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
         return
     }
     
-    ret.Ok, err = ret.Ifg.CheckQuality()
-    
-    if err != nil {
+    if ret.Ok, err = ret.Ifg.CheckQuality(); err != nil {
         err = Handle(err, "failed to check coregistration quality '%s'",
             ret.Ifg.quality)
         return
@@ -127,54 +131,47 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
         return ret, nil
     }
     
-    err = ret.Rslc.Move(self.RslcPath)
-    
-    if err != nil {
+    if err = ret.Rslc.Move(self.RslcPath); err != nil {
         err = Handle(err, "failed to move '%s' to RSLC directory", ret.Rslc.Tab)
         return
     }
     
-    err = ret.Ifg.Move(self.IfgPath)
-    
-    if err != nil {
+    if err = ret.Ifg.Move(self.IfgPath); err != nil {
         err = Handle(err, "failed to move interferogram '%s' to IFG directory",
             ret.Ifg.Dat)
         return
     }
 
-    /*
-    glob, err := fp.Glob(fp.Join(self.OutDir, slc1ID + "*"))
-    
-    if err != nil {
-        err = Handle(err, "globbing for leftover files from coregistration failed")
-        return
-    }
-    
-    for _, file := range glob {
-        err = os.Remove(file)
+    if self.Clean {
+        var glob []string
+        pattern := fp.Join(self.OutDir, slc1ID + "*")
         
-        if err != nil {
-            err = Handle(err, "failed to remove file '%s'", file)
+        if glob, err = fp.Glob(pattern); err != nil {
+            err = Handle(err, "globbing for leftover files from coregistration failed")
             return
         }
-    }
-    
-    glob, err = fp.Glob(fp.Join(self.OutDir, slc2ID + "*"))
-    
-    if err != nil {
-        err = Handle(err, "globbing for leftover files from coregistration failed")
-        return
-    }
-    
-    for _, file := range glob {
-        err = os.Remove(file)
         
-        if err != nil {
-            err = Handle(err, "failed to remove file '%s'", file)
+        for _, file := range glob {
+            if err = os.Remove(file); err != nil {
+                err = Handle(err, "failed to remove file '%s'", file)
+                return
+            }
+        }
+        
+        pattern = fp.Join(self.OutDir, slc2ID + "*")
+        
+        if glob, err = fp.Glob(pattern); err != nil {
+            err = Handle(err, "globbing for leftover files from coregistration failed")
             return
         }
+        
+        for _, file := range glob {
+            if err = os.Remove(file); err != nil {
+                err = Handle(err, "failed to remove file '%s'", file)
+                return
+            }
+        }
     }
-    */
     
     return ret, nil
 }

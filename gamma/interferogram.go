@@ -61,12 +61,12 @@ const (
 )
 
 var (
-    createOffset  = Gamma.must("create_offset")
-    phaseSimOrb   = Gamma.must("phase_sim_orb")
-    slcDiffIntf   = Gamma.must("SLC_diff_intf")
-    adf           = Gamma.must("adf")
-    phaseSlope    = Gamma.must("phase_slope")
-    CCAdaptive    = Gamma.must("cc_ad")
+    createOffset  = Gamma.Must("create_offset")
+    phaseSimOrb   = Gamma.Must("phase_sim_orb")
+    slcDiffIntf   = Gamma.Must("SLC_diff_intf")
+    adf           = Gamma.Must("adf")
+    phaseSlope    = Gamma.Must("phase_slope")
+    CCAdaptive    = Gamma.Must("cc_ad")
 
     CoherenceWeight = map[string]int {
         "constant": 0,
@@ -197,12 +197,12 @@ func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
     }
     
     // TODO: Check date difference order
-    ret.slc1, ret.slc2, ret.deltaT = *slc1, *slc2, slc1.Center().Sub(slc2.Center())
+    ret.slc1, ret.slc2, ret.deltaT = *slc1, *slc2, slc1.Time.Sub(slc2.Time)
     
     return ret, nil
 }
 
-var cpxToReal = Gamma.must("cpx_to_real")
+var cpxToReal = Gamma.Must("cpx_to_real")
 
 func (ifg *IFG) ToReal(out string, mode CpxToReal) (ret FakeFloat, err error) {
     ret.RngAzi.Rng, err = ifg.Rng()
@@ -277,7 +277,7 @@ func (opt *ifgPlotOpt) Parse(ifg *IFG) error {
     return nil
 }
 
-var rasmph_pwr24 = Gamma.must("rasmph_pwr24")
+var rasmph_pwr24 = Gamma.Must("rasmph_pwr24")
 
 func (ifg *IFG) Raster(mli string, opt ifgPlotOpt) error {
     err := opt.Parse(ifg)
@@ -469,7 +469,7 @@ func (self *IFG) Coherence(opt CoherenceOpt) (ret Coherence, err error) {
     return ret, nil
 }
 
-var rascc = Gamma.must("rascc")
+var rascc = Gamma.Must("rascc")
 
 func (c *Coherence) Raster(mli *MLI, opt ifgPlotOpt) error {
     err := opt.rasArgs.Parse(c)

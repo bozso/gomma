@@ -194,7 +194,7 @@ func stepSelect(self *Config) error {
     return nil
 }
 
-var s1Import = Gamma.must("S1_import_SLC_from_zipfiles")
+var s1Import = Gamma.Must("S1_import_SLC_from_zipfiles")
 
 func stepImport(self *Config) error {
     const (

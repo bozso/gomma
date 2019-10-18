@@ -336,9 +336,9 @@ type MosaicOpts struct {
     RefTab string
 }
 
-var mosaic = Gamma.must("SLC_mosaic_S1_TOPS")
+var mosaic = Gamma.Must("SLC_mosaic_S1_TOPS")
 
-func (s1 *S1SLC) Mosaic(slc *SLC, opts MosaicOpts) error {
+func (s1 *S1SLC) Mosaic(opts MosaicOpts) (ret SLC, err error) {
     opts.Looks.Default()
     
     bflg := 0
@@ -353,17 +353,30 @@ func (s1 *S1SLC) Mosaic(slc *SLC, opts MosaicOpts) error {
         ref = opts.RefTab
     }
     
-    _, err := mosaic(s1.Tab, slc.Dat, slc.Par, opts.Looks.Rng, opts.Looks.Azi,
-                     bflg, ref)
+    tmp := ""
     
-    if err != nil {
-        return Handle(err, "failed to mosaic '%s'", s1.Tab)
+    if tmp, err = TmpFileExt("slc"); err != nil {
+        err = Handle(err, "failed to create tmp file")
+        return
     }
     
-    return nil
+    if ret, err = NewSLC(tmp, ""); err != nil {
+        err = Handle(err, "failed to create SLC struct")
+        return
+    }
+    
+    _, err = mosaic(s1.Tab, ret.Dat, ret.Par, opts.Looks.Rng, opts.Looks.Azi,
+                    bflg, ref)
+    
+    if err != nil {
+        err = Handle(err, "failed to mosaic '%s'", s1.Tab)
+        return
+    }
+    
+    return ret, nil
 }
 
-var derampRef = Gamma.must("S1_deramp_TOPS_reference")
+var derampRef = Gamma.Must("S1_deramp_TOPS_reference")
 
 func (s1 *S1SLC) DerampRef() (ret S1SLC, err error) {
     tab := s1.Tab
@@ -382,7 +395,7 @@ func (s1 *S1SLC) DerampRef() (ret S1SLC, err error) {
     return ret, nil
 }
 
-var derampSlave = Gamma.must("S1_deramp_TOPS_slave")
+var derampSlave = Gamma.Must("S1_deramp_TOPS_slave")
 
 func (s1 *S1SLC) DerampSlave(ref *S1SLC, looks RngAzi, keep bool) (ret S1SLC, err error) {
     looks.Default()

@@ -123,7 +123,7 @@ func (opt *rasArgs) Parse(dat DataFile) error {
 }
 
 
-var _rasslc = Gamma.must("rasSLC")
+var _rasslc = Gamma.Must("rasSLC")
 
 func rasslc(opt rasArgs) error {
     dtype := 0
@@ -145,7 +145,7 @@ func rasslc(opt rasArgs) error {
     return err
 }
 
-var _raspwr = Gamma.must("raspwr")
+var _raspwr = Gamma.Must("raspwr")
 
 func raspwr(opt rasArgs) error {
     dtype := 0
@@ -169,7 +169,7 @@ func raspwr(opt rasArgs) error {
     return err
 }
 
-var _rasmph = Gamma.must("rasmph")
+var _rasmph = Gamma.Must("rasmph")
 
 func rasmph(opt rasArgs) error {
     dtype := 0
