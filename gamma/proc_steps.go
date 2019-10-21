@@ -383,8 +383,8 @@ func stepCheckGeo(c *Config) error {
     }
     
     geo, dem := meta.Geo, meta.Dem
-    geo.MLI.sep = ":"
-    dem.sep = ":"
+    geo.MLI.Sep = ":"
+    dem.Sep = ":"
     
     mrng, err := geo.MLI.Rng()
     
@@ -423,7 +423,7 @@ func stepCheckGeo(c *Config) error {
             "failed to geocode from geographic to radar coordinates")
     }
     
-    err = dem.Raster(Lookup, rasArgs{})
+    err = dem.Raster(Lookup, RasArgs{})
     
     if err != nil {
         return Handle(err, "raster generation for DEM failed")
@@ -432,10 +432,7 @@ func stepCheckGeo(c *Config) error {
     // TODO: make gm.raster2
     log.Printf("Creating quicklook hgt file.\n")
     
-    popt2 := GeoPlotOpt{
-        rasArgs: rasArgs{},
-        cycle: 500.0,
-    }
+    popt2 := GeoPlotOpt{Cycle: 500.0}
     
     err = geo.Raster(popt2)
     
@@ -531,7 +528,7 @@ func stepCoreg(self *Config) error {
     var prev *S1SLC = nil
     nzip := len(S1SLCs)
     
-    opt := ifgPlotOpt{}
+    opt := IfgPlotOpt{}
     
     for ii := midx + 1; ii < nzip; ii++ {
         curr := &S1SLCs[ii]

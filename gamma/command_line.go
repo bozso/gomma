@@ -5,95 +5,84 @@ import (
     "encoding/json"
     "fmt"
     "os"
-    fl "flag"
     fp "path/filepath"
     str "strings"
 )
 
 type (
+    Cmd func(Args) error
+    
     Process struct {
         Conf        string `name:"conf" default:"gamma.conf"`
         Step        string `name:"step" default:""`
         Start       string `name:"start" default:""`
         Stop        string `name:"stop" default:""` 
-        Log         string `name:"log" default:""`
+        Log         string `name:"log" default:"gamma.log"`
         CachePath   string `name:"cache" default:""`
-        Skip        bool   `name:"skip" default:""`
-        Show        bool   `name:"show" default:""`
+        Skip        bool   `name:"skip"`
+        Show        bool   `name:"show"`
         Config
     }
 
     Batcher struct {
+        Mode     string `pos:"0"`
+        Infile   string `pos:"1"`
         Conf     string `name:"conf" default:"gamma.conf"`
-        Mode     string `name:"" default:""`
-        Infile   string `name:"file" default:""`
         OutDir   string `name:"out" default:"."`
         Filetype string `name:"ftype" default:""`
         Mli      string `name:"mli" default:""`
+        IfgPlotOpt
         Config
-        ifgPlotOpt
     }
 
     Displayer struct {
+        Mode string `pos:"0"`
         Dat  string `pos:"1"`
         Par  string `name:"par" default:""`
-        Mode string `pos:"0"`
         Sec  string `name:"sec" default:""`
-        rasArgs
+        RasArgs
     }
     
     Coder struct {
-        GeoMeta
-        CodeOpt
         infile   string `pos:"0"`
         outfile  string `name:"out" default:""`
         metafile string `name:"meta" default:"geocode.json"`
         mode     string `name:"mode" default:""`
+        GeoMeta
+        CodeOpt
     }
 )
 
 var (
     BatchModes = []string{"quicklook", "mli / MLI", "ras"}
+    Commands = map[string]Cmd{
+        "proc": process,
+        "init": initGamma,
+        "batch": batch,
+    }
+    
+    CommandsAvailable = MapKeys(Commands)
 )
 
-
-func NewProcess(args []string) (ret Process, err error) {
-    flag := fl.NewFlagSet("proc", fl.ContinueOnError)
-
-    flag.StringVar(&ret.Conf, "config", "gamma.json",
-        "Processing configuration file")
-
-    flag.StringVar(&ret.infile, "file", "",
-        "Infile. List of files to process.")
-
-    flag.StringVar(&ret.Step, "step", "",
-        "Single processing step to be executed.")
-
-    flag.StringVar(&ret.Start, "start", "",
-        "Starting processing step.")
-
-    flag.StringVar(&ret.Stop, "stop", "",
-        "Last processing step to be executed.")
-
-    flag.StringVar(&ret.Log, "logfile", "gamma.log",
-        "Log messages will be saved here.")
-
-    flag.StringVar(&ret.CachePath, "cache", DefaultCachePath,
-        "Path to cached files.")
-
-    flag.BoolVar(&ret.Skip, "skip_optional", false,
-        "If set the proccessing will skip optional steps.")
-    flag.BoolVar(&ret.Show, "show_steps", false,
-        "If set, prints the processing steps.")
-
-    err = flag.Parse(args)
-
-    if err != nil {
-        err = Handle(err, "NewProcess failed")
+func process(args Args) (err error) {
+    proc := Process{}
+    
+    if err = args.ParseStruct(&proc); err != nil {
+        err = Handle(err, "failed to parse command line arguments")
         return
     }
-
-    return ret, nil
+    
+    start, stop, err := proc.Parse()
+    if err != nil {
+        err = Handle(err, "failed to  parse processing steps")
+        return
+    }
+    
+    if err = proc.RunSteps(start, stop); err != nil {
+        err = Handle(err, "error occurred while running processing steps")
+        return
+    }
+    return nil
 }
 
 func stepIndex(step string) int {
@@ -109,7 +98,7 @@ func listSteps() {
     fmt.Println("Available processing steps: ", stepList)
 }
 
-func (proc *Process) Parse() (istart int, istop int, err error) {
+func (proc Process) Parse() (istart int, istop int, err error) {
     if proc.Show {
         listSteps()
         os.Exit(0)
@@ -155,7 +144,7 @@ func (proc *Process) Parse() (istart int, istop int, err error) {
     return istart, istop, nil
 }
 
-func (proc *Process) RunSteps(start, stop int) error {
+func (proc Process) RunSteps(start, stop int) error {
     for ii := start; ii < stop; ii++ {
         name := stepList[ii]
         step := steps[name]
@@ -172,89 +161,58 @@ func (proc *Process) RunSteps(start, stop int) error {
     return nil
 }
 
-func InitParse(args []string) (ret string, err error) {
-    flag := fl.NewFlagSet("init", fl.ContinueOnError)
 
-    flag.StringVar(&ret, "config", "gamma.json",
-        "Processing configuration file")
-
-    err = flag.Parse(args)
-
-    if err != nil {
+func initGamma(args Args) (err error) {
+    if len(args.pos) < 1 {
+        err = Handle(nil,
+            "at least one positional argument required (path of configuration file")
         return
     }
-
-    return ret, nil
+    
+    conf := args.pos[0]
+    
+    if err = MakeDefaultConfig(conf); err != nil {
+        err = Handle(err, "failed to create config file")
+        return
+    }
+    return
 }
 
-func addRasArgsFlags(args *rasArgs, flag *fl.FlagSet) {
-    flag.IntVar(&args.Rng, "rng", 0, "Range samples of datafile.")
-    flag.IntVar(&args.Azi, "Azi", 0, "Azimuth lines of datafile.")
+func batch(args Args) (err error) {
+    batch := Batcher{}
     
-    flag.BoolVar(&args.Flip, "flip", false,
-        "Should the output image be flipped.")
+    if err = args.ParseStruct(&batch); err != nil {
+        err = Handle(err, "failed to parse command line arguments")
+        return
+    }
+
+    fmt.Printf("%#v\n", batch)
     
-    flag.StringVar(&args.Cmd, "cmd", "", "Plot command type to be used.")
-    
-    flag.IntVar(&args.Start, "start", 0, "Starting lines.")
-    flag.IntVar(&args.Nlines, "nline", 0, "Number of lines to plot.")
-    
-    flag.Float64Var(&args.Scale, "scale", 1.0, "Display scale factor.")
-    flag.Float64Var(&args.Exp, "exp", 0.35, "Display exponent.")
-    
-    flag.IntVar(&args.avgFact, "avg", 1000, "Averaging factor of pixels.")
-    flag.IntVar(&args.headerSize, "header", 0, "Header size?.")
+    switch batch.Mode {
+    case "quicklook":
+        if err = batch.Quicklook(); err != nil {
+            err = Handle(err, "quicklook failed")
+            return
+        }
+    case "mli", "MLI":
+        if err = batch.MLI(); err != nil {
+            err = Handle(err, "MLI failed")
+            return
+        }
+    case "ras", "raster", "plot":
+        if err = batch.Raster(); err != nil {
+            err = Handle(err, "raster failed")
+            return
+        }
+    default:
+        err = Handle(nil, "unrecognized mode: '%s'! Choose from: %v",
+            batch.Mode, BatchModes)
+        return
+    }
+    return nil
 }
 
-
-func NewBatcher(args []string) (ret Batcher, err error) {
-    flag := fl.NewFlagSet("list", fl.ContinueOnError)
-    
-    if len(args) == 0 {
-        err = Handle(nil, "at least one argument is required")
-        return
-    }
-    
-    ret.Mode = args[0]
-
-    flag.StringVar(&ret.Conf, "config", "gamma.json",
-        "Processing configuration file")
-    flag.StringVar(&ret.Infile, "file", "", "Inputfile.")
-    flag.StringVar(&ret.OutDir, "out", ".", "Output directory.")
-    flag.StringVar(&ret.Filetype, "ftype", "", "Type of files located in infile.")
-    
-    addRasArgsFlags(&ret.ifgPlotOpt.rasArgs, flag)
-    
-    flag.StringVar(&ret.Mli, "mli", "", "MLI datafile used for background.")
-    flag.IntVar(&ret.startCC, "startCC", 1, "Start coherence lines.")
-    flag.IntVar(&ret.startPwr, "startPwr", 1, "Start power lines.")
-    flag.IntVar(&ret.startCpx, "startCpx", 1, "Start complex lines.")
-    flag.Float64Var(&ret.Range.Min, "min", 0.0, "Minimum value.")
-    flag.Float64Var(&ret.Range.Max, "max", 0.0, "Maximum value.")
-    
-    err = flag.Parse(args[1:])
-
-    if err != nil {
-        return
-    }
-
-    if len(ret.infile) == 0 {
-        err = Handle(nil, "inputfile not specified")
-        return
-    }
-
-    path := ret.Conf
-    err = LoadJson(path, &ret.Config)
-
-    if err != nil {
-        err = Handle(err, "failed to parse json file '%s'", path)
-        return
-    }
-
-    return ret, nil
-}
-
-func (b *Batcher) Quicklook() error {
+func (b Batcher) Quicklook() error {
     cache := fp.Join(b.General.CachePath, "sentinel1")
 
     info := &ExtractOpt{root: cache, pol: b.General.Pol}
@@ -290,7 +248,7 @@ func (b *Batcher) Quicklook() error {
     return nil
 }
 
-func (b *Batcher) MLI() error {
+func (b Batcher) MLI() error {
     path := b.infile
     file, err := NewReader(path)
 
@@ -353,8 +311,8 @@ func (b *Batcher) MLI() error {
 }
 
 
-func (b *Batcher) Raster() error {
-    path := b.infile
+func (b Batcher) Raster() error {
+    path := b.Infile
     file, err := NewReader(path)
 
     if err != nil {
@@ -389,7 +347,7 @@ func (b *Batcher) Raster() error {
     return nil
 }
 
-
+/*
 func NewDisplayer(args []string) (ret Displayer, err error) {
     flag := fl.NewFlagSet("display", fl.ContinueOnError)
 
@@ -400,8 +358,6 @@ func NewDisplayer(args []string) (ret Displayer, err error) {
     flag.StringVar(&ret.Par, "par", "", "Parfile describing datafile.")
     
     flag.StringVar(&ret.Sec, "sec", "", "Secondary input datafile.")
-    
-    addRasArgsFlags(&ret.rasArgs, flag)    
     
     err = flag.Parse(args[1:])
     
@@ -443,7 +399,7 @@ func (dis *Displayer) Plot() error {
         return Handle(err, "failed to parse datafile '%s'", dis.Dat)
     }
     
-    err = dis.disArgs.Parse(dat)
+    err = dis.DisArgs.Parse(dat)
     
     if err != nil {
         return Handle(err, "failed to parse plotting options")
@@ -451,14 +407,14 @@ func (dis *Displayer) Plot() error {
     
     switch dis.Mode {
     case "dis":
-        err := Display(dat,  dis.rasArgs.disArgs)
+        err := Display(dat, dis.RasArgs.DisArgs)
         
         if err != nil {
             return Handle(err, "failed to execute display")
         }
     
     case "ras":
-        err := Raster(dat,  dis.rasArgs, dis.Sec)
+        err := Raster(dat,  dis.RasArgs, dis.Sec)
         
         if err != nil {
             return Handle(err, "failed to execute raster")
@@ -539,6 +495,7 @@ func (g *Coder) Geo2Radar() error {
 func (g *Coder) Radar2Geo() error {
     return g.Dem.radar2geo(g.infile, g.outfile, g.CodeOpt)
 }
+*/
 
 var PlotCmdFiles = map[string]Slice{
     "pwr": Slice{"pix_sigma0", "pix_gamma0", "sbi_pwr", "cc", "rmli", "mli"},
@@ -548,7 +505,7 @@ var PlotCmdFiles = map[string]Slice{
 }
 
 func (b *Batcher) PlotMLIs(file *FileReader) error {
-    opt := b.ifgPlotOpt.rasArgs
+    opt := b.IfgPlotOpt.RasArgs
     
     for file.Scan() {
         line := file.Text()
@@ -577,7 +534,7 @@ func (b *Batcher) PlotMLIs(file *FileReader) error {
 }
 
 func (b *Batcher) PlotSLCs(file *FileReader) error {
-    opt := b.ifgPlotOpt.rasArgs
+    opt := b.IfgPlotOpt.RasArgs
     
     for file.Scan() {
         line := file.Text()
@@ -606,7 +563,7 @@ func (b *Batcher) PlotSLCs(file *FileReader) error {
 }
 
 func (b *Batcher) PlotIFGs(file *FileReader) error {
-    opt := b.ifgPlotOpt
+    opt := b.IfgPlotOpt
     mli := b.Mli
     
     for file.Scan() {

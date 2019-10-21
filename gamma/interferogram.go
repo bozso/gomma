@@ -26,14 +26,16 @@ type (
         dataFile
     }
     
-    ifgPlotOpt struct {
-        rasArgs
-        cc *Coherence
-        startCC, startPwr, startCpx int
-        Range minmax 
+    IfgPlotOpt struct {
+        RasArgs
+        CC *Coherence
+        StartCC  int `name:"startcc"  default:"1"`
+        StartPwr int `name:"startpwr" default:"1"`
+        StartCpx int `name:"startcpx" default:"1"`
+        Minmax 
     }
     
-    ifgOpt struct {
+    IfgOpt struct {
         Looks RngAzi
         interact bool
         hgt string
@@ -143,7 +145,7 @@ func (ifg *IFG) Move(dir string) error {
     return nil
 }
 
-func FromSLC(slc1, slc2, ref *SLC, opt ifgOpt) (ret IFG, err error) {
+func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ret IFG, err error) {
     inter := 0
     
     if opt.interact {
@@ -247,31 +249,31 @@ func (ifg *IFG) ToReal(out string, mode CpxToReal) (ret FakeFloat, err error) {
     return ret, nil
 }
 
-func (opt *ifgPlotOpt) Parse(ifg *IFG) error {
-    err := opt.rasArgs.Parse(ifg)
+func (opt *IfgPlotOpt) Parse(ifg *IFG) error {
+    err := opt.RasArgs.Parse(ifg)
     
     if err != nil {
         return err
     }
     
-    if opt.Range.Min == 0.0 {
-        opt.Range.Min = 0.1
+    if opt.Min == 0.0 {
+        opt.Min = 0.1
     }
     
-    if opt.Range.Max == 0.0 {
-        opt.Range.Min = 0.9
+    if opt.Max == 0.0 {
+        opt.Min = 0.9
     }
     
-    if opt.startCC == 0 {
-        opt.startCC = 1
+    if opt.StartCC == 0 {
+        opt.StartCC = 1
     }
     
-    if opt.startPwr == 0 {
-        opt.startPwr = 1
+    if opt.StartPwr == 0 {
+        opt.StartPwr = 1
     }
     
-    if opt.startCpx == 0 {
-        opt.startCpx = 1
+    if opt.StartCpx == 0 {
+        opt.StartCpx = 1
     }
     
     return nil
@@ -279,32 +281,30 @@ func (opt *ifgPlotOpt) Parse(ifg *IFG) error {
 
 var rasmph_pwr24 = Gamma.Must("rasmph_pwr24")
 
-func (ifg *IFG) Raster(mli string, opt ifgPlotOpt) error {
+func (ifg *IFG) Raster(mli string, opt IfgPlotOpt) error {
     err := opt.Parse(ifg)
     
     if err != nil {
         return Handle(err, "failed to parse IFG raster arguments")
     }
     
-    
-    
-    cc := opt.cc
+    cc := opt.CC
     
     if cc == nil {
-        _, err := rasmph_pwr24(opt.Datfile, mli, opt.Rng, opt.startCpx,
-                               opt.startPwr, opt.Nlines, opt.Avg.Rng,
+        _, err := rasmph_pwr24(opt.Datfile, mli, opt.Rng, opt.StartCpx,
+                               opt.StartPwr, opt.Nlines, opt.Avg.Rng,
                                opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
-                               opt.raster)
+                               opt.Raster)
         if err != nil {
             return Handle(err, "failed to create raster for interferogram '%s'",
                 ifg.Dat)
         }
     } else {
         
-        _, err := rasmph_pwr24(opt.Datfile, mli, opt.Rng, opt.startCpx,
-                               opt.startPwr, opt.Nlines, opt.Avg.Rng,
+        _, err := rasmph_pwr24(opt.Datfile, mli, opt.Rng, opt.StartCpx,
+                               opt.StartPwr, opt.Nlines, opt.Avg.Rng,
                                opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
-                               opt.raster, *cc, opt.startCC, opt.Range.Min)
+                               opt.Raster, *cc, opt.StartCC, opt.Min)
         if err != nil {
             return Handle(err, "failed to create raster for interferogram '%s'",
                 ifg.Dat)
@@ -471,17 +471,17 @@ func (self *IFG) Coherence(opt CoherenceOpt) (ret Coherence, err error) {
 
 var rascc = Gamma.Must("rascc")
 
-func (c *Coherence) Raster(mli *MLI, opt ifgPlotOpt) error {
-    err := opt.rasArgs.Parse(c)
+func (c *Coherence) Raster(mli *MLI, opt IfgPlotOpt) error {
+    err := opt.RasArgs.Parse(c)
     
     if err != nil {
         return Handle(err, "failed to parse plot arguments")
     }
     
-    _, err = rascc(opt.Datfile, mli.Dat, opt.Rng, opt.startCC, opt.startPwr,
+    _, err = rascc(opt.Datfile, mli.Dat, opt.Rng, opt.StartCC, opt.StartPwr,
                    opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
-                   opt.Range.Min, opt.Range.Max, opt.Scale,
-                   opt.Exp, opt.LR, opt.raster)
+                   opt.Min, opt.Max, opt.Scale,
+                   opt.Exp, opt.LR, opt.Raster)
     
     return err
 }

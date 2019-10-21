@@ -7,29 +7,38 @@ import (
 
 type(
     ScaleExp struct {
-        Scale, Exp float64
+        Scale float64 `name:"scale" default:"1.0"`
+        Exp   float64 `name:"exp" default:"0.35"`
     }
     
-    disArgs struct {
+    DisArgs struct {
         ScaleExp
         RngAzi
-        Flip                 bool
-        ImgFmt, Datfile, Cmd string
-        Start, Nlines, LR    int
+        Flip    bool   `name:"flip" default:""`
+        ImgFmt  string `name:"imgfmt" default:""`
+        Datfile string `name:"dat" default:""`
+        Cmd     string `name:"cmd" default:""`
+        Start   int    `name:"start" default:"0"`
+        Nlines  int    `name:"nlines" default:"1"`
+        LR      int
     }
 
-    rasArgs struct {
-        disArgs
-        avgFact, headerSize int
-        Avg                 RngAzi
-        raster              string
+    RasArgs struct {
+        DisArgs
+        AvgFact    int    `name:"afact" default:"1000"`
+        HeaderSize int    `name:"header" default:"0"`
+        Avg        RngAzi `name:"avg" default:"5"`
+        Raster     string `name:"ras" default:""`
     }
     
     ZeroFlag int
     
-    shdArgs struct {
-        rasArgs
-        Elev, Orient, colPost, rowPost float64
+    ShdArgs struct {
+        RasArgs
+        Elev     float64 `name:"elev" default:""`
+        Orient   float64 `name:"orient" default:""`
+        ColPost  float64 `name:"colpost" default:""`
+        RowPost  float64 `name:"rowpost" default:""`
         zeroFlag ZeroFlag
     }
 )
@@ -39,7 +48,7 @@ const (
     Valid
 )
 
-func (arg *disArgs) Parse(dat DataFile) (err error) {
+func (arg *DisArgs) Parse(dat DataFile) (err error) {
     arg.ScaleExp.Parse()
     
     if arg.Start == 0 {
@@ -96,27 +105,27 @@ func calcFactor(ndata, factor int) int {
     }
 }
 
-func (opt *rasArgs) Parse(dat DataFile) error {
-    err := opt.disArgs.Parse(dat)
+func (opt *RasArgs) Parse(dat DataFile) error {
+    err := opt.DisArgs.Parse(dat)
     
     if err != nil {
         return Handle(err, "failed to parse display arguments")
     }
     
-    if opt.avgFact == 0 {
-        opt.avgFact = 1000
+    if opt.AvgFact == 0 {
+        opt.AvgFact = 1000
     }
     
     if opt.Avg.Rng == 0 {
-        opt.Avg.Rng = calcFactor(opt.Rng, opt.avgFact)
+        opt.Avg.Rng = calcFactor(opt.Rng, opt.AvgFact)
     }
     
     if opt.Avg.Azi == 0 {
-        opt.Avg.Azi = calcFactor(opt.Azi, opt.avgFact)
+        opt.Avg.Azi = calcFactor(opt.Azi, opt.AvgFact)
     }
     
-    if len(opt.raster) == 0 {
-        opt.raster = fmt.Sprintf("%s.%s", opt.Datfile, Settings.RasExt)
+    if len(opt.Raster) == 0 {
+        opt.Raster = fmt.Sprintf("%s.%s", opt.Datfile, Settings.RasExt)
     }
     
     return nil
@@ -125,7 +134,7 @@ func (opt *rasArgs) Parse(dat DataFile) error {
 
 var _rasslc = Gamma.Must("rasSLC")
 
-func rasslc(opt rasArgs) error {
+func rasslc(opt RasArgs) error {
     dtype := 0
     
     switch opt.ImgFmt {
@@ -140,14 +149,14 @@ func rasslc(opt rasArgs) error {
     
     _, err := _rasslc(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                       opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
-                      dtype, opt.headerSize, opt.raster)
+                      dtype, opt.HeaderSize, opt.Raster)
     
     return err
 }
 
 var _raspwr = Gamma.Must("raspwr")
 
-func raspwr(opt rasArgs) error {
+func raspwr(opt RasArgs) error {
     dtype := 0
     
     switch opt.ImgFmt {
@@ -164,14 +173,14 @@ func raspwr(opt rasArgs) error {
     
     _, err := _raspwr(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                       opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
-                      opt.LR, opt.raster, dtype, opt.headerSize)
+                      opt.LR, opt.Raster, dtype, opt.HeaderSize)
 
     return err
 }
 
 var _rasmph = Gamma.Must("rasmph")
 
-func rasmph(opt rasArgs) error {
+func rasmph(opt RasArgs) error {
     dtype := 0
     
     switch opt.ImgFmt {
@@ -186,7 +195,7 @@ func rasmph(opt rasArgs) error {
     
     _, err := _rasmph(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                       opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
-                      opt.LR, opt.raster, dtype) 
+                      opt.LR, opt.Raster, dtype) 
     
     return err
 }

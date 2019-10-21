@@ -11,20 +11,24 @@ import (
 )
 
 type (
-    minmax struct {
-        Min, Max float64
+    Minmax struct {
+        Min float64 `name:"min" default:"0.0"`
+        Max float64 `name:"max" default:"1.0"`
     }
     
-    iminmax struct {
-        Min, Max int
+    IMinmax struct {
+        Min int `name:"min" default:"0"`
+        Max int `name:"max" default:"1"`
     }
     
     LatLon struct {
-        Lat, Lon float64
+        Lat float64 `name:"lan" default:"1.0"`
+        Lon float64 `name:"lot" default:"1.0"`
     }
     
     RngAzi struct {
-        Rng, Azi int
+        Rng int `name:"rng" default:"1"`
+        Azi int `name:"azi" default:"1"`
     }
     
     GeneralOpt struct {
@@ -32,7 +36,7 @@ type (
         MasterDate               string
         CachePath                string `json:"CACHE_PATH"`
         Looks                    RngAzi
-        IWs                      [3]iminmax
+        IWs                      [3]IMinmax
     }
 
     PreSelectOpt struct {
@@ -58,13 +62,13 @@ type (
     }
 
     IfgSelectOpt struct {
-        Bperp  minmax
-        DeltaT minmax
+        Bperp  Minmax
+        DeltaT Minmax
     }
 
     CoherenceOpt struct {
         WeightType             string
-        Box                    minmax
+        Box                    Minmax
         SlopeCorrelationThresh float64
         SlopeWindow            int
     }
@@ -95,7 +99,7 @@ var (
         "coreg":  stepCoreg,
     }
 
-    stepList []string
+    stepList = MapKeys(steps)
 
     defaultConfig = Config{
         General: GeneralOpt{
@@ -145,18 +149,19 @@ var (
         },
 
         IFGSelect: IfgSelectOpt{
-            Bperp:  minmax{Min: 0.0, Max: 150.0},
-            DeltaT: minmax{Min: 0.0, Max: 15.0},
+            Bperp:  Minmax{Min: 0.0, Max: 150.0},
+            DeltaT: Minmax{Min: 0.0, Max: 15.0},
         },
 
         CalcCoherence: CoherenceOpt{
             WeightType:             "gaussian",
-            Box:                    minmax{Min: 3.0, Max: 9.0},
+            Box:                    Minmax{Min: 3.0, Max: 9.0},
             SlopeCorrelationThresh: 0.4,
             SlopeWindow:            5,
         },
     }
 )
+
 
 
 func init() {

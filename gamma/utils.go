@@ -23,7 +23,8 @@ type (
     }
 
     Params struct {
-        Par, sep string
+        Par string `name:"par" default:""`
+        Sep string `name:"sep" default:":"`
         contents []string
     }
 
@@ -41,6 +42,7 @@ type (
 type Args struct {
     opt map[string]string
     pos []string
+    npos int
 }
 
 func NewArgs(args []string) (ret Args) {
@@ -55,6 +57,9 @@ func NewArgs(args []string) (ret Args) {
             ret.pos = append(ret.pos, arg)
         }
     }
+    
+    ret.npos = len(ret.pos)
+    
     return
 }
 
@@ -91,22 +96,40 @@ func StringToVal(v ref.Value, kind ref.Kind, in string) error {
     return nil
 }
 
-func (h *Args) ParseStruct(s interface{}) error {
-    vv := ref.ValueOf(s)
-    kind := vv.Kind()
+func (h Args) ParseStruct(s interface{}) error {
+    vptr := ref.ValueOf(s)
+    kind := vptr.Kind()
     
     if kind != ref.Ptr {
         return Handle(nil, "expected a pointer to struct not '%v'", kind)
     }
     
-    v := vv.Elem()
+    v := vptr.Elem()
+    
+    if err := h.parseStruct(v); err != nil {
+        return Handle(err, "parsing of struct field failed")
+    }
+    return nil
+}
+
+func (h Args) parseStruct(v ref.Value) error {
     t := v.Type()
-    
-    
+
     for ii := 0; ii < v.NumField(); ii++ {
-        field := t.Field(ii)
-        tag, sfield := field.Tag, v.Field(ii)
-        kind := field.Type.Kind()
+        sField := t.Field(ii)
+        sValue := v.Field(ii)
+        kind := sField.Type.Kind()
+        
+        fmt.Printf("Parsing field[%d]: %s\n", ii, sField.Name)
+        
+        if kind == ref.Struct {
+            if err := h.parseStruct(sValue); err != nil {
+                return Handle(err, "parsing of Struct field failed")
+            }
+            continue
+        }
+        
+        tag := sField.Tag
         
         if tag == "" {
             continue
@@ -114,7 +137,7 @@ func (h *Args) ParseStruct(s interface{}) error {
         
         pos := tag.Get("pos")
         npos := len(pos)
-
+        
         if npos > 0 {
             idx, err := conv.Atoi(pos)
             
@@ -122,21 +145,35 @@ func (h *Args) ParseStruct(s interface{}) error {
                 return Handle(err, "failed to parse '%s' into an int", pos)
             }
             
-            if idx > npos {
+            if idx >= h.npos {
                 return Handle(nil, 
                     "index %d is out of the bounds of positional arguments",
                     idx)
             }
             
-            if err = StringToVal(sfield, kind, h.pos[idx]); err != nil {
+            if err = StringToVal(sValue, kind, h.pos[idx]); err != nil {
                 return Handle(err, "failed to set struct field")
             }
+            continue
         }
         
         name := tag.Get("name")
         
         if name == "" || name == "-" {
-            name = field.Name
+            name = sField.Name
+        }
+        
+        
+        if kind == ref.Bool {
+            val := false
+            for _, pos := range h.pos {
+                if pos == name {
+                    val = true
+                    break
+                }
+            }
+            sValue.SetBool(val)
+            continue
         }
         
         val, ok := h.opt[name]
@@ -145,14 +182,30 @@ func (h *Args) ParseStruct(s interface{}) error {
             val = tag.Get("default")
         }
         
-        if err := StringToVal(sfield, kind, val); err != nil {
+        if err := StringToVal(sValue, kind, val); err != nil {
             return Handle(err, "failed to set struct field")
         }
     }
-    
     return nil
 }
 
+func MapKeys(dict interface{}) (ret []string) {
+    val := ref.ValueOf(dict)
+    kind := val.Kind()
+    
+    if kind != ref.Map {
+        log.Fatalf("expected a map not an '%s'", kind)
+    }
+    
+    keys := val.MapKeys()
+    ret = make([]string, len(keys))
+
+    for ii, key := range keys {
+        ret[ii] = key.String()
+    }
+    
+    return
+}
 
 const cmdErr = `Command '%v' failed!
 Output of command is: %v
@@ -257,7 +310,7 @@ func ReadFile(path string) (ret []byte, err error) {
 }
 
 func FromString(params, sep string) Params {
-    return Params{Par: "", sep: sep, contents: str.Split(params, "\n")}
+    return Params{Par: "", Sep: sep, contents: str.Split(params, "\n")}
 }
 
 func (self *Params) Param(name string) (ret string, err error) {
@@ -276,13 +329,13 @@ func (self *Params) Param(name string) (ret string, err error) {
         for scanner.Scan() {
             line := scanner.Text()
             if str.Contains(line, name) {
-                return str.Trim(str.Split(line, self.sep)[1], " "), nil
+                return str.Trim(str.Split(line, self.Sep)[1], " "), nil
             }
         }
     } else {
         for _, line := range self.contents {
             if str.Contains(line, name) {
-                return str.Trim(str.Split(line, self.sep)[1], " "), nil
+                return str.Trim(str.Split(line, self.Sep)[1], " "), nil
             }
         }
     }

@@ -40,9 +40,9 @@ type (
     }
     
     GeoPlotOpt struct {
-        rasArgs
-        startHgt, startPwr int
-        cycle float64
+        RasArgs
+        StartHgt, StartPwr int
+        Cycle float64
     }
     
     GeoMeta struct {
@@ -337,11 +337,11 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
     return ret, nil
 }
 
-func (d *DEM) Raster(mode DEMPlot, opt rasArgs) error {
+func (d *DEM) Raster(mode DEMPlot, opt RasArgs) error {
     
     switch mode {
     case Lookup:
-        opt.disArgs.Datfile = d.Lookup
+        opt.DisArgs.Datfile = d.Lookup
         opt.ImgFmt = "FCOMPLEX"
         
         err := opt.Parse(d)
@@ -352,7 +352,7 @@ func (d *DEM) Raster(mode DEMPlot, opt rasArgs) error {
         
         return rasmph(opt)
     case Dem:
-        opt.disArgs.Datfile = d.Dat
+        opt.DisArgs.Datfile = d.Dat
         opt.ImgFmt = "FLOAT"
         
         err := opt.Parse(d)
@@ -374,22 +374,22 @@ func NewGeocode(dat, par string) (ret Geocode, err error) {
 } 
 
 func (opt *GeoPlotOpt) Parse(d DataFile) error {
-    err := opt.rasArgs.Parse(d)
+    err := opt.RasArgs.Parse(d)
     
     if err != nil {
         return Handle(err, "failed to parse plotting options")
     }
     
-    if opt.startPwr == 0 {
-        opt.startPwr = 1
+    if opt.StartPwr == 0 {
+        opt.StartPwr = 1
     }
     
-    if opt.startHgt == 0 {
-        opt.startHgt = 1
+    if opt.StartHgt == 0 {
+        opt.StartHgt = 1
     }
     
-    if opt.cycle == 0 {
-        opt.cycle = 160.0
+    if opt.Cycle == 0 {
+        opt.Cycle = 160.0
     }
     
     return nil
@@ -398,7 +398,7 @@ func (opt *GeoPlotOpt) Parse(d DataFile) error {
 var rashgt = Gamma.Must("rashgt")
 
 func (geo *Geocode) Raster(opt GeoPlotOpt) error {
-    opt.rasArgs.raster = fmt.Sprintf("%s.%s", geo.Hgt, Settings.RasExt)
+    opt.RasArgs.Raster = fmt.Sprintf("%s.%s", geo.Hgt, Settings.RasExt)
     
     err := opt.Parse(geo)
     
@@ -407,9 +407,9 @@ func (geo *Geocode) Raster(opt GeoPlotOpt) error {
     }
     
     
-    _, err = rashgt(geo.Hgt, geo.MLI.Dat, opt.Rng, opt.startHgt, opt.startPwr,
-                    opt.Nlines, opt.Avg.Rng, opt.Avg.Azi, opt.cycle, opt.Scale,
-                    opt.Exp, opt.LR, opt.raster)
+    _, err = rashgt(geo.Hgt, geo.MLI.Dat, opt.Rng, opt.StartHgt, opt.StartPwr,
+                    opt.Nlines, opt.Avg.Rng, opt.Avg.Azi, opt.Cycle, opt.Scale,
+                    opt.Exp, opt.LR, opt.Raster)
     return err
 }
 
