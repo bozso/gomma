@@ -71,6 +71,7 @@ type (
     IWs [maxIW]S1IW
 
     S1SLC struct {
+        ftype *string
         nIW int
         Tab string
         time.Time
@@ -95,7 +96,7 @@ var (
     }
     
     S1DirPaths = [4]string{"slc", "rslc", "mli", "rmli"}
-    
+    S1SLCType = "S1SLC"
 )
 
 func NewS1Zip(zipPath, root string) (ret *S1Zip, err error) {
@@ -186,7 +187,7 @@ func (s1 *S1Zip) Info(exto *ExtractOpt) (ret IWInfos, err error) {
 }
 
 func NewIW(dat, par, TOPS_par string) (ret S1IW, err error) {
-    ret.dataFile, err = NewDataFile(dat, par, "par")
+    ret.dataFile, err = NewDataFile(dat, par, Unknown)
 
     if err != nil {
         err = Handle(err,
@@ -200,7 +201,6 @@ func NewIW(dat, par, TOPS_par string) (ret S1IW, err error) {
     }
 
     ret.TOPS_par = NewGammaParam(TOPS_par)
-    ret.files = []string{dat, par, TOPS_par}
 
     return ret, nil
 }
@@ -243,6 +243,8 @@ func FromTabfile(tab string) (ret S1SLC, err error) {
         err = Handle(err, "failed to retreive date for '%s'", tab)
         return
     }
+    
+    ret.ftype = &S1SLCType
     
     return ret, nil
 }
@@ -631,7 +633,7 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
         }
     }
 
-    ret.Tab = tab
+    ret.Tab, ret.ftype = tab, &S1SLCType 
 
     return ret, nil
 }
@@ -673,7 +675,7 @@ func (s1 *S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
         }
     }
 
-    ret.Tab, ret.nIW = tab, s1.nIW
+    ret.Tab, ret.nIW, ret.ftype = tab, s1.nIW, &S1SLCType
 
     return ret, nil
 }

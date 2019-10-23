@@ -20,7 +20,7 @@ type (
     CoregOut struct {
         RSLC SLC
         Rslc S1SLC
-        Ifg IFG
+        Ifg DataFile
         Ok bool
     }
 )
@@ -113,7 +113,7 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
     
     ID := fmt.Sprintf("%s_%s", slc1ID, slc2ID)
     
-    ret.Ifg, err = NewIFG(ID + ".diff", ID + ".off", "", ID + ".diff_par",
+    ifg, err := NewIFG(ID + ".diff", ID + ".off", "", ID + ".diff_par",
         ID + ".results")
     
     if err != nil {
@@ -121,9 +121,9 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
         return
     }
     
-    if ret.Ok, err = ret.Ifg.CheckQuality(); err != nil {
+    if ret.Ok, err = ifg.CheckQuality(); err != nil {
         err = Handle(err, "failed to check coregistration quality '%s'",
-            ret.Ifg.quality)
+            ifg.Quality)
         return
     }
     
@@ -136,9 +136,9 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
         return
     }
     
-    if err = ret.Ifg.Move(self.IfgPath); err != nil {
+    if ret.Ifg, err = ifg.Move(self.IfgPath); err != nil {
         err = Handle(err, "failed to move interferogram '%s' to IFG directory",
-            ret.Ifg.Dat)
+            ifg.Dat)
         return
     }
 

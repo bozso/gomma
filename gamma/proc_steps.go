@@ -372,7 +372,7 @@ func stepGeocode (c *Config) error {
     return nil
 }
 
-
+/*
 func stepCheckGeo(c *Config) error {
     meta := GeoMeta{}
     path := fp.Join(c.General.OutputDir, "geocode.json")
@@ -385,33 +385,15 @@ func stepCheckGeo(c *Config) error {
     geo, dem := meta.Geo, meta.Dem
     geo.MLI.Sep = ":"
     dem.Sep = ":"
+    mra := geo.MLI.RngAzi
+    drng := dem.Rng
     
-    mrng, err := geo.MLI.Rng()
-    
-    if err != nil {
-        return Handle(err, "failed to retreive master MLI range samples")
-    }
-    
-    mazi, err := geo.MLI.Azi()
-    
-    if err != nil {
-        return Handle(err, "failed to retreive master MLI azimuth lines")
-    }
-    
-    drng, err := dem.Rng()
-    
-    if err != nil {
-        return Handle(err, "failed to retreive DEM range samples")
-    }
-    
-
     log.Printf("Geocoding DEM heights into image coordinates.\n")
-    
     
     opt := CodeOpt{
         inWidth: drng,
-        outWidth: mrng,
-        nlines: mazi,
+        outWidth: mra.Rng,
+        nlines: mra.Azi,
         dtype: "FLOAT",
         interpolMode: InvSquaredDist,
     }
@@ -423,7 +405,7 @@ func stepCheckGeo(c *Config) error {
             "failed to geocode from geographic to radar coordinates")
     }
     
-    err = dem.Raster(Lookup, RasArgs{})
+    err = dem.Raster(RasArgs{})
     
     if err != nil {
         return Handle(err, "raster generation for DEM failed")
@@ -447,6 +429,7 @@ func stepCheckGeo(c *Config) error {
     
     return nil
 }
+*/
 
 func stepCoreg(self *Config) error {
     outDir := self.General.OutputDir
@@ -528,7 +511,7 @@ func stepCoreg(self *Config) error {
     var prev *S1SLC = nil
     nzip := len(S1SLCs)
     
-    opt := IfgPlotOpt{}
+    opt := RasArgs{DisArgs:DisArgs{Sec: mli.Dat}}
     
     for ii := midx + 1; ii < nzip; ii++ {
         curr := &S1SLCs[ii]
@@ -545,11 +528,11 @@ func stepCoreg(self *Config) error {
             continue
         }
         
-        err = out.Ifg.Raster(mli.Dat, opt)
+        err = out.Ifg.Raster(opt)
         
         if err != nil {
             return Handle(err, "failed to create raster image for interferogram '%s",
-                out.Ifg.Dat)
+                out.Ifg.Datfile())
         }
         
         prev = &out.Rslc
@@ -573,11 +556,11 @@ func stepCoreg(self *Config) error {
             continue
         }
         
-        err = out.Ifg.Raster(mli.Dat, opt)
+        err = out.Ifg.Raster(opt)
         
         if err != nil {
             return Handle(err, "failed to create raster image for interferogram '%s",
-                out.Ifg.Dat)
+                out.Ifg.Datfile())
         }
         
         prev = &out.Rslc

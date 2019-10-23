@@ -14,21 +14,29 @@ type(
     DisArgs struct {
         ScaleExp
         RngAzi
-        Flip    bool   `name:"flip" default:""`
-        ImgFmt  string `name:"imgfmt" default:""`
-        Datfile string `name:"dat" default:""`
-        Cmd     string `name:"cmd" default:""`
-        Start   int    `name:"start" default:"0"`
-        Nlines  int    `name:"nlines" default:"1"`
-        LR      int
+        Minmax
+        Flip     bool    `name:"flip" default:""`
+        ImgFmt   string  `name:"imgfmt" default:""`
+        Datfile  string  `name:"dat" default:""`
+        Cmd      string  `name:"cmd" default:""`
+        Start    int     `name:"start" default:"0"`
+        Nlines   int     `name:"nlines" default:"1"`
+        Sec      string  `name:"sec" default:""`
+        StartCC  int     `name:"startcc"  default:"1"`
+        StartPwr int     `name:"startpwr" default:"1"`
+        StartCpx int     `name:"startcpx" default:"1"`
+        StartHgt int     `name:"starthgt" default:"1"`
+        Coh      string  `name:"coh" default:""`
+        Cycle    float64 `name:"cycle" default:"160.0"`
+        LR       int
     }
 
     RasArgs struct {
         DisArgs
         AvgFact    int    `name:"afact" default:"1000"`
         HeaderSize int    `name:"header" default:"0"`
-        Avg        RngAzi `name:"avg" default:"5"`
-        Raster     string `name:"ras" default:""`
+        Avg        RngAzi `name:"avg"`
+        Raster     string `name:"ras"`
     }
     
     ZeroFlag int
@@ -64,28 +72,52 @@ func (arg *DisArgs) Parse(dat DataFile) (err error) {
     }
 
     if arg.Rng == 0 {
-        if arg.Rng, err = dat.Rng(); err != nil {
-            return Handle(err, "failed to get range_samples")
-        }
+        arg.Rng = dat.GetRng()
     }
 
     if arg.Azi == 0 {
-        if arg.Azi, err = dat.Azi(); err != nil {
-            return Handle(err, "failed to get azimuth_lines")
-        }
+        arg.Azi = dat.GetAzi()
     }
 
     // parts = pth.basename(datfile).split(".")
-    if len(arg.ImgFmt) == 0 {
-        if arg.ImgFmt, err = dat.ImageFormat(); err != nil {
-            return Handle(err, "failed to get image_format")
-        }
-    }
+    //if len(arg.ImgFmt) == 0 {
+        //if arg.ImgFmt, err = dat.ImageFormat(); err != nil {
+            //return Handle(err, "failed to get image_format")
+        //}
+    //}
 
     if arg.Flip {
         arg.LR = -1
     } else {
         arg.LR = 1
+    }
+    
+    if arg.Min == 0.0 {
+        arg.Min = 0.1
+    }
+    
+    if arg.Max == 0.0 {
+        arg.Min = 0.9
+    }
+    
+    if arg.StartCC == 0 {
+        arg.StartCC = 1
+    }
+    
+    if arg.StartPwr == 0 {
+        arg.StartPwr = 1
+    }
+    
+    if arg.StartCpx == 0 {
+        arg.StartCpx = 1
+    }
+    
+    if arg.StartHgt == 0 {
+        arg.StartHgt = 1
+    }
+    
+    if arg.Cycle == 0 {
+        arg.Cycle = 160.0
     }
 
     return nil

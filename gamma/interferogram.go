@@ -16,25 +16,18 @@ type (
     
     IFG struct {
         dataFile
-        diffPar Params
-        quality, simUnwrap string
-        deltaT time.Duration
-        slc1, slc2 SLC
+        DiffPar Params          `json:"diffparfile"`
+        Quality   string        `json:"quality"`
+        SimUnwrap string        `json:"simulated_unwrapped"`
+        SLC1      SLC           `json:"slc1"`
+        SLC2      SLC           `json:"slc2"`
+        DeltaT    time.Duration `json:"-"`
     }
     
     Coherence struct {
         dataFile
     }
-    
-    IfgPlotOpt struct {
-        RasArgs
-        CC *Coherence
-        StartCC  int `name:"startcc"  default:"1"`
-        StartPwr int `name:"startpwr" default:"1"`
-        StartCpx int `name:"startcpx" default:"1"`
-        Minmax 
-    }
-    
+        
     IfgOpt struct {
         Looks RngAzi
         interact bool
@@ -74,20 +67,23 @@ var (
         "constant": 0,
         "gaussian": 1,
     }
+    
+    IFGType = "IFG"
 )
 
+// TODO: check datatype of coherence file
 func NewCoherence(dat, par string) (ret Coherence, err error) {
-    ret.dataFile, err = NewDataFile(dat, par, "par")
+    ret.dataFile, err = NewDataFile(dat, par, Float)
     return
 }
 
-func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
+func NewIFG(dat, par, simUnw, diffPar, quality string) (ret IFG, err error) {
     if len(dat) == 0 {
         err = Handle(nil, "'dat' should not be an empty string")
         return
     }
     
-    self.Dat = dat
+    ret.Dat = dat
     
     base := NoExt(dat)
     
@@ -95,56 +91,31 @@ func NewIFG(dat, par, simUnw, diffPar, quality string) (self IFG, err error) {
         par = base + ".off"
     }
     
-    self.Params = NewGammaParam(par)
+    ret.Params = NewGammaParam(par)
     
     if len(simUnw) == 0 {
         simUnw = base + ".sim_unw"
     }
     
-    self.quality, self.simUnwrap = quality, simUnw
+    ret.Quality, ret.SimUnwrap = quality, simUnw
     
-    self.diffPar = NewGammaParam(diffPar)
+    ret.DiffPar = NewGammaParam(diffPar)
     
-    self.files = []string{}
+    if ret.Rng, err = ret.rng(); err != nil {
+        err = Handle(err, "failed to retreive range samples from '%s'", par)
+        return
+    }
     
-    return self, nil
+    if ret.Azi, err = ret.azi(); err != nil {
+        err = Handle(err, "failed to retreive azimuth lines from '%s'", par)
+        return
+    }
+    
+    ret.Dtype = FloatCpx
+    
+    return ret, nil
 }
     
-
-func (ifg *IFG) Move(dir string) error {
-    err := Move(&ifg.dataFile.Dat, dir)
-    
-    if err != nil {
-        return Handle(err, "failed to move IFG datafile")
-    }
-    
-    err = Move(&ifg.dataFile.Par, dir)
-    
-    if err != nil {
-        return Handle(err, "failed to move IFG parfile")
-    }
-    
-    err = Move(&ifg.diffPar.Par, dir)
-    
-    if err != nil {
-        return Handle(err, "failed to move IFG diff file")
-    }
-    
-    err = Move(&ifg.quality, dir)
-    
-    if err != nil {
-        return Handle(err, "failed to move IFG quality file")
-    }
-    
-    err = Move(&ifg.simUnwrap, dir)
-    
-    if err != nil {
-        return Handle(err, "failed to move IFG simulated unwrapped phase file")
-    }
-    
-    return nil
-}
-
 func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ret IFG, err error) {
     inter := 0
     
@@ -191,35 +162,26 @@ func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ret IFG, err error) {
         return
     }
     
-    ret, err = NewIFG(diff, off, "", "", "")
-    
-    if err != nil {
+    if ret, err = NewIFG(diff, off, "", "", ""); err != nil {
         err = Handle(err, "failed to create new interferogram struct")
         return
     }
     
     // TODO: Check date difference order
-    ret.slc1, ret.slc2, ret.deltaT = *slc1, *slc2, slc1.Time.Sub(slc2.Time)
+    ret.SLC1, ret.SLC2, ret.DeltaT = *slc1, *slc2, slc1.Time.Sub(slc2.Time)
     
     return ret, nil
 }
 
 var cpxToReal = Gamma.Must("cpx_to_real")
 
-func (ifg *IFG) ToReal(out string, mode CpxToReal) (ret FakeFloat, err error) {
-    ret.RngAzi.Rng, err = ifg.Rng()
-    
-    if err != nil {
-        err = Handle(err, "failed to retreive interferogram range samples")
+func (ifg IFG) ToReal(out string, mode CpxToReal) (ret dataFile, err error) {
+    if ret, err = TmpDataFile(); err != nil {
+        err = Handle(err, "failed to create temporary datafile")
         return
     }
     
-    ret.RngAzi.Azi, err = ifg.Azi()
-    
-    if err != nil {
-        err = Handle(err, "failed to retreive interferogram azimuth lines")
-        return
-    }
+    ret.RngAzi, ret.Dtype = ifg.RngAzi, Float
     
     Mode := 0
     
@@ -238,60 +200,27 @@ func (ifg *IFG) ToReal(out string, mode CpxToReal) (ret FakeFloat, err error) {
         return ret, Handle(nil, "Unrecognized mode!")
     }
     
-    _, err = cpxToReal(ifg.Dat, out, ret.Rng, Mode)
-    
-    if err != nil {
+    if _, err = cpxToReal(ifg.Dat, ret.Dat, ret.Rng, Mode); err != nil {
         err = Handle(err, "cpx_to_real failed")
         return
     }
     
-    ret.Dat, ret.ImgFmt = out, "FLOAT"
     return ret, nil
-}
-
-func (opt *IfgPlotOpt) Parse(ifg *IFG) error {
-    err := opt.RasArgs.Parse(ifg)
-    
-    if err != nil {
-        return err
-    }
-    
-    if opt.Min == 0.0 {
-        opt.Min = 0.1
-    }
-    
-    if opt.Max == 0.0 {
-        opt.Min = 0.9
-    }
-    
-    if opt.StartCC == 0 {
-        opt.StartCC = 1
-    }
-    
-    if opt.StartPwr == 0 {
-        opt.StartPwr = 1
-    }
-    
-    if opt.StartCpx == 0 {
-        opt.StartCpx = 1
-    }
-    
-    return nil
 }
 
 var rasmph_pwr24 = Gamma.Must("rasmph_pwr24")
 
-func (ifg *IFG) Raster(mli string, opt IfgPlotOpt) error {
+func (ifg IFG) Raster(opt RasArgs) error {
     err := opt.Parse(ifg)
     
     if err != nil {
         return Handle(err, "failed to parse IFG raster arguments")
     }
     
-    cc := opt.CC
+    cc := opt.Coh
     
-    if cc == nil {
-        _, err := rasmph_pwr24(opt.Datfile, mli, opt.Rng, opt.StartCpx,
+    if len(cc) == 0 {
+        _, err := rasmph_pwr24(opt.Datfile, opt.Sec, opt.Rng, opt.StartCpx,
                                opt.StartPwr, opt.Nlines, opt.Avg.Rng,
                                opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
                                opt.Raster)
@@ -301,10 +230,10 @@ func (ifg *IFG) Raster(mli string, opt IfgPlotOpt) error {
         }
     } else {
         
-        _, err := rasmph_pwr24(opt.Datfile, mli, opt.Rng, opt.StartCpx,
+        _, err := rasmph_pwr24(opt.Datfile, opt.Sec, opt.Rng, opt.StartCpx,
                                opt.StartPwr, opt.Nlines, opt.Avg.Rng,
                                opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
-                               opt.Raster, *cc, opt.StartCC, opt.Min)
+                               opt.Raster, cc, opt.StartCC, opt.Min)
         if err != nil {
             return Handle(err, "failed to create raster for interferogram '%s'",
                 ifg.Dat)
@@ -314,20 +243,24 @@ func (ifg *IFG) Raster(mli string, opt IfgPlotOpt) error {
     return nil
 }
 
-func (ifg *IFG) Rng() (int, error) {
+func (ifg IFG) rng() (int, error) {
     return ifg.Int("interferogram_width", 0)
 }
 
-func (ifg *IFG) Azi() (int, error) {
+func (ifg IFG) azi() (int, error) {
     return ifg.Int("interferogram_azimuth_lines", 0)
 }
 
-func (ifg *IFG) ImageFormat() (string, error) {
+/*
+ * TODO: remove?
+func (ifg IFG) imgfmt() (string, error) {
     return "FCOMPLEX", nil
 }
+*/
 
-func (self *IFG) CheckQuality() (ret bool, err error) {
-    qual := self.quality
+
+func (self IFG) CheckQuality() (ret bool, err error) {
+    qual := self.Quality
     
     file, err := os.Open(qual)
     
@@ -377,7 +310,7 @@ func (self *IFG) CheckQuality() (ret bool, err error) {
     return ret, nil
 }
 
-func (self *IFG) AdaptFilt(opt AdaptFiltOpt) (ret IFG, cc Coherence, err error) {
+func (self IFG) AdaptFilt(opt AdaptFiltOpt) (ret IFG, cc Coherence, err error) {
     step := float64(opt.FFTWindow) / 8.0
     
     if opt.step > 0.0 {
@@ -407,12 +340,7 @@ func (self *IFG) AdaptFilt(opt AdaptFiltOpt) (ret IFG, cc Coherence, err error) 
         cc = self.datfile + ".cc"
     */
     
-    rng, err := self.Rng()
-    
-    if err != nil {
-        err = Handle(err, "failed to retreive range samples")
-        return
-    }
+    rng := self.Rng
     
     _, err = adf(self.Dat, ret.Dat, cc.Dat, rng, opt.alpha, opt.FFTWindow,
                  opt.cohWindow, step, opt.offset.Azi, opt.offset.Rng,
@@ -426,19 +354,13 @@ func (self *IFG) AdaptFilt(opt AdaptFiltOpt) (ret IFG, cc Coherence, err error) 
     return ret, cc, nil
 }
 
-func (self *IFG) Coherence(opt CoherenceOpt) (ret Coherence, err error) {
+func (self IFG) Coherence(opt CoherenceOpt) (ret Coherence, err error) {
     weightFlag := CoherenceWeight[opt.WeightType]
-    var width int
     
     //log.info("CALCULATING COHERENCE AND CREATING QUICKLOOK IMAGES.")
     //log.info('Weight type is "%s"'.format(weight_type))
     
-    width, err = self.Rng()
-    
-    if err != nil {
-        err = Handle(err, "failed to retreive range samples")
-        return
-    }
+    width := self.Rng
     
     log.Printf("Estimating phase slope. ")
     
@@ -469,9 +391,10 @@ func (self *IFG) Coherence(opt CoherenceOpt) (ret Coherence, err error) {
     return ret, nil
 }
 
+/*
 var rascc = Gamma.Must("rascc")
 
-func (c *Coherence) Raster(mli *MLI, opt IfgPlotOpt) error {
+func (c Coherence) Raster(mli *MLI, opt IfgPlotOpt) error {
     err := opt.RasArgs.Parse(c)
     
     if err != nil {
@@ -485,6 +408,7 @@ func (c *Coherence) Raster(mli *MLI, opt IfgPlotOpt) error {
     
     return err
 }
+*/
 
 /*
 def raster(self, start_cpx=1, start_pwr=1, start_cc=1, cc_min=0.2,

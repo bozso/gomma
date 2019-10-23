@@ -6,11 +6,13 @@ import (
     "fmt"
     "os"
     fp "path/filepath"
-    str "strings"
+    //ref "reflect"
+    //str "strings"
 )
 
 type (
     Cmd func(Args) error
+    JSONMap map[string]interface{}
     
     Process struct {
         Conf        string `name:"conf" default:"gamma.conf"`
@@ -23,34 +25,10 @@ type (
         Show        bool   `name:"show"`
         Config
     }
+)
 
-    Batcher struct {
-        Mode     string `pos:"0"`
-        Infile   string `pos:"1"`
-        Conf     string `name:"conf" default:"gamma.conf"`
-        OutDir   string `name:"out" default:"."`
-        Filetype string `name:"ftype" default:""`
-        Mli      string `name:"mli" default:""`
-        IfgPlotOpt
-        Config
-    }
-
-    Displayer struct {
-        Mode string `pos:"0"`
-        Dat  string `pos:"1"`
-        Par  string `name:"par" default:""`
-        Sec  string `name:"sec" default:""`
-        RasArgs
-    }
-    
-    Coder struct {
-        infile   string `pos:"0"`
-        outfile  string `name:"out" default:""`
-        metafile string `name:"meta" default:"geocode.json"`
-        mode     string `name:"mode" default:""`
-        GeoMeta
-        CodeOpt
-    }
+const (
+    parseErr = "failed to parse command line arguments"
 )
 
 var (
@@ -59,6 +37,7 @@ var (
         "proc": process,
         "init": initGamma,
         "batch": batch,
+        "move": move,
     }
     
     CommandsAvailable = MapKeys(Commands)
@@ -68,7 +47,7 @@ func process(args Args) (err error) {
     proc := Process{}
     
     if err = args.ParseStruct(&proc); err != nil {
-        err = Handle(err, "failed to parse command line arguments")
+        err = Handle(err, parseErr)
         return
     }
     
@@ -178,11 +157,24 @@ func initGamma(args Args) (err error) {
     return
 }
 
+type(
+    Batcher struct {
+        Mode     string `pos:"0"`
+        Infile   string `pos:"1"`
+        Conf     string `name:"conf" default:"gamma.conf"`
+        OutDir   string `name:"out" default:"."`
+        Filetype string `name:"ftype" default:""`
+        Mli      string `name:"mli" default:""`
+        RasArgs
+        Config
+    }
+)
+
 func batch(args Args) (err error) {
     batch := Batcher{}
     
     if err = args.ParseStruct(&batch); err != nil {
-        err = Handle(err, "failed to parse command line arguments")
+        err = Handle(err, parseErr)
         return
     }
 
@@ -310,44 +302,122 @@ func (b Batcher) MLI() error {
     return nil
 }
 
-
 func (b Batcher) Raster() error {
     path := b.Infile
+    opt := b.RasArgs
+    
     file, err := NewReader(path)
-
     if err != nil {
         return Handle(err, "failed to create FileReader '%s'!", path)
     }
-
     defer file.Close()
     
-    switch b.Filetype {
-    case "mli", "MLI":
-        err := b.PlotMLIs(&file)
+    for file.Scan() {
+        line := file.Text()
         
-        if err != nil {
-            return Handle(err, "plotting of MLI datafiles failed")
+        if len(line) == 0 {
+            continue
         }
-    case "slc", "SLC":
-        err := b.PlotSLCs(&file)
         
-        if err != nil {
-            return Handle(err, "plotting of SLC datafiles failed")
+        var data DataFile
+        if data, err = LoadDataFile(line); err != nil {
+            return Handle(err, "failed to load datafile from '%s'", line)
         }
-    case "ifg", "IFG":
-        err := b.PlotIFGs(&file)
         
-        if err != nil {
-            return Handle(err, "plotting of IFG datafiles failed")
+        if err = data.Raster(opt); err != nil {
+            return Handle(err, "failed to create raster file for '%s'", line)
         }
-    default:
-        return fmt.Errorf("unrecognized filetype '%s'", b.Filetype) 
+    }
+    
+    return nil
+}
+
+type(
+    Mover struct {
+        OutDir   string `name:"out" default:"."`
+        MetaFile string `pos:"0"`
+    }
+)
+
+func move(args Args) (err error) {
+    m := Mover{}
+    
+    if err = args.ParseStruct(&m); err != nil {
+        err = Handle(err, parseErr)
+        return
+    }
+    
+    path := m.MetaFile
+    
+    dat, err := LoadDataFile(path)
+    if err != nil {
+        err = Handle(err, "failed to parse json metadatafile '%s'", path)
+        return
+    }
+    
+    log.Fatalf("%s\n", dat.TypeStr())
+    
+    out := m.OutDir
+    
+    if dat, err = dat.Move(out); err != nil {
+        err = Handle(err, "failed to move datafile to '%s", out)
+        return
+    }
+    
+    if path, err = Move(path, out); err != nil {
+        err = Handle(err, "failed to move json metafile to '%s'", out)
+        return
+    }
+    
+    fmt.Printf("Datafile after move: %#v\n", dat)
+    
+    if err = SaveJson(path, dat); err != nil {
+        err = Handle(err, "failed to refresh json metafile")
+        return
     }
     
     return nil
 }
 
 /*
+type Creater struct {
+    MetaFile string `pos:"0"`
+    dataFile
+}
+
+func create(args Args) (err error) {
+    c := Creater{}
+    
+    if err = args.ParseStruct(&c); err != nil {
+        err = Handle(err, parseErr)
+        return
+    }
+    
+    dat := c.Dat
+    
+    if len(dat) == 0 {
+        if dat, err = TmpFile(); err != nil {
+            err = Handle(err, "failed to create temporary file")
+            return
+        }
+    }
+    
+    return nil
+}
+*/
+
+/*
+
+type(
+    Displayer struct {
+        Mode string `pos:"0"`
+        Dat  string `pos:"1"`
+        Par  string `name:"par" default:""`
+        Sec  string `name:"sec" default:""`
+        RasArgs
+    }
+)
+
 func NewDisplayer(args []string) (ret Displayer, err error) {
     flag := fl.NewFlagSet("display", fl.ContinueOnError)
 
@@ -423,6 +493,16 @@ func (dis *Displayer) Plot() error {
     return nil
 }
 
+type(
+    Coder struct {
+        infile   string `pos:"0"`
+        outfile  string `name:"out" default:""`
+        metafile string `name:"meta" default:"geocode.json"`
+        mode     string `name:"mode" default:""`
+        GeoMeta
+        CodeOpt
+    }
+)
 
 func NewCoder(args []string) (ret Coder, err error) {
     flag := fl.NewFlagSet("coding", fl.ContinueOnError)
@@ -504,109 +584,101 @@ var PlotCmdFiles = map[string]Slice{
     "hgt": Slice{"hgt", "rdc"},
 }
 
-func (b *Batcher) PlotMLIs(file *FileReader) error {
-    opt := b.IfgPlotOpt.RasArgs
+func LoadDataFile(path string) (ret DataFile, err error) {
     
-    for file.Scan() {
-        line := file.Text()
-        
-        if len(line) == 0 {
-            continue
+    data, err := ReadFile(path)
+    if err != nil {
+        err = Handle(err, "failed to read file '%s'", path)
+        return
+    }
+    
+    m := make(JSONMap)
+    
+    if err = json.Unmarshal(data, &m); err != nil {
+        err = Handle(err, "failed to parse json data %s'", data)
+        return
+    }
+    
+    t, ok := m["type"]
+    if !ok {
+        err = Handle(nil, "failed to retreive filetype from '%s'", path)
+        return
+    }
+    
+    var dat, par, quality, diffPar, simUnwrap string
+    
+    switch t {
+    case "SLC", "slc", "MLI", "mli":
+        if dat, err = m.String("datafile"); err != nil {
+            err = Handle(err, "failed to retreive datafile")
+            return
         }
         
-        split := str.Fields(line)
-        
-        log.Printf("Processing: %s\n", line)
-        
-        mli, err := NewMLI(split[0], split[1])
-        
-        if err != nil {
-            return Handle(err, "failed to parse MLI file from line '%s'", line)
+        if par, err = m.String("paramfile"); err != nil {
+            err = Handle(err, "failed to retreive paramfile")
+            return
         }
+        
+        switch t {
+        case "IFG", "ifg":
+            if quality, err = m.String("quality"); err != nil {
+                err = Handle(err, "failed to retreive quality file")
+                return
+            }
             
-        err = mli.Raster(opt)
-        
-        if err != nil {
-            return Handle(err, "failed to create raster for '%s'", line)
+            if diffPar, err = m.String("diffparfile"); err != nil {
+                err = Handle(err, "failed to diffparfile")
+                return
+            }
+            
+            if simUnwrap, err = m.String("simulated_unwrapped"); err != nil {
+                err = Handle(err, "failed to simulated unwrapped datafile")
+                return
+            }
         }
     }
-    return nil
+    
+    switch t {
+    case "SLC", "slc":
+        if ret, err = NewSLC(dat, par); err != nil {
+            err = Handle(err, "failed to create SLC struct")
+            return
+        }
+    case "MLI", "mli":
+        if ret, err = NewMLI(dat, par); err != nil {
+            err = Handle(err, "failed to create MLI struct")
+            return
+        }
+    case "IFG", "ifg":
+        ret, err = NewIFG(dat, par, simUnwrap, diffPar, quality)
+        if err != nil {
+            err = Handle(err, "failed to create IFG struct")
+            return
+        }
+    default:
+        err = Handle(nil, "unrecognized filetype '%s'", t)
+        return
+    }
+    
+    return ret, nil
 }
 
-func (b *Batcher) PlotSLCs(file *FileReader) error {
-    opt := b.IfgPlotOpt.RasArgs
-    
-    for file.Scan() {
-        line := file.Text()
-        
-        if len(line) == 0 {
-            continue
-        }
-        
-        split := str.Fields(line)
-        
-        log.Printf("Processing: %s\n", line)
-        
-        slc, err := NewSLC(split[0], split[1])
-        
-        if err != nil {
-            return Handle(err, "failed to parse SLC file from line '%s'", line)
-        }
-            
-        err = slc.Raster(opt)
-        
-        if err != nil {
-            return Handle(err, "failed to create raster for '%s'", line)
-        }
-    }
-    return nil
-}
 
-func (b *Batcher) PlotIFGs(file *FileReader) error {
-    opt := b.IfgPlotOpt
-    mli := b.Mli
+func (m JSONMap) String(name string) (ret string, err error) {
+    tmp, ok := m[name]
     
-    for file.Scan() {
-        line := file.Text()
-        
-        if len(line) == 0 {
-            continue
-        }
-        
-        split := str.Fields(line)
-        
-        log.Printf("Processing: %s\n", line)
-        
-        dat := split[0]
-        par, diffPar, simUnwrap, quality := "", "", "", ""
-        
-        if len(split) > 2 {
-            par = split[1]
-        }
-        
-        if len(split) > 3 {
-            simUnwrap = split[2]
-        }
-        
-        if len(split) > 4 {
-            diffPar = split[3]
-        }
-        
-        if len(split) > 5 {
-            quality = split[4]
-        }
-        
-        ifg, err := NewIFG(dat, par, simUnwrap, diffPar, quality)
-        
-        if err != nil {
-            return Handle(err, "failed to parse IFG file from line '%s'", line)
-        }
-            
-        err = ifg.Raster(mli, opt)
-        
-        if err != nil {
-            return Handle(err, "failed to create raster for '%s'", line)
-        }
+    if !ok {
+        err = Handle(nil, "key '%s' is not present in map '%s'", name, m)
+        return
     }
-    return nil
+    
+    ret, ok = tmp.(string)
+    
+    if !ok {
+        err = Handle(nil, "unexpected type %T for '%s', expected string",
+            tmp, name)
+        return
+    }
+    
+    return ret, nil
 }

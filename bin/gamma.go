@@ -9,24 +9,6 @@ import (
 
 var commands = []string{"proc", "list", "init", "batch", "ras", "dis", "iono"}
 
-const (
-    parseErr = "failed to parse command line arguments: %s\n"
-)
-
-type (
-    Embed struct {
-        Emb int `name:"emb" default:"3"`
-    }
-    
-    Tester struct {
-        Pos  int    `pos:"0"`
-        Opts string `name:"opts" default:"asd"`
-        Opti int    `name:"opti" default:"1"`
-        Flag bool   `name:"flag"`
-        Embed
-    }
-)
-
 func main() {
     defer gm.RemoveTmp()
     

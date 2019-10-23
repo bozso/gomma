@@ -27,8 +27,8 @@ type (
     }
     
     RngAzi struct {
-        Rng int `name:"rng" default:"1"`
-        Azi int `name:"azi" default:"1"`
+        Rng int `json:"rng" name:"rng" default:"1"`
+        Azi int `json:"azi" name:"azi" default:"1"`
     }
     
     GeneralOpt struct {
@@ -95,7 +95,7 @@ var (
         "select": stepSelect,
         "import": stepImport,
         "geo": stepGeocode,
-        "check_geo": stepCheckGeo,
+        //"check_geo": stepCheckGeo,
         "coreg":  stepCoreg,
     }
 

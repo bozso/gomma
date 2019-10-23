@@ -23,8 +23,8 @@ type (
     }
 
     Params struct {
-        Par string `name:"par" default:""`
-        Sep string `name:"sep" default:":"`
+        Par string `json:"paramfile" name:"par"`
+        Sep string `json:"separator" name:"sep" default:":"`
         contents []string
     }
 

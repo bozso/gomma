@@ -16,11 +16,16 @@ type (
     }
     
     CodeOpt struct {
-        inWidth, outWidth, nlines, npoints int
+        inWidth int
+        outWidth int
+        nlines int
+        npoints int
         dtype string
-        oversamp, maxRad float64
+        oversamp float64
+        maxRad float64
         interpolMode InterpolationMode
-        flipInput, flipOutput bool
+        flipInput bool
+        flipOutput bool
         order int
     }
     
@@ -41,8 +46,6 @@ type (
     
     GeoPlotOpt struct {
         RasArgs
-        StartHgt, StartPwr int
-        Cycle float64
     }
     
     GeoMeta struct {
@@ -98,24 +101,33 @@ const (
     Inter
 )
 
+// TODO: check datatype
 func NewDEM(dat, par, lookup, lookupOld string) (ret DEM, err error) {
-    ret.dataFile, err = NewDataFile(dat, par, "par")
+    if ret.dataFile, err = Newdatafile(dat, par); err != nil {
+        err = Handle(err, "failed to create DEM struct")
+        return
+    }
     
-    if err != nil {
+    if ret.Rng, err = ret.rng(); err != nil {
+        err = Handle(err, "failed to retreive range samples from '%s'", par)
+        return
+    }
+    
+    if ret.Azi, err = ret.azi(); err != nil {
+        err = Handle(err, "failed to retreive azimuth lines from '%s'", par)
         return
     }
     
     ret.Lookup, ret.LookupOld = lookup, lookupOld
-    ret.files = []string{dat, par, lookup, lookupOld}
 
     return ret, nil    
 }
 
-func (dem DEM) Rng() (int, error) {
+func (dem DEM) rng() (int, error) {
     return dem.Int("width", 0)
 }
 
-func (dem DEM) Azi() (int, error) {
+func (dem DEM) azi() (int, error) {
     return dem.Int("nlines", 0)
 }
 
@@ -221,7 +233,7 @@ func (dem *DEM) geo2radar(infile, outfile string, opt CodeOpt) error {
 
 var r2g = Gamma.Must("geocode_back")
 
-func (dem *DEM) radar2geo(infile, outfile string, opt CodeOpt) error {
+func (dem DEM) radar2geo(infile, outfile string, opt CodeOpt) error {
     lrIn, lrOut, err := opt.Parse()
     
     if err != nil {
@@ -337,8 +349,17 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
     return ret, nil
 }
 
-func (d *DEM) Raster(mode DEMPlot, opt RasArgs) error {
+func (d DEM) Raster(opt RasArgs) error {
+    opt.DisArgs.Datfile = d.Dat
+    opt.ImgFmt = "FLOAT"
     
+    err := opt.Parse(d)
+    
+    if err != nil {
+        return Handle(err, "failed to parse raster options")
+    }
+    
+    /*
     switch mode {
     case Lookup:
         opt.DisArgs.Datfile = d.Lookup
@@ -352,17 +373,10 @@ func (d *DEM) Raster(mode DEMPlot, opt RasArgs) error {
         
         return rasmph(opt)
     case Dem:
-        opt.DisArgs.Datfile = d.Dat
-        opt.ImgFmt = "FLOAT"
-        
-        err := opt.Parse(d)
-        
-        if err != nil {
-            return Handle(err, "failed to parse raster options")
-        }
     default:
         return Handle(nil, "unrecognized plot mode")
     }
+    */
     
     return nil
 }
@@ -388,24 +402,20 @@ func (opt *GeoPlotOpt) Parse(d DataFile) error {
         opt.StartHgt = 1
     }
     
-    if opt.Cycle == 0 {
-        opt.Cycle = 160.0
-    }
     
     return nil
 }
 
 var rashgt = Gamma.Must("rashgt")
 
-func (geo *Geocode) Raster(opt GeoPlotOpt) error {
-    opt.RasArgs.Raster = fmt.Sprintf("%s.%s", geo.Hgt, Settings.RasExt)
+func (geo Geocode) Raster(opt RasArgs) error {
+    opt.Raster = fmt.Sprintf("%s.%s", geo.Hgt, Settings.RasExt)
     
     err := opt.Parse(geo)
     
     if err != nil {
         return Handle(err, "failed to parse plot arguments")
     }
-    
     
     _, err = rashgt(geo.Hgt, geo.MLI.Dat, opt.Rng, opt.StartHgt, opt.StartPwr,
                     opt.Nlines, opt.Avg.Rng, opt.Avg.Azi, opt.Cycle, opt.Scale,
@@ -494,16 +504,7 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
         log.Println("DEM already imported.")
     }
     
-    mra := RngAzi{}
-    
-    mra.Rng, err = mli.Rng()
-    
-    if err != nil {
-        err = Handle(err, "failed to retreive reference mli range samples")
-        return
-    }
-    
-    mra.Azi, err = mli.Azi()
+    mra := mli.RngAzi
     
     if err != nil {
         err = Handle(err, "failed to retreive reference mli azimuth lines")
@@ -609,21 +610,7 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
         log.Println("Initial lookup table already created.")
     }
     
-    dra := RngAzi{}
-    
-    dra.Rng, err = dem.Rng()
-    
-    if err != nil {
-        err = Handle(err, "failed to retreive DEM range samples")
-        return
-    }
-    
-    dra.Azi, err = dem.Azi()
-    
-    if err != nil {
-        err = Handle(err, "failed to retreive DEM azimuth lines")
-        return
-    }
+    dra := dem.RngAzi
     
     _, err = pixelArea(mli.Par, dem.Par, dem.Dat, dem.Lookup, geo.LsMap,
                        geo.Inc, geo.Sigma0, geo.Gamma0, g.AreaFactor)
