@@ -1,6 +1,7 @@
 package gamma
 
 import (
+    "errors"
     "fmt"
     "log"
     "os"
@@ -468,3 +469,28 @@ func RemoveTmp() {
         }
     }
 }
+
+type werror struct {
+    Err error
+}
+
+func NewError(format string, args ...interface{}) werror {
+    return errors.New(fmt.Sprintf(format, args))
+}
+
+func (e werror) Wrap(err error) error {
+    return fmt.Errorf("%w: %w", e, err)
+}
+
+
+/*
+func (e *werror) Wrap(err error, format string, args ...interface{}) {
+    str := fmt.Sprintf(format, args...)
+
+    if err == nil {
+        return fmt.Errorf("%s: %w", str, e)
+    } else {
+        return fmt.Errorf("%s: %w: %w", str, err, e)
+    }
+}
+*/

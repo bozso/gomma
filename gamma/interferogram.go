@@ -67,8 +67,6 @@ var (
         "constant": 0,
         "gaussian": 1,
     }
-    
-    IFGType = "IFG"
 )
 
 // TODO: check datatype of coherence file
@@ -114,6 +112,10 @@ func NewIFG(dat, par, simUnw, diffPar, quality string) (ret IFG, err error) {
     ret.Dtype = FloatCpx
     
     return ret, nil
+}
+
+func (i IFG) TypeStr() string {
+    return "IFG"
 }
     
 func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ret IFG, err error) {
@@ -175,7 +177,7 @@ func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ret IFG, err error) {
 
 var cpxToReal = Gamma.Must("cpx_to_real")
 
-func (ifg IFG) ToReal(out string, mode CpxToReal) (ret dataFile, err error) {
+func (ifg IFG) ToReal(mode CpxToReal) (ret dataFile, err error) {
     if ret, err = TmpDataFile(); err != nil {
         err = Handle(err, "failed to create temporary datafile")
         return
@@ -211,9 +213,7 @@ func (ifg IFG) ToReal(out string, mode CpxToReal) (ret dataFile, err error) {
 var rasmph_pwr24 = Gamma.Must("rasmph_pwr24")
 
 func (ifg IFG) Raster(opt RasArgs) error {
-    err := opt.Parse(ifg)
-    
-    if err != nil {
+    if err := opt.Parse(ifg); err != nil {
         return Handle(err, "failed to parse IFG raster arguments")
     }
     

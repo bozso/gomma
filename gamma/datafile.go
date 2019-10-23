@@ -44,6 +44,11 @@ type (
     }
 )
 
+var (
+    RngError = NewError("failed to retreive range samples")
+    AziError = NewError("failed to retreive azimuth lines")
+)
+
 const (
     Float DType = iota
     Double
@@ -114,7 +119,8 @@ func NewDataFile(dat, par string, dt DType) (ret dataFile, err error) {
     }
     
     if ret.Rng, err = ret.rng(); err != nil {
-        err = Handle(err, "failed to retreive range samples from '%s'", par)
+        err = RngError.Wrap(err)
+        //err = Handle(err, "failed to retreive range samples from '%s'", par)
         return
     }
     

@@ -7,8 +7,6 @@ import (
     gm "../gamma"
 )
 
-var commands = []string{"proc", "list", "init", "batch", "ras", "dis", "iono"}
-
 func main() {
     defer gm.RemoveTmp()
     
