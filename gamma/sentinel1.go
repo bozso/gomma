@@ -71,7 +71,6 @@ type (
     IWs [maxIW]S1IW
 
     S1SLC struct {
-        ftype *string
         nIW int
         Tab string
         time.Time
@@ -137,7 +136,8 @@ func NewS1Zip(zipPath, root string) (ret *S1Zip, err error) {
         err = os.MkdirAll(path, os.ModePerm)
         
         if err != nil {
-            err = Handle(err, "failed to create directory '%s'", path)
+            err = DirCreateErr.Wrap(err, path)
+            //err = Handle(err, "failed to create directory '%s'", path)
             return
         }
     }
@@ -205,13 +205,18 @@ func NewIW(dat, par, TOPS_par string) (ret S1IW, err error) {
     return ret, nil
 }
 
+const (
+    ParseTabErr Werror = "failed to parse tabfile '%s'"
+)
+
 func FromTabfile(tab string) (ret S1SLC, err error) {
     fmt.Printf("Parsing tabfile: '%s'.\n", tab)
     
     file, err := NewReader(tab)
     
     if err != nil {
-        err = Handle(err, "failed to open file '%s' for reading", tab)
+        err = FileOpenErr.Wrap(err, tab)
+        //err = Handle(err, "failed to open file '%s' for reading", tab)
         return
     }
     
@@ -244,9 +249,11 @@ func FromTabfile(tab string) (ret S1SLC, err error) {
         return
     }
     
-    ret.ftype = &S1SLCType
-    
     return ret, nil
+}
+
+func (s1 S1SLC) TypeStr() string {
+    return "S1SLC"
 }
 
 func (s1 *S1SLC) Exist() (ret bool, err error) {
@@ -273,7 +280,8 @@ func (iw *S1IW) Move(dir string) error {
     err := os.Rename(slc, dst)
 
     if err != nil {
-        return Handle(err, "failed to move file '%s' to '%s'", slc, dst)
+        return MoveErr.Wrap(err, slc, dst)
+        //return Handle(err, "failed to move file '%s' to '%s'", slc, dst)
     }
     
     iw.dataFile.Dat = dst
@@ -282,7 +290,8 @@ func (iw *S1IW) Move(dir string) error {
     err = os.Rename(par, dst)
 
     if err != nil {
-        return Handle(err, "failed to move file '%s' to '%s'", par, dst)
+        return MoveErr.Wrap(err, par, dst)
+        //return Handle(err, "failed to move file '%s' to '%s'", par, dst)
     }
     
     iw.dataFile.Params.Par = dst
@@ -291,7 +300,8 @@ func (iw *S1IW) Move(dir string) error {
     err = os.Rename(TOPS_par, dst)
 
     if err != nil {
-        return Handle(err, "failed to move file '%s' to '%s'", TOPS_par, dst)
+        return MoveErr.Wrap(err, TOPS_par, dst)
+        //return Handle(err, "failed to move file '%s' to '%s'", TOPS_par, dst)
     }
     
     iw.TOPS_par.Par = dst
@@ -305,7 +315,8 @@ func (s1 *S1SLC) Move(dir string) error {
     file, err := os.Create(newtab)
     
     if err != nil {
-        return Handle(err, "failed to open file '%s'", newtab)
+        return FileOpenErr.Wrap(err, newtab)
+        //return Handle(err, "failed to open file '%s'", newtab)
     }
     
     defer file.Close()
@@ -316,7 +327,8 @@ func (s1 *S1SLC) Move(dir string) error {
         err := IW.Move(dir)
         
         if err != nil {
-            return Handle(err, "failed to move IW%d for S1SLC '%s'", ii + 1, s1.Tab)
+            return err
+            //return Handle(err, "failed to move IW%d for S1SLC '%s'", ii + 1, s1.Tab)
         }
         
         line := fmt.Sprintf("%s %s %s\n", IW.Dat, IW.Par, IW.TOPS_par.Par)
@@ -324,7 +336,8 @@ func (s1 *S1SLC) Move(dir string) error {
         _, err = file.WriteString(line)
         
         if err != nil {
-            return Handle(err, "failed to write to file_'%s'", newtab)
+            return FileWriteErr.Wrap(err, newtab)
+            //return Handle(err, "failed to write to file_'%s'", newtab)
         }
     }
     
@@ -358,12 +371,13 @@ func (s1 *S1SLC) Mosaic(opts MosaicOpts) (ret SLC, err error) {
     tmp := ""
     
     if tmp, err = TmpFileExt("slc"); err != nil {
-        err = Handle(err, "failed to create tmp file")
-        return
+        //err = Handle(err, "failed to create tmp file")
+        return ret, err
     }
     
     if ret, err = NewSLC(tmp, ""); err != nil {
-        err = Handle(err, "failed to create SLC struct")
+        err = DataCreateErr.Wrap(err, "SLC")
+        //err = Handle(err, "failed to create SLC struct")
         return
     }
     
@@ -463,21 +477,21 @@ func iwInfo(path string) (ret IWInfo, err error) {
     par, err := TmpFile()
 
     if err != nil {
-        err = Handle(err, "Failed to create tmp file!")
-        return
+        //err = Handle(err, "Failed to create tmp file!")
+        return ret, err
     }
 
     TOPS_par, err := TmpFile()
 
     if err != nil {
-        err = Handle(err, "Failed to create tmp file!")
-        return
+        //err = Handle(err, "Failed to create tmp file!")
+        return ret, err
     }
 
     _, err = Gamma["par_S1_SLC"](nil, path, nil, nil, par, nil, TOPS_par)
 
     if err != nil {
-        err = Handle(err, "Could not import parameter files from '%s'!",
+        err = Handle(err, "failed to import parameter files from '%s'",
             path)
         return
     }
@@ -485,7 +499,7 @@ func iwInfo(path string) (ret IWInfo, err error) {
     _info, err := burstCorners(par, TOPS_par)
 
     if err != nil {
-        err = Handle(err, "Failed to parse parameter files!")
+        err = Handle(err, "failed to parse parameter files")
         return
     }
 
@@ -496,7 +510,7 @@ func iwInfo(path string) (ret IWInfo, err error) {
     nburst, err := TOPS.Int("number_of_bursts", 0)
 
     if err != nil {
-        err = Handle(err, "Could not retreive number of bursts!")
+        err = Handle(err, "failed to retreive number of bursts")
         return
     }
 
@@ -508,7 +522,7 @@ func iwInfo(path string) (ret IWInfo, err error) {
         numbers[ii-1], err = TOPS.Float(tpl, 0)
 
         if err != nil {
-            err = Handle(err, "Could not get burst number: '%s'", tpl)
+            err = Handle(err, "failed to get burst number: '%s'", tpl)
             return
         }
     }
@@ -516,14 +530,14 @@ func iwInfo(path string) (ret IWInfo, err error) {
     max, err := makePoint(info, true)
 
     if err != nil {
-        err = Handle(err, "Could not create max latlon point!")
+        err = Handle(err, "failed to create max latlon point")
         return
     }
 
     min, err := makePoint(info, false)
 
     if err != nil {
-        err = Handle(err, "Could not create min latlon point!")
+        err = Handle(err, "failed to create min latlon point")
         return
     }
 
@@ -574,9 +588,9 @@ func IWAbsDiff(one, two IWInfos) (float64, error) {
         nburst1, nburst2 := one[ii].nburst, two[ii].nburst
         if nburst1 != nburst2 {
             return 0.0, fmt.Errorf(
-                "In: IWInfos.AbsDiff: number of burst in first SLC IW%d (%d) "+
-                    "is not equal to the number of burst in the second SLC IW%d (%d)",
-                ii+1, nburst1, ii+1, nburst2)
+                "number of burst in first SLC IW%d (%d) is not equal to " + 
+                "the number of burst in the second SLC IW%d (%d)",
+                ii + 1, nburst1, ii + 1, nburst2)
         }
 
         for jj := 0; jj < nburst1; jj++ {
@@ -619,7 +633,7 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
     }
 
     if !exist {
-        err = Handle(err, "tabfile '%s' does not exist!", tab)
+        err = Handle(err, "tabfile '%s' does not exist", tab)
         return
     }
 
@@ -628,12 +642,13 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
         ret.IWs[ii-1], err = NewIW(dat, par, TOPS_par)
 
         if err != nil {
-            err = Handle(err, "Could not create new IW!")
+            err = DataCreateErr.Wrap(err, "IW")
+            //err = Handle(err, "Could not create new IW!")
             return
         }
     }
 
-    ret.Tab, ret.ftype = tab, &S1SLCType 
+    ret.Tab, ret.nIW = tab, 3
 
     return ret, nil
 }
@@ -644,7 +659,8 @@ func (s1 *S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
     file, err := os.Create(tab)
 
     if err != nil {
-        err = Handle(err, "failed to create file '%s'!", tab)
+        err = FileCreateErr.Wrap(err, tab)
+        //err = Handle(err, "failed to create file '%s'!", tab)
         return
     }
     
@@ -660,7 +676,8 @@ func (s1 *S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
         ret.IWs[ii], err = NewIW(dat, par, TOPS_par)
 
         if err != nil {
-            err = Handle(err, "failed to create new IW")
+            err = DataCreateErr.Wrap(err, "IW")
+            //err = Handle(err, "failed to create new IW")
             return
         }
         
@@ -669,13 +686,14 @@ func (s1 *S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
         _, err = file.WriteString(line)
 
         if err != nil {
-            err = Handle(err, "failed to write line '%s' to file '%s'",
-                line, tab)
+            err = FileWriteErr.Wrap(err, tab)
+            //err = Handle(err, "failed to write line '%s' to file '%s'",
+                //line, tab)
             return
         }
     }
 
-    ret.Tab, ret.nIW, ret.ftype = tab, s1.nIW, &S1SLCType
+    ret.Tab, ret.nIW = tab, s1.nIW
 
     return ret, nil
 }
@@ -695,7 +713,8 @@ func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
                      wflag, opt.refTab)
     
     if err != nil {
-        return Handle(err, "failed to create MLI file '%s'", mli.Dat)
+        return DataCreateErr.Wrap(err, "MLI")
+        //return Handle(err, "failed to create MLI file '%s'", mli.Dat)
     }
     
     return nil
@@ -710,13 +729,15 @@ func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
     ret, err = NewMLI(dat, par)
     
     if err != nil {
-        err = Handle(err, "failed to create MLI struct")
+        err = DataCreateErr.Wrap(err, "MLI")
+        //err = Handle(err, "failed to create MLI struct")
         return
     }
     
     exist, err := ret.Exist()
     
     if err != nil {
+        //err = FileExistErr.Wrap(err, 
         err = Handle(err, "failed to check whether MLI exists")
         return
     }
@@ -728,15 +749,16 @@ func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
     slc, err := s1.SLC(pol)
     
     if err != nil {
-        err = Handle(err, "failed to create S1SLC struct")
+        err = DataCreateErr.Wrap(err, "S1SLC")
+        //err = Handle(err, "failed to create S1SLC struct")
         return
     }
     
     err = slc.MLI(&ret, opt)
     
     if err != nil {
-        err = Handle(err, "failed to check create MLI file")
-        return
+        //err = Handle(err, "failed to check create MLI file")
+        return ret, err
     }
     
     return ret, nil
@@ -745,6 +767,10 @@ func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
 func (s1 *S1Zip) tabName(mode, pol string) string {
     return fp.Join(s1.Root, mode, fmt.Sprintf("%s.tab", pol))
 }
+
+const (
+    ExtractErr Werror = "failed to extract %s file from '%s'"
+)
 
 func (s1 *S1Zip) ImportSLC(exto *ExtractOpt) (err error) {
     var _annot, _calib, _tiff, _noise string
@@ -763,7 +789,8 @@ func (s1 *S1Zip) ImportSLC(exto *ExtractOpt) (err error) {
     file, err := os.Create(tab)
 
     if err != nil {
-        err = Handle(err, "failed to open file '%s'", tab)
+        err = FileOpenErr.Wrap(err, tab)
+        //err = Handle(err, "failed to open file '%s'", tab)
         return
     }
 
@@ -773,32 +800,36 @@ func (s1 *S1Zip) ImportSLC(exto *ExtractOpt) (err error) {
         _annot, err = ext.extract(annot, ii)
 
         if err != nil {
-            err = Handle(err, "failed to extract annotation file from '%s'",
-                path)
+            err = ExtractErr.Wrap(err, "annotation", path)
+            //err = Handle(err, "failed to extract annotation file from '%s'",
+                //path)
             return
         }
 
         _calib, err = ext.extract(calib, ii)
 
         if err != nil {
-            err = Handle(err, "failed to extract calibration file from '%s'",
-                path)
+            err = ExtractErr.Wrap(err, "calibration", path)
+            //err = Handle(err, "failed to extract calibration file from '%s'",
+                //path)
             return
         }
 
         _tiff, err = ext.extract(tiff, ii)
 
         if err != nil {
-            err = Handle(err, "failed to extract tiff file from '%s'",
-                path)
+            err = ExtractErr.Wrap(err, "TIFF", path)
+            //err = Handle(err, "failed to extract tiff file from '%s'",
+                //path)
             return
         }
 
         _noise, err = ext.extract(noise, ii)
 
         if err != nil {
-            err = Handle(err, "failed to extract noise file from '%s'",
-                path)
+            err = ExtractErr.Wrap(err, "noise", path)
+            //err = Handle(err, "failed to extract noise file from '%s'",
+                //path)
             return
         }
 
@@ -816,8 +847,9 @@ func (s1 *S1Zip) ImportSLC(exto *ExtractOpt) (err error) {
         _, err = file.WriteString(line)
 
         if err != nil {
-            err = Handle(err, "failed to write line '%s' to file'%s'",
-                line, tab)
+            err = FileWriteErr.Wrap(err, tab)
+            //err = Handle(err, "failed to write line '%s' to file'%s'",
+                //line, tab)
             return
         }
     }
@@ -840,8 +872,9 @@ func (s1 *S1Zip) Quicklook(exto *ExtractOpt) (ret string, err error) {
     ret, err = ext.extract(quicklook, 0)
 
     if err != nil {
-        err = Handle(err, "failed to extract annotation file from '%s'",
-            path)
+        err = ExtractErr.Wrap(err, "annotation", path)
+        //err = Handle(err, "failed to extract annotation file from '%s'",
+            //path)
         return
     }
 

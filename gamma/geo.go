@@ -104,17 +104,20 @@ const (
 // TODO: check datatype
 func NewDEM(dat, par, lookup, lookupOld string) (ret DEM, err error) {
     if ret.dataFile, err = Newdatafile(dat, par); err != nil {
-        err = Handle(err, "failed to create DEM struct")
+        err = DataCreateErr.Wrap(err, "DEM")
+        //err = Handle(err, "failed to create DEM struct")
         return
     }
     
     if ret.Rng, err = ret.rng(); err != nil {
-        err = Handle(err, "failed to retreive range samples from '%s'", par)
+        err = RngError.Wrap(err, par)
+        //err = Handle(err, "failed to retreive range samples from '%s'", par)
         return
     }
     
     if ret.Azi, err = ret.azi(); err != nil {
-        err = Handle(err, "failed to retreive azimuth lines from '%s'", par)
+        err = AziError.Wrap(err, par)
+        //err = Handle(err, "failed to retreive azimuth lines from '%s'", par)
         return
     }
     
@@ -335,14 +338,16 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
     ret.Rng, err = conv.Atoi(split[0])
 
     if err != nil {
-        err = Handle(err, "failed to convert string '%s' to int", split[0])
+        err = ParseIntErr.Wrap(err, split[0])
+        //err = Handle(err, "failed to convert string '%s' to int", split[0])
         return
     }
     
     ret.Azi, err = conv.Atoi(split[1])
 
     if err != nil {
-        err = Handle(err, "failed to convert string '%s' to int", split[0])
+        err = ParseIntErr.Wrap(err, split[1])
+        //err = Handle(err, "failed to convert string '%s' to int", split[0])
         return
     }
 
@@ -441,14 +446,16 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
     err = os.MkdirAll(geodir, os.ModePerm)
     
     if err != nil {
-        err = Handle(err, "failed to create directory '%s'!", geodir)
+        err = DirCreateErr.Wrap(err, geodir)
+        //err = Handle(err, "failed to create directory '%s'!", geodir)
         return
     }
     
     demOrig, err := NewDEM(fp.Join(geodir, "srtm.dem"), "", "", "")
     
     if err != nil {
-        err = Handle(err, "failed to create DEM struct")
+        err = DataCreateErr.Wrap(err, "DEM")
+        //err = Handle(err, "failed to create DEM struct")
         return
     }
     
@@ -505,17 +512,14 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
     }
     
     mra := mli.RngAzi
-    
-    if err != nil {
-        err = Handle(err, "failed to retreive reference mli azimuth lines")
-        return
-    }
-    
     offsetWin := g.OffsetWindows
     
     Patch := RngAzi{
-        Rng: int(float64(mra.Rng) / float64(offsetWin.Rng) + float64(overlap.Rng) / 2),
-        Azi: int(float64(mra.Azi) / float64(offsetWin.Azi) + float64(overlap.Azi) / 2),
+        Rng: int(float64(mra.Rng) / float64(offsetWin.Rng) +
+             float64(overlap.Rng) / 2),
+        
+        Azi: int(float64(mra.Azi) / float64(offsetWin.Azi) +
+             float64(overlap.Azi) / 2),
     }
     
     // make sure the number of patches are even
@@ -532,7 +536,8 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
         fp.Join(geodir, "lookup"), fp.Join(geodir, "lookup_old"))
     
     if err != nil {
-        err = Handle(err, "failed to create DEM struct")
+        err = DataCreateErr.Wrap(err, "DEM")
+        //err = Handle(err, "failed to create DEM struct")
         return
     }
     

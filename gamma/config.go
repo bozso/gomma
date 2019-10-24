@@ -5,7 +5,7 @@ import (
     "fmt"
     "os"
     "log"
-    ref "reflect"
+    //ref "reflect"
     //conv "strconv"
     str "strings"
 )
@@ -57,8 +57,10 @@ type (
     }
 
     CoregOpt struct {
-        CoherenceThresh, FractionThresh, PhaseStdevThresh float64
-        MasterIdx                                         int
+        CoherenceThresh  float64 `name:"coh"    default:"0.8"`
+        FractionThresh   float64 `name:"frac"   default:"0.01"`
+        PhaseStdevThresh float64 `name:"phase"  default:"0.8"`
+        MasterIdx        int     `name:"master" default:"0"`
     }
 
     IfgSelectOpt struct {
@@ -67,10 +69,10 @@ type (
     }
 
     CoherenceOpt struct {
-        WeightType             string
+        WeightType             string  `name:"weight" default:""`
         Box                    Minmax
-        SlopeCorrelationThresh float64
-        SlopeWindow            int
+        SlopeCorrelationThresh float64 `name:"slope"  default:""`
+        SlopeWindow            int     `name:"win"    default:""`
     }
 
     Config struct {
@@ -162,18 +164,6 @@ var (
     }
 )
 
-
-
-func init() {
-    keys := ref.ValueOf(steps).MapKeys()
-
-    stepList = make([]string, len(keys))
-
-    for ii, key := range keys {
-        stepList[ii] = key.String()
-    }
-}
-
 func (ra *RngAzi) Default() {
     if ra.Rng == 0 {
         ra.Rng = 1
@@ -193,17 +183,13 @@ func delim(msg, sym string) {
 
 
 func MakeDefaultConfig(path string) (err error) {
-    var (
-        f *os.File
-        out []byte
-    )
-    
-    out, err = json.MarshalIndent(defaultConfig, "", "    ")
+    out, err := json.MarshalIndent(defaultConfig, "", "    ")
     if err != nil {
         return Handle(err, "failed to json encode default configuration")
     }
-    
-    if f, err = os.Create(path); err != nil {
+        
+    f, err := os.Create(path);
+    if err != nil {
         return Handle(err, "failed to create file: %s", path)
     }
     defer f.Close()
@@ -228,13 +214,11 @@ func SaveJson(path string, val interface{}) error {
     }
     defer f.Close()
 
-    _, err = f.Write(out)
-    if err != nil {
+    if _, err = f.Write(out); err != nil {
         return Handle(err, "failed to write to file '%s'", path)
     }
 
     return nil
-    
 }
 
 func LoadJson(path string, val interface{}) error {

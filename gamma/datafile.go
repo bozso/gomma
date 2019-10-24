@@ -4,12 +4,12 @@ import (
     "fmt"
     "time"
     "os"
-    "log"
+    //"log"
     "encoding/json"
     fp "path/filepath"
     str "strings"
     conv "strconv"
-    ref "reflect"
+    //ref "reflect"
 )
 
 type (
@@ -44,10 +44,6 @@ type (
     }
 )
 
-var (
-    RngError = NewError("failed to retreive range samples")
-    AziError = NewError("failed to retreive azimuth lines")
-)
 
 const (
     Float DType = iota
@@ -85,6 +81,10 @@ func NewGammaParam(path string) Params {
     return Params{Par: path, Sep: ":", contents: nil}
 }
 
+const (
+    DataCreateErr Werror = "failed to create %s Struct"
+)
+
 func Newdatafile(dat, par string) (ret dataFile, err error) {
     if len(dat) == 0 {
         err = Handle(err, "'dat' should not be an empty string")
@@ -105,27 +105,36 @@ func Newdatafile(dat, par string) (ret dataFile, err error) {
 func TmpDataFile() (ret dataFile, err error) {
     dat, err := TmpFileExt("dat")
     if err != nil {
-        err = Handle(err, "failed to create tmp file")
-        return
+        //err = Handle(err, "failed to create tmp file")
+        return ret, err
     }
     
     return Newdatafile(dat, "")
 }
 
+const (
+    RngError Werror = "failed to retreive range samples from '%s'"
+    AziError Werror = "failed to retreive azimuth lines from '%s'"
+)
+
+
 func NewDataFile(dat, par string, dt DType) (ret dataFile, err error) {
     if ret, err = Newdatafile(dat, par); err != nil {
-        err = Handle(err, "failed to create new datafile struct")
+        err = DataCreateErr.Wrap(err, "dataFile")
+        //err = Handle(err, "failed to create new datafile struct")
         return
     }
     
     if ret.Rng, err = ret.rng(); err != nil {
-        err = RngError.Wrap(err)
+        err = RngError.Wrap(err, par)
+        //err = RngError.Wrap(err)
         //err = Handle(err, "failed to retreive range samples from '%s'", par)
         return
     }
     
     if ret.Azi, err = ret.azi(); err != nil {
-        err = Handle(err, "failed to retreive azimuth lines from '%s'", par)
+        err = AziError.Wrap(err, par)
+        //err = Handle(err, "failed to retreive azimuth lines from '%s'", par)
         return
     }
     
@@ -160,7 +169,7 @@ func FromLine(line string) (ret DataFile, err error) {
 
 func (d dataFile) Exist() (ret bool, err error) {
     if ret, err = Exist(d.Dat); err != nil {
-        err = Handle(err, "stat on file '%s' failed", d.Dat)
+        //err = Handle(err, "stat on file '%s' failed", d.Dat)
         return
     }
 
@@ -169,7 +178,7 @@ func (d dataFile) Exist() (ret bool, err error) {
     }
     
     if ret, err = Exist(d.Par); err != nil {
-        err = Handle(err, "stat on file '%s' failed", d.Par)
+        //err = Handle(err, "stat on file '%s' failed", d.Par)
         return
     }
 
@@ -204,6 +213,10 @@ func (d dataFile) imgfmt() (string, error) {
     return d.Param("image_format")
 }
 
+const (
+    TimeParseErr Werror = "failed retreive %s from date string '%s'"
+)
+
 func (d dataFile) Date() (ret time.Time, err error) {
 
     dateStr, err := d.Param("date")
@@ -218,7 +231,8 @@ func (d dataFile) Date() (ret time.Time, err error) {
     year, err := conv.Atoi(split[0])
     
     if err != nil {
-        err = Handle(err, "failed retreive year from date string '%s'", dateStr)
+        err = TimeParseErr.Wrap(err, "year", dateStr)
+        //err = Handle(err, "failed retreive year from date string '%s'", dateStr)
         return
     }
     
@@ -255,7 +269,8 @@ func (d dataFile) Date() (ret time.Time, err error) {
     day, err := conv.Atoi(split[2])
         
     if err != nil {
-        err = Handle(err, "failed retreive day from date string '%s'", dateStr)
+        err = TimeParseErr.Wrap(err, "day", dateStr)
+        //err = Handle(err, "failed retreive day from date string '%s'", dateStr)
         return
     }
     
@@ -269,21 +284,24 @@ func (d dataFile) Date() (ret time.Time, err error) {
         hour, err = conv.Atoi(split[3])
             
         if err != nil {
-            err = Handle(err, "failed retreive hour from date string '%s'", dateStr)
+            err = TimeParseErr.Wrap(err, "hour", dateStr)
+            //err = Handle(err, "failed retreive hour from date string '%s'", dateStr)
             return
         }
         
         min, err = conv.Atoi(split[4])
             
         if err != nil {
-            err = Handle(err, "failed retreive minute from date string '%s'", dateStr)
+            err = TimeParseErr.Wrap(err, "minute", dateStr)
+            //err = Handle(err, "failed retreive minute from date string '%s'", dateStr)
             return
         }
         
         sec, err = conv.ParseFloat(split[5], 64)
             
         if err != nil {
-            err = Handle(err, "failed retreive seconds from string '%s'", dateStr)
+            err = TimeParseErr.Wrap(err, "seconds", dateStr)
+            //err = Handle(err, "failed retreive seconds from string '%s'", dateStr)
             return
         }
     }        
@@ -298,32 +316,6 @@ func (d dataFile) TypeStr() string {
 
 func (d dataFile) PlotCmd() string {
     return ""
-}
-
-func DataFileStr(s interface{}) (ret string, err error) {
-    //vptr := ref.ValueOf(s)
-    //kind := vptr.Kind()
-    
-    //if kind != ref.Ptr {
-        //err = Handle(nil, "expected a pointer to struct not '%v'", kind)
-        //return
-    //}
-    
-    v := ref.ValueOf(s)
-    //vptr.Elem()
-    ts := v.Type().Name()
-    
-    
-    log.Fatalf("%s %s %s\n", v, ts)
-    
-    return ts, nil
-    
-    /*
-    switch ts {
-        
-        
-    }
-    */
 }
 
 func (d dataFile) MarshalJSON() ([]byte, error) {
@@ -342,17 +334,18 @@ func (d dataFile) Move(dir string) (ret DataFile, err error) {
     var dat, par string
     
     if dat, err = Move(d.Dat, dir); err != nil {
-        err = Handle(err, "failed to move datafile '%s' to '%s'", d.Dat, dir)
+        //err = Handle(err, "failed to move datafile '%s' to '%s'", d.Dat, dir)
         return
     }
     
     if par, err = Move(d.Par, dir); err != nil {
-        err = Handle(err, "failed to move datafile '%s' to '%s'", d.Par, dir)
+        //err = Handle(err, "failed to move datafile '%s' to '%s'", d.Par, dir)
         return
     }
     
     if ret, err = NewDataFile(dat, par, d.Dtype); err != nil {
-        err = Handle(err, "failed to create new DataFile struct")
+        err = DataCreateErr.Wrap(err, "DataFile")
+        //err = Handle(err, "failed to create new DataFile struct")
         return
     }
     
@@ -401,12 +394,13 @@ func (s SLC) MakeMLI(opt MLIOpt) (ret MLI, err error) {
     tmp := ""
     
     if tmp, err = TmpFileExt("mli"); err != nil {
-        err = Handle(err, "failed to create tmp file")
-        return
+        //err = Handle(err, "failed to create tmp file")
+        return ret, err
     }
     
     if ret, err = NewMLI(tmp, ""); err != nil {
-        err = Handle(err, "failed to create MLI struct")
+        err = DataCreateErr.Wrap(err, "MLI")
+        //err = Handle(err, "failed to create MLI struct")
         return
     }
     
@@ -453,17 +447,19 @@ func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (ret SBIOut, err error) {
     tmp := ""
     
     if tmp, err = TmpFile(); err != nil {
-        err = Handle(err, "failed to create tmp file")
-        return
+        //err = Handle(err, "failed to create tmp file")
+        return ret, err
     }
     
     if ret.ifg, err = NewIFG(tmp + ".diff", "", "", "", ""); err != nil {
-        err = Handle(err, "failed to create IFG struct")
+        err = DataCreateErr.Wrap(err, "IFG")
+        //err = Handle(err, "failed to create IFG struct")
         return
     }
     
     if ret.mli, err = NewMLI(tmp + ".mli", ""); err != nil {
-        err = Handle(err, "failed to create MLI struct")
+        err = DataCreateErr.Wrap(err, "MLI")
+        //err = Handle(err, "failed to create MLI struct")
         return
     }
     
@@ -659,7 +655,8 @@ func Move(path string, dir string) (ret string, err error) {
     }
     
     if err = os.Rename(path, dst); err != nil {
-        err = Handle(err, "failed to move file '%s' to '%s'", path, dst)
+        err = MoveErr.Wrap(err, path, dst)
+        //err = Handle(err, "failed to move file '%s' to '%s'", path, dst)
         return
     }
     

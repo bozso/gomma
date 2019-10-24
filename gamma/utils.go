@@ -1,7 +1,7 @@
 package gamma
 
 import (
-    "errors"
+    //"errors"
     "fmt"
     "log"
     "os"
@@ -39,7 +39,6 @@ type (
     }
 )
 
-
 type Args struct {
     opt map[string]string
     pos []string
@@ -64,12 +63,18 @@ func NewArgs(args []string) (ret Args) {
     return
 }
 
+const (
+    ParseIntErr Werror = "failed to parse '%s' into an integer"
+    ParseFloatErr Werror = "failed to parse '%s' into an float"
+)
+
 func StringToVal(v ref.Value, kind ref.Kind, in string) error {
     switch kind {
     case ref.Int:
         set, err := conv.Atoi(in)
         if err != nil {
-            return Handle(err, "failed to parse '%s' into an int", in)
+            return ParseIntErr.Wrap(err, in)
+            //return Handle(err, "failed to parse '%s' into an int", in)
         }
         
         v.SetInt(int64(set))
@@ -77,7 +82,8 @@ func StringToVal(v ref.Value, kind ref.Kind, in string) error {
         set, err := conv.ParseFloat(in, 32)
         
         if err != nil {
-            return Handle(err, "failed to parse '%s' into a float32", in)
+            return ParseFloatErr.Wrap(err, in)
+            //return Handle(err, "failed to parse '%s' into a float32", in)
         }
         
         v.SetFloat(set)
@@ -85,7 +91,8 @@ func StringToVal(v ref.Value, kind ref.Kind, in string) error {
         set, err := conv.ParseFloat(in, 64)
         
         if err != nil {
-            return Handle(err, "failed to parse '%s' into a float64", in)
+            return ParseFloatErr.Wrap(err, in)
+            //return Handle(err, "failed to parse '%s' into a float64", in)
         }
         
         v.SetFloat(set)
@@ -96,6 +103,12 @@ func StringToVal(v ref.Value, kind ref.Kind, in string) error {
     }
     return nil
 }
+
+const (
+    ParseFieldErr Werror = "parsing of struct field '%s' failed"
+    SetFieldErr Werror = "failed to set struct field '%s'"
+    ParseStructErr Werror = "failed to parse struct %#v"
+)
 
 func (h Args) ParseStruct(s interface{}) error {
     vptr := ref.ValueOf(s)
@@ -108,7 +121,8 @@ func (h Args) ParseStruct(s interface{}) error {
     v := vptr.Elem()
     
     if err := h.parseStruct(v); err != nil {
-        return Handle(err, "parsing of struct field failed")
+        return ParseStructErr.Wrap(err, v)
+        //return Handle(err, "parsing of struct field failed")
     }
     return nil
 }
@@ -125,7 +139,8 @@ func (h Args) parseStruct(v ref.Value) error {
         
         if kind == ref.Struct {
             if err := h.parseStruct(sValue); err != nil {
-                return Handle(err, "parsing of Struct field failed")
+                return ParseFieldErr.Wrap(err, sField.Name)
+                //return Handle(err, "parsing of Struct field failed")
             }
             continue
         }
@@ -143,7 +158,8 @@ func (h Args) parseStruct(v ref.Value) error {
             idx, err := conv.Atoi(pos)
             
             if err != nil {
-                return Handle(err, "failed to parse '%s' into an int", pos)
+                return ParseIntErr.Wrap(err, pos)
+                //return Handle(err, "failed to parse '%s' into an int", pos)
             }
             
             if idx >= h.npos {
@@ -153,7 +169,8 @@ func (h Args) parseStruct(v ref.Value) error {
             }
             
             if err = StringToVal(sValue, kind, h.pos[idx]); err != nil {
-                return Handle(err, "failed to set struct field")
+                return SetFieldErr.Wrap(err, sField.Name)
+                //return Handle(err, "failed to set struct field")
             }
             continue
         }
@@ -184,7 +201,8 @@ func (h Args) parseStruct(v ref.Value) error {
         }
         
         if err := StringToVal(sValue, kind, val); err != nil {
-            return Handle(err, "failed to set struct field")
+            return SetFieldErr.Wrap(err, sField.Name)
+            //return Handle(err, "failed to set struct field")
         }
     }
     return nil
@@ -275,11 +293,17 @@ func MakeCmd(cmd string) CmdFun {
     }
 }
 
+const (
+    FileOpenErr Werror = "failed to open file '%s'"
+    FileReadErr Werror = "failed to open file '%s'"
+)
+
 func NewReader(path string) (ret FileReader, err error) {
     ret.File, err = os.Open(path)
 
     if err != nil {
-        err = Handle(err, "Could not open file '%s'!", path)
+        err = FileOpenErr.Wrap(err, path)
+        //err = Handle(err, "Could not open file '%s'!", path)
         return
     }
 
@@ -295,7 +319,8 @@ func NewPath(args ...string) path {
 func ReadFile(path string) (ret []byte, err error) {
     f, err := os.Open(path)
     if err != nil {
-        err = Handle(err, "failed to open file '%s'", path)
+        err = FileOpenErr.Wrap(err, path)
+        //err = Handle(err, "failed to open file '%s'", path)
         return
     }
 
@@ -303,7 +328,8 @@ func ReadFile(path string) (ret []byte, err error) {
 
     contents, err := io.ReadAll(f)
     if err != nil {
-        err = Handle(err, "failed to read file '%s'!", path)
+        err = FileReadErr.Wrap(err, path)
+        //err = Handle(err, "failed to read file '%s'!", path)
         return
     }
 
@@ -320,7 +346,8 @@ func (self *Params) Param(name string) (ret string, err error) {
         file, err = os.Open(self.Par)
 
         if err != nil {
-            err = Handle(err, "failed to open file '%s'", self.Par)
+            err = FileOpenErr.Wrap(err, self.Par)
+            //err = Handle(err, "failed to open file '%s'", self.Par)
             return
         }
 
@@ -381,7 +408,8 @@ func (self Params) Int(name string, idx int) (ret int, err error) {
     ret, err = conv.Atoi(data)
 
     if err != nil {
-        err = Handle(err, "failed to convert string '%s' to int", data)
+        err = ParseIntErr.Wrap(err, data)
+        //err = Handle(err, "failed to convert string '%s' to int", data)
         return
     }
 
@@ -410,7 +438,8 @@ func (self Params) Float(name string, idx int) (ret float64, err error) {
     ret, err = conv.ParseFloat(data, 64)
 
     if err != nil {
-        err = Handle(err, "failed to convert string '%s' to float", data)
+        err = ParseFloatErr.Wrap(err, data)
+        //err = Handle(err, "failed to convert string '%s' to float", data)
         return
     }
 
@@ -470,16 +499,30 @@ func RemoveTmp() {
     }
 }
 
-type werror struct {
-    Err error
-}
+type Werror string
+type CWerror string
 
+/*
 func NewError(format string, args ...interface{}) werror {
     return errors.New(fmt.Sprintf(format, args))
 }
+*/
 
-func (e werror) Wrap(err error) error {
-    return fmt.Errorf("%w: %w", e, err)
+func (e Werror) Wrap(err error, args ...interface{}) error {
+    str := fmt.Sprintf(string(e), args...)
+    return fmt.Errorf("%s: %w", str, err)
+}
+
+func (e Werror) Make(args ...interface{}) error {
+    return fmt.Errorf(string(e), args)
+}
+
+func (e CWerror) Wrap(err error) error {
+    return fmt.Errorf("%s: %w", string(e), err)
+}
+
+func (e CWerror) Make() error {
+    return fmt.Errorf(string(e))
 }
 
 
@@ -494,3 +537,12 @@ func (e *werror) Wrap(err error, format string, args ...interface{}) {
     }
 }
 */
+
+const (
+    DirCreateErr Werror = "failed to create directory '%s'"
+    FileExistErr Werror = "failed to determine wether '%s' exist"
+    FileWriteErr Werror = "failed to write to file '%s'"
+    FileCreateErr Werror = "failed to create file '%s'"
+    MoveErr Werror = "failed to move '%s' to '%s'"
+    EmptyStringErr Werror = "expected %s to be a non empty string"
+)

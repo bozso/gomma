@@ -28,16 +28,18 @@ type (
 )
 
 const (
-    parseErr = "failed to parse command line arguments"
+    ParseErr CWerror = "failed to parse command line arguments"
 )
 
 var (
     BatchModes = []string{"quicklook", "mli / MLI", "ras"}
+    
     Commands = map[string]Cmd{
         "proc": process,
         "init": initGamma,
         "batch": batch,
         "move": move,
+        "make": create,
     }
     
     CommandsAvailable = MapKeys(Commands)
@@ -379,9 +381,64 @@ func move(args Args) (err error) {
     return nil
 }
 
+type (
+    Coregister struct {
+        CoregOpt
+        Master  string `name:"master" default:""`
+        Slave   string `name:"slave" default:""`
+        Ref     string `name:"ref" default:""`
+        Outfile string `name:"out" default:""`
+    }
+
+)
+
 /*
+func coreg(args Args) error {
+    c := Coregister{}
+    
+    args.ParseStruct(&c)
+    
+    sm, ss, sr := c.Master, c.Slave, c.Ref
+    
+    if len(sm) == 0 {
+        return EmptyStringErr.Make("master", sm)
+    }
+    
+    if len(ss) == 0 {
+        return EmptyStringErr.Make("slave", ss)
+    }
+    
+    ref *S1SLC
+    
+    if len(r) == 0 {
+        ref = nil
+    } else {
+        r, err := FromTabfile(sr)
+        if err != nil {
+            return ParseTabErr.Wrap(sr)
+        }
+        ref = &r
+    }
+    
+    s, err := FromTabfile(ss)
+    if err != nil {
+        return ParseTabErr.Wrap(ss)
+    }
+    
+    m, err := FromTabfile(sm)
+    if err != nil {
+        return ParseTabErr.Wrap(sm)
+    }
+    
+    
+    c.CoregOpt
+}
+*/
+
 type Creater struct {
-    MetaFile string `pos:"0"`
+    MetaFile   string `pos:"0"`
+    Dtype      string `pos:"1"`
+    ParfileExt string `name:"parExt"`
     dataFile
 }
 
@@ -397,14 +454,24 @@ func create(args Args) (err error) {
     
     if len(dat) == 0 {
         if dat, err = TmpFile(); err != nil {
-            err = Handle(err, "failed to create temporary file")
             return
         }
     }
     
+    ext := c.ParfileExt
+    if len(ext) == 0 {
+        ext = "par"
+    }
+    
+    par := c.Par
+    if len(par) == 0 {
+        par = fmt.Sprintf("%s.%s", dat, ext)
+    }
+    
+    datf, err := 
+    
     return nil
 }
-*/
 
 /*
 
