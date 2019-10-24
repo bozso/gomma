@@ -74,7 +74,6 @@ func StringToVal(v ref.Value, kind ref.Kind, in string) error {
         set, err := conv.Atoi(in)
         if err != nil {
             return ParseIntErr.Wrap(err, in)
-            //return Handle(err, "failed to parse '%s' into an int", in)
         }
         
         v.SetInt(int64(set))
@@ -83,7 +82,6 @@ func StringToVal(v ref.Value, kind ref.Kind, in string) error {
         
         if err != nil {
             return ParseFloatErr.Wrap(err, in)
-            //return Handle(err, "failed to parse '%s' into a float32", in)
         }
         
         v.SetFloat(set)
@@ -92,7 +90,6 @@ func StringToVal(v ref.Value, kind ref.Kind, in string) error {
         
         if err != nil {
             return ParseFloatErr.Wrap(err, in)
-            //return Handle(err, "failed to parse '%s' into a float64", in)
         }
         
         v.SetFloat(set)
@@ -115,14 +112,13 @@ func (h Args) ParseStruct(s interface{}) error {
     kind := vptr.Kind()
     
     if kind != ref.Ptr {
-        return Handle(nil, "expected a pointer to struct not '%v'", kind)
+        return fmt.Errorf("expected a pointer to struct not '%v'", kind)
     }
     
     v := vptr.Elem()
     
     if err := h.parseStruct(v); err != nil {
         return ParseStructErr.Wrap(err, v)
-        //return Handle(err, "parsing of struct field failed")
     }
     return nil
 }
@@ -135,12 +131,11 @@ func (h Args) parseStruct(v ref.Value) error {
         sValue := v.Field(ii)
         kind := sField.Type.Kind()
         
-        fmt.Printf("Parsing field[%d]: %s\n", ii, sField.Name)
+        //fmt.Printf("Parsing field[%d]: %s\n", ii, sField.Name)
         
         if kind == ref.Struct {
             if err := h.parseStruct(sValue); err != nil {
                 return ParseFieldErr.Wrap(err, sField.Name)
-                //return Handle(err, "parsing of Struct field failed")
             }
             continue
         }
@@ -159,7 +154,6 @@ func (h Args) parseStruct(v ref.Value) error {
             
             if err != nil {
                 return ParseIntErr.Wrap(err, pos)
-                //return Handle(err, "failed to parse '%s' into an int", pos)
             }
             
             if idx >= h.npos {
@@ -170,7 +164,6 @@ func (h Args) parseStruct(v ref.Value) error {
             
             if err = StringToVal(sValue, kind, h.pos[idx]); err != nil {
                 return SetFieldErr.Wrap(err, sField.Name)
-                //return Handle(err, "failed to set struct field")
             }
             continue
         }
@@ -202,7 +195,6 @@ func (h Args) parseStruct(v ref.Value) error {
         
         if err := StringToVal(sValue, kind, val); err != nil {
             return SetFieldErr.Wrap(err, sField.Name)
-            //return Handle(err, "failed to set struct field")
         }
     }
     return nil
@@ -226,9 +218,6 @@ func MapKeys(dict interface{}) (ret []string) {
     return
 }
 
-const cmdErr = `Command '%v' failed!
-Output of command is: %v
-%w`
 
 var tmp = Tmp{}
 
@@ -267,6 +256,12 @@ func Handle(err error, format string, args ...interface{}) error {
     }
 }
 
+const (
+    CmdErr Werror = "execution of command '%s' failed"
+    ExeErr Werror = `Command '%v' failed!
+    Output of command is: %v`
+)
+
 func MakeCmd(cmd string) CmdFun {
     return func(args ...interface{}) (string, error) {
         arg := make([]string, len(args))
@@ -286,7 +281,7 @@ func MakeCmd(cmd string) CmdFun {
         result := string(out)
 
         if err != nil {
-            return "", fmt.Errorf(cmdErr, cmd, result, err)
+            return "", ExeErr.Wrap(err, cmd, result)
         }
 
         return result, nil
@@ -320,7 +315,6 @@ func ReadFile(path string) (ret []byte, err error) {
     f, err := os.Open(path)
     if err != nil {
         err = FileOpenErr.Wrap(err, path)
-        //err = Handle(err, "failed to open file '%s'", path)
         return
     }
 
@@ -329,7 +323,6 @@ func ReadFile(path string) (ret []byte, err error) {
     contents, err := io.ReadAll(f)
     if err != nil {
         err = FileReadErr.Wrap(err, path)
-        //err = Handle(err, "failed to read file '%s'!", path)
         return
     }
 
@@ -347,7 +340,6 @@ func (self *Params) Param(name string) (ret string, err error) {
 
         if err != nil {
             err = FileOpenErr.Wrap(err, self.Par)
-            //err = Handle(err, "failed to open file '%s'", self.Par)
             return
         }
 
@@ -409,7 +401,6 @@ func (self Params) Int(name string, idx int) (ret int, err error) {
 
     if err != nil {
         err = ParseIntErr.Wrap(err, data)
-        //err = Handle(err, "failed to convert string '%s' to int", data)
         return
     }
 
@@ -439,7 +430,6 @@ func (self Params) Float(name string, idx int) (ret float64, err error) {
 
     if err != nil {
         err = ParseFloatErr.Wrap(err, data)
-        //err = Handle(err, "failed to convert string '%s' to float", data)
         return
     }
 
@@ -502,19 +492,13 @@ func RemoveTmp() {
 type Werror string
 type CWerror string
 
-/*
-func NewError(format string, args ...interface{}) werror {
-    return errors.New(fmt.Sprintf(format, args))
-}
-*/
-
 func (e Werror) Wrap(err error, args ...interface{}) error {
     str := fmt.Sprintf(string(e), args...)
     return fmt.Errorf("%s: %w", str, err)
 }
 
 func (e Werror) Make(args ...interface{}) error {
-    return fmt.Errorf(string(e), args)
+    return fmt.Errorf(string(e), args...)
 }
 
 func (e CWerror) Wrap(err error) error {

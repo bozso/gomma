@@ -73,7 +73,7 @@ func str2dtype(in string) (ret DType, err error) {
     case "SHORT":
         return Short, nil
     default:
-        return ret, Handle(nil, "unrecognized data format: %s", in)
+        return ret, fmt.Errorf("unrecognized data type: '%s'", in)
     }
 }
 
@@ -105,7 +105,6 @@ func Newdatafile(dat, par string) (ret dataFile, err error) {
 func TmpDataFile() (ret dataFile, err error) {
     dat, err := TmpFileExt("dat")
     if err != nil {
-        //err = Handle(err, "failed to create tmp file")
         return ret, err
     }
     
@@ -121,20 +120,16 @@ const (
 func NewDataFile(dat, par string, dt DType) (ret dataFile, err error) {
     if ret, err = Newdatafile(dat, par); err != nil {
         err = DataCreateErr.Wrap(err, "dataFile")
-        //err = Handle(err, "failed to create new datafile struct")
         return
     }
     
     if ret.Rng, err = ret.rng(); err != nil {
         err = RngError.Wrap(err, par)
-        //err = RngError.Wrap(err)
-        //err = Handle(err, "failed to retreive range samples from '%s'", par)
         return
     }
     
     if ret.Azi, err = ret.azi(); err != nil {
         err = AziError.Wrap(err, par)
-        //err = Handle(err, "failed to retreive azimuth lines from '%s'", par)
         return
     }
     
@@ -270,7 +265,6 @@ func (d dataFile) Date() (ret time.Time, err error) {
         
     if err != nil {
         err = TimeParseErr.Wrap(err, "day", dateStr)
-        //err = Handle(err, "failed retreive day from date string '%s'", dateStr)
         return
     }
     
@@ -285,7 +279,6 @@ func (d dataFile) Date() (ret time.Time, err error) {
             
         if err != nil {
             err = TimeParseErr.Wrap(err, "hour", dateStr)
-            //err = Handle(err, "failed retreive hour from date string '%s'", dateStr)
             return
         }
         
@@ -293,7 +286,6 @@ func (d dataFile) Date() (ret time.Time, err error) {
             
         if err != nil {
             err = TimeParseErr.Wrap(err, "minute", dateStr)
-            //err = Handle(err, "failed retreive minute from date string '%s'", dateStr)
             return
         }
         
@@ -301,7 +293,6 @@ func (d dataFile) Date() (ret time.Time, err error) {
             
         if err != nil {
             err = TimeParseErr.Wrap(err, "seconds", dateStr)
-            //err = Handle(err, "failed retreive seconds from string '%s'", dateStr)
             return
         }
     }        
@@ -318,14 +309,6 @@ func (d dataFile) PlotCmd() string {
     return ""
 }
 
-func (d dataFile) MarshalJSON() ([]byte, error) {
-    return json.Marshal(JSONMap{
-        "datafile": d.Dat,
-        "paramfile": d.Par,
-        "type": d.TypeStr(),
-    })
-}
-
 func (d dataFile) Save(path string) error {
     return SaveJson(path, &d)
 }
@@ -334,240 +317,19 @@ func (d dataFile) Move(dir string) (ret DataFile, err error) {
     var dat, par string
     
     if dat, err = Move(d.Dat, dir); err != nil {
-        //err = Handle(err, "failed to move datafile '%s' to '%s'", d.Dat, dir)
         return
     }
     
     if par, err = Move(d.Par, dir); err != nil {
-        //err = Handle(err, "failed to move datafile '%s' to '%s'", d.Par, dir)
         return
     }
     
     if ret, err = NewDataFile(dat, par, d.Dtype); err != nil {
         err = DataCreateErr.Wrap(err, "DataFile")
-        //err = Handle(err, "failed to create new DataFile struct")
         return
     }
     
     return ret, nil
-}
-
-type SLC struct {
-    dataFile
-}
-
-func NewSLC(dat, par string) (ret SLC, err error) {
-    ret.dataFile, err = NewDataFile(dat, par, Unknown)
-    return
-}
-
-func (s SLC) TypeStr() string {
-    return "SLC"
-}
-
-var multiLook = Gamma.Must("multi_look")
-
-type (
-    // TODO: add loff, nlines
-    MLIOpt struct {
-        Subset
-        refTab string
-        Looks RngAzi
-        windowFlag bool
-        ScaleExp
-    }
-)
-
-func (opt *MLIOpt) Parse() {
-    opt.ScaleExp.Parse()
-    
-    if len(opt.refTab) == 0 {
-        opt.refTab = "-"
-    }
-    
-    opt.Looks.Default()
-}
-
-func (s SLC) MakeMLI(opt MLIOpt) (ret MLI, err error) {
-    opt.Parse()
-    
-    tmp := ""
-    
-    if tmp, err = TmpFileExt("mli"); err != nil {
-        //err = Handle(err, "failed to create tmp file")
-        return ret, err
-    }
-    
-    if ret, err = NewMLI(tmp, ""); err != nil {
-        err = DataCreateErr.Wrap(err, "MLI")
-        //err = Handle(err, "failed to create MLI struct")
-        return
-    }
-    
-    _, err = multiLook(s.Dat, s.Par, ret.Dat, ret.Par,
-                       opt.Looks.Rng, opt.Looks.Azi,
-                       opt.Subset.Begin, opt.Subset.Nlines,
-                       opt.ScaleExp.Scale, opt.ScaleExp.Exp)
-    
-    if err != nil {
-        err = Handle(err, "multi_look failed")
-        return
-    }
-    
-    return ret, nil
-}
-
-type (
-    SBIOpt struct {
-        NormSquintDiff float64
-        Looks RngAzi
-        InvWeight, Keep  bool
-    }
-    
-    SBIOut struct {
-        ifg IFG
-        mli MLI
-    }
-)
-
-
-var sbiInt = Gamma.Must("SBI_INT")
-
-func (opt *SBIOpt) Default() {
-    opt.Looks.Default()
-    
-    if opt.NormSquintDiff == 0.0 {
-        opt.NormSquintDiff = 0.5
-    }
-}
-
-func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (ret SBIOut, err error) {
-    opt.Default()
-    
-    tmp := ""
-    
-    if tmp, err = TmpFile(); err != nil {
-        //err = Handle(err, "failed to create tmp file")
-        return ret, err
-    }
-    
-    if ret.ifg, err = NewIFG(tmp + ".diff", "", "", "", ""); err != nil {
-        err = DataCreateErr.Wrap(err, "IFG")
-        //err = Handle(err, "failed to create IFG struct")
-        return
-    }
-    
-    if ret.mli, err = NewMLI(tmp + ".mli", ""); err != nil {
-        err = DataCreateErr.Wrap(err, "MLI")
-        //err = Handle(err, "failed to create MLI struct")
-        return
-    }
-    
-    iwflg, cflg := 0, 0
-    if opt.InvWeight { iwflg = 1 }
-    if opt.Keep { cflg = 1 }
-    
-    _, err = sbiInt(ref.Dat, ref.Par, slave.Dat, slave.Par,
-                    ret.ifg.Dat, ret.ifg.Par, ret.mli.Dat, ret.mli.Par, 
-                    opt.NormSquintDiff, opt.Looks.Rng, opt.Looks.Azi,
-                    iwflg, cflg)
-    
-    if err != nil {
-        err = Handle(err, "SBI_INT failed")
-        return
-    }
-    
-    return ret, nil
-}
-
-type (
-    SSIMode int
-    
-    SSIOpt struct {
-        Hgt, LtFine, OutDir string
-        Mode SSIMode
-        Keep bool
-    }
-    
-    SSIOut struct {
-        Ifg IFG
-        Unw dataFile
-    }
-)
-
-const (
-    Ifg           SSIMode = iota
-    IfgUnwrapped
-)
-
-var ssiInt = Gamma.Must("SSI_INT")
-
-func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err error) {
-    mode := 1
-    
-    if opt.Mode == IfgUnwrapped {
-        mode = 2
-    }
-    
-    cflg := 1
-    if opt.Keep { cflg = 0 }
-    
-    mID, sID := ref.Format(DateShort), slave.Format(DateShort)
-    ID := fmt.Sprintf("%s_%s", mID, sID)
-    
-    _, err = ssiInt(ref.Dat, ref.Par, mli.Dat, mli.Par, opt.Hgt, opt.LtFine,
-                    slave.Dat, slave.Par, mode, mID, sID, ID, opt.OutDir, cflg)
-    
-    if err != nil {
-        err = Handle(err, "SSI_INT failed")
-        return
-    }
-    
-    // TODO: figure out the name of the output files
-    
-    return ret, nil
-}
-
-
-func (d SLC) PlotCmd() string {
-    return "SLC"
-}
-
-func (s SLC) Raster(opt RasArgs) error {
-    err := opt.Parse(s)
-    
-    if err != nil {
-        return Handle(err, "failed to parse raster options")
-    }
-    
-    return rasslc(opt)
-}
-
-type MLI struct {
-    dataFile
-}
-
-func NewMLI(dat, par string) (ret MLI, err error) {
-    ret.dataFile, err = NewDataFile(dat, par, Unknown)
-    return
-}
-
-func (m MLI) TypeStr() string {
-    return "MLI"
-}
-
-func (d MLI) PlotCmd() string {
-    return "MLI"
-}
-
-func (m MLI) Raster(opt RasArgs) error {
-    err := opt.Parse(m)
-    
-    if err != nil {
-        return Handle(err, "failed to parse raster options")
-    }
-    
-    return raspwr(opt)
 }
 
 func Display(dat DataFile, opt DisArgs) error {
@@ -661,4 +423,134 @@ func Move(path string, dir string) (ret string, err error) {
     }
     
     return dst, nil
+}
+
+// TODO: implement dtype2str
+func (d dataFile) MarshalJSON() ([]byte, error) {
+    return json.Marshal(JSONMap{
+        "datafile": d.Dat,
+        "paramfile": d.Par,
+        "range_samples": d.Rng,
+        "azimuth_lines": d.Azi,
+        //"dtype": dtype2str(d.Dtype),
+        "type": d.TypeStr(),
+    })
+}
+
+func LoadDataFile(path string) (ret DataFile, err error) {
+    
+    data, err := ReadFile(path)
+    if err != nil {
+        err = Handle(err, "failed to read file '%s'", path)
+        return
+    }
+    
+    m := make(JSONMap)
+    
+    if err = json.Unmarshal(data, &m); err != nil {
+        err = Handle(err, "failed to parse json data %s'", data)
+        return
+    }
+    
+    ti, ok := m["type"]
+    if !ok {
+        err = fmt.Errorf("failed to retreive filetype from '%s'", path)
+        return
+    }
+    
+    t, ok := ti.(string)
+    if !ok {
+        err = TypeErr.Make(t, ti, "string")
+        return
+    }
+    
+    
+    var (
+        dat, par, dt, quality, diffPar, simUnwrap string
+        ra RngAzi
+    )
+    
+    t = str.ToUpper(t)
+    
+    switch t {
+    case "SLC", "MLI":
+        if dat, err = m.String("datafile"); err != nil {
+            err = Handle(err, "failed to retreive datafile")
+            return
+        }
+        
+        if par, err = m.String("paramfile"); err != nil {
+            err = Handle(err, "failed to retreive paramfile")
+            return
+        }
+        
+        if dt, err = m.String("dtype"); err != nil {
+            err = Handle(err, "failed to retreive dtype")
+            return
+        }
+        
+        if ra.Rng, err = m.Int("range_samples"); err != nil {
+            err = RngError.Wrap(err, path)
+            return
+        }
+        
+        if ra.Azi, err = m.Int("azimuth_lines"); err != nil {
+            err = AziError.Wrap(err, path)
+            return
+        }
+        
+        switch t {
+        case "IFG":
+            if quality, err = m.String("quality"); err != nil {
+                err = Handle(err, "failed to retreive quality file")
+                return
+            }
+            
+            if diffPar, err = m.String("diffparfile"); err != nil {
+                err = Handle(err, "failed to diffparfile")
+                return
+            }
+            
+            if simUnwrap, err = m.String("simulated_unwrapped"); err != nil {
+                err = Handle(err, "failed to simulated unwrapped datafile")
+                return
+            }
+        }
+    }
+        
+    switch t {
+    case "SLC":
+        if ret, err = NewSLC(dat, par); err != nil {
+            err = DataCreateErr.Wrap(err, "SLC")
+            //err = Handle(err, "failed to create SLC struct")
+            return
+        }
+    case "MLI":
+        if ret, err = NewMLI(dat, par); err != nil {
+            err = DataCreateErr.Wrap(err, "MLI")
+            //err = Handle(err, "failed to create MLI struct")
+            return
+        }
+    case "IFG":
+        ret, err = NewIFG(dat, par, simUnwrap, diffPar, quality)
+        if err != nil {
+            err = DataCreateErr.Wrap(err, "IFG")
+            //err = Handle(err, "failed to create IFG struct")
+            return
+        }
+    default:
+        var dtype DType
+        if dtype, err = str2dtype(dt); err != nil {
+            err = Handle(err, "failed to retreive datatype from string '%s'",
+                dt)
+            return
+        }
+        
+        if ret, err = NewDataFile(dat, par, dtype); err != nil {
+            err = DataCreateErr.Wrap(err, "DataFile")
+            return
+        }
+    }
+    
+    return ret, nil
 }

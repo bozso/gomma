@@ -49,7 +49,8 @@ func process(args Args) (err error) {
     proc := Process{}
     
     if err = args.ParseStruct(&proc); err != nil {
-        err = Handle(err, parseErr)
+        err = ParseErr.Wrap(err)
+        //err = Handle(err, parseErr)
         return
     }
     
@@ -79,6 +80,12 @@ func listSteps() {
     fmt.Println("Available processing steps: ", stepList)
 }
 
+
+const (
+    StepErr Werror = "start step '%s' not in list of available steps"
+)
+
+
 func (proc Process) Parse() (istart int, istop int, err error) {
     if proc.Show {
         listSteps()
@@ -91,17 +98,19 @@ func (proc Process) Parse() (istart int, istop int, err error) {
     if istep == -1 {
         if istart == -1 {
             listSteps()
-            err = Handle(nil,
-                "start step '%s' not in list of available steps!",
-                proc.Start)
+            err = StepErr.Make(proc.Start)
+            //err = Handle(nil,
+                //"start step '%s' not in list of available steps!",
+                //proc.Start)
             return
         }
 
         if istop == -1 {
             listSteps()
-            err = Handle(nil,
-                "stop step '%s' not in list of available steps!",
-                proc.Stop)
+            err = StepErr.Make(proc.Stop)
+            //err = Handle(nil,
+                //"stop step '%s' not in list of available steps!",
+                //proc.Stop)
             return
         }
     } else {
@@ -176,11 +185,12 @@ func batch(args Args) (err error) {
     batch := Batcher{}
     
     if err = args.ParseStruct(&batch); err != nil {
-        err = Handle(err, parseErr)
+        err = ParseErr.Wrap(err)
+        //err = Handle(err, parseErr)
         return
     }
 
-    fmt.Printf("%#v\n", batch)
+    //fmt.Printf("%#v\n", batch)
     
     switch batch.Mode {
     case "quicklook":
@@ -215,7 +225,7 @@ func (b Batcher) Quicklook() error {
     file, err := NewReader(path)
 
     if err != nil {
-        return Handle(err, "failed to create FileReader '%s'!", path)
+        return err
     }
 
     defer file.Close()
@@ -247,7 +257,7 @@ func (b Batcher) MLI() error {
     file, err := NewReader(path)
 
     if err != nil {
-        return Handle(err, "failed to create FileReader '%s'!", path)
+        return err
     }
 
     defer file.Close()
@@ -283,7 +293,7 @@ func (b Batcher) MLI() error {
         exist, err := mli.Exist()
         
         if err != nil {
-            return Handle(err, "failed to check whether MLI file exists")
+            return err
         }
         
         if exist {
@@ -310,7 +320,7 @@ func (b Batcher) Raster() error {
     
     file, err := NewReader(path)
     if err != nil {
-        return Handle(err, "failed to create FileReader '%s'!", path)
+        return err
     }
     defer file.Close()
     
@@ -345,7 +355,7 @@ func move(args Args) (err error) {
     m := Mover{}
     
     if err = args.ParseStruct(&m); err != nil {
-        err = Handle(err, parseErr)
+        err = ParseErr.Wrap(err)
         return
     }
     
@@ -362,20 +372,18 @@ func move(args Args) (err error) {
     out := m.OutDir
     
     if dat, err = dat.Move(out); err != nil {
-        err = Handle(err, "failed to move datafile to '%s", out)
-        return
+        //err = Handle(err, "failed to move datafile to '%s", out)
+        return err
     }
     
     if path, err = Move(path, out); err != nil {
-        err = Handle(err, "failed to move json metafile to '%s'", out)
-        return
+        //err = Handle(err, "failed to move json metafile to '%s'", out)
+        return err
     }
-    
-    fmt.Printf("Datafile after move: %#v\n", dat)
     
     if err = SaveJson(path, dat); err != nil {
         err = Handle(err, "failed to refresh json metafile")
-        return
+        return err
     }
     
     return nil
@@ -446,7 +454,7 @@ func create(args Args) (err error) {
     c := Creater{}
     
     if err = args.ParseStruct(&c); err != nil {
-        err = Handle(err, parseErr)
+        err = ParseErr.Wrap(err)
         return
     }
     
@@ -468,7 +476,22 @@ func create(args Args) (err error) {
         par = fmt.Sprintf("%s.%s", dat, ext)
     }
     
-    datf, err := 
+    dt, err := str2dtype(c.Dtype)
+    if err != nil {
+        return
+    }
+    
+    datf, err := NewDataFile(dat, par, dt) 
+    if err != nil {
+        err = DataCreateErr.Wrap(err, "DataFile")
+        return
+    }
+    
+    if err = datf.Save(c.MetaFile); err != nil {
+        err = Handle(err, "failed to save datafile to metafile '%s'",
+            c.MetaFile)
+        return
+    }
     
     return nil
 }
@@ -651,99 +674,47 @@ var PlotCmdFiles = map[string]Slice{
     "hgt": Slice{"hgt", "rdc"},
 }
 
-func LoadDataFile(path string) (ret DataFile, err error) {
-    
-    data, err := ReadFile(path)
-    if err != nil {
-        err = Handle(err, "failed to read file '%s'", path)
-        return
-    }
-    
-    m := make(JSONMap)
-    
-    if err = json.Unmarshal(data, &m); err != nil {
-        err = Handle(err, "failed to parse json data %s'", data)
-        return
-    }
-    
-    t, ok := m["type"]
-    if !ok {
-        err = Handle(nil, "failed to retreive filetype from '%s'", path)
-        return
-    }
-    
-    var dat, par, quality, diffPar, simUnwrap string
-    
-    switch t {
-    case "SLC", "slc", "MLI", "mli":
-        if dat, err = m.String("datafile"); err != nil {
-            err = Handle(err, "failed to retreive datafile")
-            return
-        }
-        
-        if par, err = m.String("paramfile"); err != nil {
-            err = Handle(err, "failed to retreive paramfile")
-            return
-        }
-        
-        switch t {
-        case "IFG", "ifg":
-            if quality, err = m.String("quality"); err != nil {
-                err = Handle(err, "failed to retreive quality file")
-                return
-            }
-            
-            if diffPar, err = m.String("diffparfile"); err != nil {
-                err = Handle(err, "failed to diffparfile")
-                return
-            }
-            
-            if simUnwrap, err = m.String("simulated_unwrapped"); err != nil {
-                err = Handle(err, "failed to simulated unwrapped datafile")
-                return
-            }
-        }
-    }
-    
-    switch t {
-    case "SLC", "slc":
-        if ret, err = NewSLC(dat, par); err != nil {
-            err = Handle(err, "failed to create SLC struct")
-            return
-        }
-    case "MLI", "mli":
-        if ret, err = NewMLI(dat, par); err != nil {
-            err = Handle(err, "failed to create MLI struct")
-            return
-        }
-    case "IFG", "ifg":
-        ret, err = NewIFG(dat, par, simUnwrap, diffPar, quality)
-        if err != nil {
-            err = Handle(err, "failed to create IFG struct")
-            return
-        }
-    default:
-        err = Handle(nil, "unrecognized filetype '%s'", t)
-        return
-    }
-    
-    return ret, nil
-}
-
+const (
+    KeyErr Werror = "key '%s' is not present in '%s'"
+    TypeErr Werror = "unexpected type %T for '%s', expected %s"
+)
 
 func (m JSONMap) String(name string) (ret string, err error) {
     tmp, ok := m[name]
     
     if !ok {
-        err = Handle(nil, "key '%s' is not present in map '%s'", name, m)
+        err = KeyErr.Make(name, m)
+        //err = Handle(nil, "key '%s' is not present in map '%s'", name, m)
         return
     }
     
     ret, ok = tmp.(string)
     
     if !ok {
-        err = Handle(nil, "unexpected type %T for '%s', expected string",
-            tmp, name)
+        err = TypeErr.Make(tmp, name, "string")
+        //err = Handle(nil, "unexpected type %T for '%s', expected string",
+            //tmp, name)
+        return
+    }
+    
+    return ret, nil
+}
+
+func (m JSONMap) Int(name string) (ret int, err error) {
+    tmp, ok := m[name]
+    
+    if !ok {
+        err = KeyErr.Wrap(err, name, m)
+        //err = Handle(nil, "key '%s' is not present in map '%s'", name, m)
+        return
+    }
+    
+    ret, ok = tmp.(int)
+    
+    if !ok {
+        err = TypeErr.Make(tmp, name, "int")
+        //err = Handle(nil, "unexpected type %T for '%s', expected int",
+            //tmp, name)
         return
     }
     

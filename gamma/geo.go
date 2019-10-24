@@ -105,19 +105,16 @@ const (
 func NewDEM(dat, par, lookup, lookupOld string) (ret DEM, err error) {
     if ret.dataFile, err = Newdatafile(dat, par); err != nil {
         err = DataCreateErr.Wrap(err, "DEM")
-        //err = Handle(err, "failed to create DEM struct")
         return
     }
     
     if ret.Rng, err = ret.rng(); err != nil {
         err = RngError.Wrap(err, par)
-        //err = Handle(err, "failed to retreive range samples from '%s'", par)
         return
     }
     
     if ret.Azi, err = ret.azi(); err != nil {
         err = AziError.Wrap(err, par)
-        //err = Handle(err, "failed to retreive azimuth lines from '%s'", par)
         return
     }
     
@@ -150,12 +147,12 @@ func (opt *CodeOpt) Parse() (lrIn int, lrOut int, err error) {
     }
     
     if opt.inWidth == 0 {
-        err = Handle(nil, "infile width must be specified")
+        err = fmt.Errorf("infile width must be specified")
         return
     }
     
     if opt.outWidth == 0 {
-        err = Handle(nil, "outfile width must be specified")
+        err = fmt.Errorf("outfile width must be specified")
         return
     }
     
@@ -267,7 +264,7 @@ func (dem DEM) radar2geo(infile, outfile string, opt CodeOpt) error {
         case LanczosSqrt:
             interp = 7
         default:
-            return Handle(nil, "unrecognized interpolation option")
+            return fmt.Errorf("unrecognized interpolation option")
         }
     }
     
@@ -287,7 +284,7 @@ func (dem DEM) radar2geo(infile, outfile string, opt CodeOpt) error {
         case "DOUBLE":
             dtype = 5
         default:
-            return Handle(nil, "unrecognized data format: %s", opt.dtype)
+            return fmt.Errorf("unrecognized data format: %s", opt.dtype)
     }
     
     // TODO: use this if opt.inWidth == 0?
@@ -331,23 +328,17 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
     split := str.Split(line, " ")
     
     if len(split) < 2 {
-        err = Handle(nil, "split to retreive range, azimuth failed")
+        err = fmt.Errorf("split to retreive range, azimuth failed")
         return
     }
     
-    ret.Rng, err = conv.Atoi(split[0])
-
-    if err != nil {
+    if ret.Rng, err = conv.Atoi(split[0]); err != nil {
         err = ParseIntErr.Wrap(err, split[0])
-        //err = Handle(err, "failed to convert string '%s' to int", split[0])
         return
     }
     
-    ret.Azi, err = conv.Atoi(split[1])
-
-    if err != nil {
+    if ret.Azi, err = conv.Atoi(split[1]); err != nil {
         err = ParseIntErr.Wrap(err, split[1])
-        //err = Handle(err, "failed to convert string '%s' to int", split[0])
         return
     }
 
@@ -455,14 +446,13 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
     
     if err != nil {
         err = DataCreateErr.Wrap(err, "DEM")
-        //err = Handle(err, "failed to create DEM struct")
         return
     }
     
     vrtPath := g.DEMPath
     
     if len(vrtPath) == 0 {
-        err = Handle(nil, "path to vrt files not specified")
+        err = fmt.Errorf("path to vrt files not specified")
         return
     }
     
@@ -544,8 +534,8 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
     
     geo := Geocode{
         Hgt     : fp.Join(geodir, "hgt"),
-        Sigma0     : fp.Join(geodir, "sigma0"),
-        Gamma0     : fp.Join(geodir, "gamma0"),
+        Sigma0  : fp.Join(geodir, "sigma0"),
+        Gamma0  : fp.Join(geodir, "gamma0"),
         LsMap   : fp.Join(geodir, "lsMap"),
         SimSar  : fp.Join(geodir, "sim_sar"),
         Zenith  : fp.Join(geodir, "zenith"),
@@ -608,7 +598,6 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
                        geo.LsMap, g.nPixel, 2, g.RngOversamp)
         
         if err != nil {
-            err = Handle(err, "gc_map failed")
             return
         }      
     } else {
@@ -621,14 +610,12 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
                        geo.Inc, geo.Sigma0, geo.Gamma0, g.AreaFactor)
     
     if err != nil {
-        err = Handle(err, "pixel area failed")
         return
     }
     
     _, err = createDiffPar(mli.Par, nil, geo.DiffPar, SLC_MLI, NonInter)
     
     if err != nil {
-        err = Handle(err, "create_diff_par failed")
         return
     }
     
@@ -660,7 +647,6 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
                                    SLC_MLI, NonInter)
             
             if err != nil {
-                err = Handle(err, "create_diff_par failed")
                 return
             }
             
@@ -670,7 +656,6 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
                                 g.CCThresh, g.LanczosOrder, g.BandwithFrac)
             
             if err != nil {
-                err = Handle(err, "offset_pwrm failed")
                 return
             }
             
@@ -679,7 +664,6 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
             
             
             if err != nil {
-                err = Handle(err, "offset_fitm failed")
                 return
             }
 
@@ -689,7 +673,6 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
                                dem.Lookup, 1)
             
             if err != nil {
-                err = Handle(err, "gc_map_fine failed")
                 return
             }
 
@@ -698,7 +681,6 @@ func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
                                geo.Inc, geo.Sigma0, geo.Gamma0, g.AreaFactor)
             
             if err != nil {
-                err = Handle(err, "pixel_area failed")
                 return
             }
 
