@@ -7,12 +7,23 @@ import (
     gm "../gamma"
 )
 
+var err error
+
+func exit() {
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "%s", err)
+        os.Exit(1)
+    }
+    os.Exit(0)
+}
+
 func main() {
+    defer exit()
     defer gm.RemoveTmp()
     
     if len(os.Args) < 2 {
-        fmt.Printf("Expected one of the following subcommands: %v!\n",
-            gm.CommandsAvailable)
+        err = fmt.Errorf("Expected one of the following subcommands: %v!\n",
+                gm.CommandsAvailable)
         return
     }
     
@@ -23,13 +34,14 @@ func main() {
     cmd, ok := gm.Commands[mode]
     
     if !ok {
-        fmt.Printf("Expected on of the following subcommands: %v!\n",
+        err = fmt.Errorf("Expected on of the following subcommands: %v!\n",
             gm.CommandsAvailable)
         return
     }
     
-    if err := cmd(args); err != nil {
-        fmt.Printf("Failed to execute command '%s'! Error: %s\n", mode, err)
+    if err = cmd(args); err != nil {
+        err = fmt.Errorf("Failed to execute command '%s'! Error: %s\n",
+            mode, err)
         return
     }
 }

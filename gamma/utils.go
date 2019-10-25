@@ -104,7 +104,7 @@ func StringToVal(v ref.Value, kind ref.Kind, in string) error {
 const (
     ParseFieldErr Werror = "parsing of struct field '%s' failed"
     SetFieldErr Werror = "failed to set struct field '%s'"
-    ParseStructErr Werror = "failed to parse struct %#v"
+    ParseStructErr Werror = "failed to parse struct %s"
 )
 
 func (h Args) ParseStruct(s interface{}) error {
@@ -118,7 +118,7 @@ func (h Args) ParseStruct(s interface{}) error {
     v := vptr.Elem()
     
     if err := h.parseStruct(v); err != nil {
-        return ParseStructErr.Wrap(err, v)
+        return ParseStructErr.Wrap(err, v.Type().Name())
     }
     return nil
 }

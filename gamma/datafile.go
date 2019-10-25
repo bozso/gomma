@@ -18,6 +18,8 @@ type (
         Parfile() string
         GetRng() int
         GetAzi() int
+        GetDate() time.Time
+        TimeStr(dateFormat) string
         TypeStr() string
         Int(string, int) (int, error)
         Float(string, int) (float64, error)
@@ -26,6 +28,7 @@ type (
         Move(string) (DataFile, error)
         //Display(disArgs) error
         Raster(RasArgs) error
+        Save(string) error
     }
     
     DType int
@@ -36,11 +39,6 @@ type (
         Params
         RngAzi
         time.Time       `json:"-"`
-    }
-    
-    Subset struct {
-        Begin  int `name:"begin" default:""`
-        Nlines int `name:"nlines" default:""`
     }
 )
 
@@ -57,6 +55,8 @@ const (
 )
 
 func str2dtype(in string) (ret DType, err error) {
+    in = str.ToUpper(in)
+    
     switch in {
     case "FLOAT":
         return Float, nil
@@ -66,7 +66,7 @@ func str2dtype(in string) (ret DType, err error) {
         return ShortCpx, nil
     case "FCOMPLEX":
         return FloatCpx, nil
-    case "SUN", "sun", "RASTER", "raster", "BMP", "bmp":
+    case "SUN", "RASTER", "BMP":
         return Raster, nil
     case "UNSIGNED CHAR":
         return UChar, nil
@@ -76,6 +76,28 @@ func str2dtype(in string) (ret DType, err error) {
         return ret, fmt.Errorf("unrecognized data type: '%s'", in)
     }
 }
+
+func dtype2str(in DType) (ret string, err error) {
+    switch in {
+    case Float:
+        return "FLOAT", nil
+    case Double:
+        return "DOUBLE", nil
+    case ShortCpx:
+        return "SCOMPLEX", nil
+    case FloatCpx:
+        return "FCOMPLEX", nil
+    case Raster:
+        return "RASTER", nil
+    case UChar:
+        return "UNSIGNED CHAR", nil
+    case Short:
+        return "SHORT", nil
+    default:
+        return ret, fmt.Errorf("unrecognized data type: '%s'", in)
+    }
+}
+
 
 func NewGammaParam(path string) Params {
     return Params{Par: path, Sep: ":", contents: nil}
@@ -139,13 +161,13 @@ func NewDataFile(dat, par string, dt DType) (ret dataFile, err error) {
     }
     
     if dt == Unknown {
-        var fmt string
-        if fmt, err = ret.imgfmt(); err != nil {
+        var format string
+        if format, err = ret.imgfmt(); err != nil {
             err = Handle(err, "failed to retreive image format from '%s'", par)
             return
         }
         
-        if ret.Dtype, err = str2dtype(fmt); err != nil {
+        if ret.Dtype, err = str2dtype(format); err != nil {
             err = Handle(err, "failed to retreive datatype")
             return
         }
@@ -196,6 +218,20 @@ func (d dataFile) GetAzi() int {
     return d.Azi
 }
 
+func (d dataFile) GetDate() time.Time {
+    return d.Time
+}
+
+func (d dataFile) TimeStr(format dateFormat) string {
+    switch format {
+    case DShort:
+        return d.Time.Format(DateShort)
+    case DLong:
+        return d.Time.Format(DateLong)
+    }
+    return ""
+}
+
 func (d dataFile) rng() (int, error) {
     return d.Int("range_samples", 0)
 }
@@ -206,6 +242,10 @@ func (d dataFile) azi() (int, error) {
 
 func (d dataFile) imgfmt() (string, error) {
     return d.Param("image_format")
+}
+
+func ID(one DataFile, two DataFile, format dateFormat) string {
+    return fmt.Sprintf("%s_%s", one.TimeStr(format), two.TimeStr(format))
 }
 
 const (
@@ -409,6 +449,25 @@ func (d dataFile) Raster(opt RasArgs) (err error) {
     return nil
 }
 
+type(
+    Subset struct {
+        RngOffset int `name:"roff" default:"0"`
+        AziOffset int `name:"aoff" default:"0"`
+        RngWidth int `name:"rwidth" default:"0"`
+        AziLines int `name:"alines" default:"0"`
+    }
+)
+
+func (s *Subset) Parse(d DataFile) {
+    if s.RngWidth == 0 {
+        s.RngWidth = d.GetRng()
+    }
+    
+    if s.AziLines == 0 {
+        s.AziLines = d.GetAzi()
+    }
+}
+
 func Move(path string, dir string) (ret string, err error) {
     dst, err := fp.Abs(fp.Join(dir, fp.Base(path)));
     if err != nil {
@@ -427,13 +486,18 @@ func Move(path string, dir string) (ret string, err error) {
 
 // TODO: implement dtype2str
 func (d dataFile) MarshalJSON() ([]byte, error) {
+    dt, err := dtype2str(d.Dtype)
+    if err != nil {
+        return nil, err
+    }
+    
     return json.Marshal(JSONMap{
         "datafile": d.Dat,
         "paramfile": d.Par,
         "range_samples": d.Rng,
         "azimuth_lines": d.Azi,
-        //"dtype": dtype2str(d.Dtype),
-        "type": d.TypeStr(),
+        "dtype": dt,
+        "ftype": d.TypeStr(),
     })
 }
 
@@ -452,9 +516,9 @@ func LoadDataFile(path string) (ret DataFile, err error) {
         return
     }
     
-    ti, ok := m["type"]
+    ti, ok := m["ftype"]
     if !ok {
-        err = fmt.Errorf("failed to retreive filetype from '%s'", path)
+        err = KeyErr.Make("ftype", m)
         return
     }
     

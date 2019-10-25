@@ -22,17 +22,17 @@ const (
     DateShort = "20060102"
     DateLong  = "20060102T150405"
 
-    long dateFormat = iota
-    short
+    DLong dateFormat = iota
+    DShort
 )
 
 func ParseDate(format dateFormat, str string) (ret time.Time, err error) {
     var form string
 
     switch format {
-    case long:
+    case DLong:
         form = DateLong
-    case short:
+    case DShort:
         form = DateShort
     default:
         break
@@ -93,9 +93,9 @@ func date2str(date Date, format dateFormat) string {
     var layout string
 
     switch format {
-    case long:
+    case DLong:
         layout = DateLong
-    case short:
+    case DShort:
         layout = DateShort
     default:
         break

@@ -54,7 +54,7 @@ var (
     
     Imv   = MakeCmd("eog")
 
-    Settings = loadSettings("settings.json")
+    Settings = loadSettings("/home/istvan/progs/gamma/bin/settings.json")
     Gamma = makeGamma()
 )
 

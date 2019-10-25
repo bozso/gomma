@@ -58,7 +58,7 @@ func (s SLC) MakeMLI(opt MLIOpt) (ret MLI, err error) {
     
     _, err = multiLook(s.Dat, s.Par, ret.Dat, ret.Par,
                        opt.Looks.Rng, opt.Looks.Azi,
-                       opt.Subset.Begin, opt.Subset.Nlines,
+                       opt.Subset.RngOffset, opt.Subset.RngWidth,
                        opt.ScaleExp.Scale, opt.ScaleExp.Exp)
     
     if err != nil {
@@ -72,14 +72,15 @@ func (s SLC) MakeMLI(opt MLIOpt) (ret MLI, err error) {
 
 type (
     SBIOpt struct {
-        NormSquintDiff float64
-        Looks RngAzi
-        InvWeight, Keep  bool
+        NormSquintDiff float64 `name:"nsquint" default:"0.5"`
+        InvWeight      bool    `name:"invw"`
+        Keep           bool    `name:"keep"`
+        Looks          RngAzi
     }
     
     SBIOut struct {
-        ifg IFG
-        mli MLI
+        Ifg IFG
+        Mli MLI
     }
 )
 
@@ -104,13 +105,13 @@ func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (ret SBIOut, err error) {
         return ret, err
     }
     
-    if ret.ifg, err = NewIFG(tmp + ".diff", "", "", "", ""); err != nil {
+    if ret.Ifg, err = NewIFG(tmp + ".diff", "", "", "", ""); err != nil {
         err = DataCreateErr.Wrap(err, "IFG")
         //err = Handle(err, "failed to create IFG struct")
         return
     }
     
-    if ret.mli, err = NewMLI(tmp + ".mli", ""); err != nil {
+    if ret.Mli, err = NewMLI(tmp + ".mli", ""); err != nil {
         err = DataCreateErr.Wrap(err, "MLI")
         //err = Handle(err, "failed to create MLI struct")
         return
@@ -121,7 +122,7 @@ func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (ret SBIOut, err error) {
     if opt.Keep { cflg = 1 }
     
     _, err = sbiInt(ref.Dat, ref.Par, slave.Dat, slave.Par,
-                    ret.ifg.Dat, ret.ifg.Par, ret.mli.Dat, ret.mli.Par, 
+                    ret.Ifg.Dat, ret.Ifg.Par, ret.Mli.Dat, ret.Mli.Par, 
                     opt.NormSquintDiff, opt.Looks.Rng, opt.Looks.Azi,
                     iwflg, cflg)
     
@@ -138,9 +139,11 @@ type (
     SSIMode int
     
     SSIOpt struct {
-        Hgt, LtFine, OutDir string
+        Hgt    string `name:"" default:""`
+        LtFine string `name:"lookup" default:""`
+        OutDir string `name:"out" default:"."`
+        Keep bool     `name:"keep"`
         Mode SSIMode
-        Keep bool
     }
     
     SSIOut struct {

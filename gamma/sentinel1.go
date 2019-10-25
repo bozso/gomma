@@ -109,7 +109,7 @@ func NewS1Zip(zipPath, root string) (ret *S1Zip, err error) {
 
     start, stop := zipBase[17:32], zipBase[33:48]
 
-    if ret.date, err = NewDate(long, start, stop); err != nil {
+    if ret.date, err = NewDate(DLong, start, stop); err != nil {
         err = Handle(err, "Could not create new date from strings: '%s' '%s'",
             start, stop)
         return

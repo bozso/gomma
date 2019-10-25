@@ -7,7 +7,7 @@ import (
     "os"
     fp "path/filepath"
     //ref "reflect"
-    //str "strings"
+    str "strings"
 )
 
 type (
@@ -25,6 +25,10 @@ type (
         Show        bool   `name:"show"`
         Config
     }
+    
+    MetaFile struct {
+        Meta string `pos:"0"`
+    }
 )
 
 const (
@@ -40,6 +44,8 @@ var (
         "batch": batch,
         "move": move,
         "make": create,
+        "stat": stat,
+        //"splitIfg": splitIfg,
     }
     
     CommandsAvailable = MapKeys(Commands)
@@ -347,7 +353,7 @@ func (b Batcher) Raster() error {
 type(
     Mover struct {
         OutDir   string `name:"out" default:"."`
-        MetaFile string `pos:"0"`
+        MetaFile
     }
 )
 
@@ -359,7 +365,7 @@ func move(args Args) (err error) {
         return
     }
     
-    path := m.MetaFile
+    path := m.Meta
     
     dat, err := LoadDataFile(path)
     if err != nil {
@@ -444,10 +450,11 @@ func coreg(args Args) error {
 */
 
 type Creater struct {
-    MetaFile   string `pos:"0"`
-    Dtype      string `pos:"1"`
+    Dtype      string `name:"dtype"`
+    Ftype      string `name:"ftype"`
     ParfileExt string `name:"parExt"`
     dataFile
+    MetaFile
 }
 
 func create(args Args) (err error) {
@@ -476,23 +483,177 @@ func create(args Args) (err error) {
         par = fmt.Sprintf("%s.%s", dat, ext)
     }
     
-    dt, err := str2dtype(c.Dtype)
-    if err != nil {
-        return
+    
+    dt_, dt := c.Dtype, Unknown
+    
+    if len(dt_) > 0 {
+        dt, err = str2dtype(dt_)
+        if err != nil {
+            return
+        }
     }
     
+    dat, err = fp.Abs(dat)
+    if err != nil { return }
+    
+    par, err = fp.Abs(par)
+    if err != nil { return }
+        
     datf, err := NewDataFile(dat, par, dt) 
     if err != nil {
         err = DataCreateErr.Wrap(err, "DataFile")
         return
     }
     
-    if err = datf.Save(c.MetaFile); err != nil {
+    
+    var Dat DataFile
+    ftype := str.ToUpper(c.Ftype)
+    switch ftype {
+    case "MLI":
+        Dat = MLI{dataFile: datf}
+    default:
+        err = fmt.Errorf("unrecognized filetype '%s'", ftype)
+        return
+    }
+    
+    if err = Dat.Save(c.Meta); err != nil {
         err = Handle(err, "failed to save datafile to metafile '%s'",
             c.MetaFile)
         return
     }
     
+    return nil
+}
+
+/*
+type (
+    SplitIfg struct {
+        SBIOpt
+        SSIOpt
+        SpectrumMode string `name:"mode"`
+        Master       string `name:"master"`
+        Slave        string `name:"slave"`
+        Mli          string `name:"mli"`
+    }
+)
+
+func splitIfg(args Args) error {
+    si := SplitIfg{}
+    si.Mode = Ifg
+    
+    if err := args.ParseStruct(&si); err != nil {
+        return ParseErr.Wrap(err)
+    }
+    
+    ms, ss := si.Master, si.Slave
+    
+    if len(ms) == 0 || len(ss) == 0 {
+        return fmt.Errorf("both master and slave SLC files should be specified")
+    }
+    
+    var (
+        m_, s_ DataFile
+        m, s SLC
+        err error
+    )
+    
+    if m_, err := LoadDataFile(ms); err != nil {
+        return err
+    }
+    
+    if m, ok := m_.(SLC); !ok {
+        return TypeErr.Make(m, "master", "SLC")
+    }
+    
+    if s_, err = LoadDataFile(ms); err != nil {
+        return err
+    }
+    
+    if s, ok := s_.(SLC); !ok {
+        return TypeErr.Make(m, "slave", "SLC")
+    }
+    
+    id := ID(m, s, DShort)
+    
+    mode := str.ToUpper(si.SpectrumMode)
+    
+    switch mode {
+    case "BEAM", "B":
+        opt := si.SBIOpt
+        
+        out, err := m.SplitBeamIfg(s, opt)
+        
+        if err != nil {
+            return err
+        }
+        
+        if err = out.Mli.Save(id + "_sbi_mli.json"); err != nil {
+            return err
+        }
+        
+        if err = out.Ifg.Save(id + "_sbi_ifg.json"); err != nil {
+            return err
+        }
+    case "SPECTRUM", "S":
+        opt := si.SSIOpt
+        
+        Mli, err := LoadDataFile(si.Mli)
+        if err != nil {
+            return err
+        }
+        
+        mli, ok := Mli.(MLI)
+        
+        if !ok {
+            return TypeErr.Make(Mli, "mli", "MLI")
+        }
+        
+        out, err := m.SplitSpectrumIfg(s, mli, opt)
+        
+        if err != nil {
+            return err
+        }
+        
+        // still need to figure out the returned files
+        return nil
+    default:
+        return fmt.Errorf("unrecognized Split Interferogram mode: '%s'", mode)
+    }
+    return nil
+}
+*/
+
+type (
+    Stat struct {
+        Out string `pos:"1"`
+        MetaFile
+        Subset
+    }
+)
+
+var imgStat = Gamma.Must("image_stat")
+
+func stat(args Args) error {
+    s := Stat{}
+    
+    if err := args.ParseStruct(&s); err != nil {
+        return ParseErr.Wrap(err)
+    }
+    
+    dat, err := LoadDataFile(s.Meta)
+    if err != nil {
+        return err
+    }
+    
+    s.Subset.Parse(dat)
+    
+    _, err = imgStat(dat.Datfile(), dat.GetRng(), s.RngOffset, s.AziOffset,
+                     s.RngWidth, s.AziLines, s.Out)
+    
+    if err != nil {
+        return err
+    }
+
     return nil
 }
 
@@ -705,18 +866,26 @@ func (m JSONMap) Int(name string) (ret int, err error) {
     
     if !ok {
         err = KeyErr.Wrap(err, name, m)
-        //err = Handle(nil, "key '%s' is not present in map '%s'", name, m)
         return
     }
     
-    ret, ok = tmp.(int)
-    
-    if !ok {
-        err = TypeErr.Make(tmp, name, "int")
-        //err = Handle(nil, "unexpected type %T for '%s', expected int",
-            //tmp, name)
+    switch v := tmp.(type) {
+    case int:
+        return int(v), nil
+    case int8:
+        return int(v), nil
+    case int16:
+        return int(v), nil
+    case int32:
+        return int(v), nil
+    case int64:
+        return int(v), nil
+    case float32:
+        return int(v), nil
+    case float64:
+        return int(v), nil
+    default:
+        err = fmt.Errorf("failed to convert '%s' of type '%T' to int", tmp, tmp)
         return
     }
-    
-    return ret, nil
 }

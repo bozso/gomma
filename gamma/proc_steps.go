@@ -113,7 +113,7 @@ func stepSelect(self *Config) error {
     
     
     if len(dateStart) != 0 {
-        _dateStart, err := ParseDate(short, dateStart)
+        _dateStart, err := ParseDate(DShort, dateStart)
         
         if err != nil {
             return Handle(err, "failed to parse date '%s' in short format",
@@ -127,7 +127,7 @@ func stepSelect(self *Config) error {
     }
     
     if len(dateStop) != 0 {
-        _dateStop, err := ParseDate(short, dateStop)
+        _dateStop, err := ParseDate(DShort, dateStop)
         
         if err != nil {
             return Handle(err, "failed to parse date '%s' in short format",
@@ -227,7 +227,7 @@ func stepImport(self *Config) error {
     masterDate := self.General.MasterDate
     
     for _, s1zip := range zips {
-        if date2str(s1zip, short) == masterDate {
+        if date2str(s1zip, DShort) == masterDate {
             master = s1zip
         }
     }
@@ -298,7 +298,7 @@ func stepImport(self *Config) error {
     for _, s1zip := range zips {
         // iw, err := s1zip.Info(extInfo)
         
-        date := date2str(s1zip, short)
+        date := date2str(s1zip, DShort)
         
         other := Search(s1zip, zips)
         
@@ -595,10 +595,10 @@ func stepCoreg(self *Config) error {
 
 func Search(s1 *S1Zip, zips []*S1Zip) *S1Zip {
     
-    date1 := date2str(s1, short)
+    date1 := date2str(s1, DShort)
     
     for _, zip := range zips {
-        if date1 == date2str(zip, short)  && s1.Path != zip.Path {
+        if date1 == date2str(zip, DShort)  && s1.Path != zip.Path {
             return zip
         }
     }
