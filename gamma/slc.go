@@ -5,16 +5,24 @@ import (
 )
 
 type SLC struct {
-    dataFile
+    DatParFile
 }
 
-func NewSLC(dat, par string) (ret SLC, err error) {
-    ret.dataFile, err = NewDataFile(dat, par, Unknown)
-    return
-}
+const (
+    TypeMismatch Werror = "expected complex datatype for %s datafile, got '%s'"
+)
 
-func (s SLC) TypeStr() string {
-    return "SLC"
+func (s *SLC) FromJson(m JSONMap) (err error) {
+    if err = s.DatParFile.FromJson(m); err != nil {
+        return
+    }
+    
+    if s.DType != ShortCpx && s.DType != FloatCpx {
+        err = TypeMismatch.Make("SLC", s.DType.String())
+        fmt.Errorf("expected complex datatype for SLC, got '%s'",
+            dtype2str(s.DType))
+        return
+    }
 }
 
 var multiLook = Gamma.Must("multi_look")
@@ -43,16 +51,8 @@ func (opt *MLIOpt) Parse() {
 func (s SLC) MakeMLI(opt MLIOpt) (ret MLI, err error) {
     opt.Parse()
     
-    tmp := ""
-    
-    if tmp, err = TmpFileExt("mli"); err != nil {
-        //err = Handle(err, "failed to create tmp file")
-        return ret, err
-    }
-    
-    if ret, err = NewMLI(tmp, ""); err != nil {
-        err = DataCreateErr.Wrap(err, "MLI")
-        //err = Handle(err, "failed to create MLI struct")
+    var dp DatPar
+    if dp, err = TmpDatPar(); err != nil {
         return
     }
     
@@ -62,12 +62,10 @@ func (s SLC) MakeMLI(opt MLIOpt) (ret MLI, err error) {
                        opt.ScaleExp.Scale, opt.ScaleExp.Exp)
     
     if err != nil {
-        err = CmdErr.Wrap(err, "multi_look")
-        //err = Handle(err, "multi_look failed")
         return
     }
     
-    return ret, nil
+    return ret, err = dp.ToFile(Float)
 }
 
 type (
@@ -186,11 +184,6 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err
     return ret, nil
 }
 
-
-func (d SLC) PlotCmd() string {
-    return "SLC"
-}
-
 func (s SLC) Raster(opt RasArgs) error {
     err := opt.Parse(s)
     
@@ -202,21 +195,21 @@ func (s SLC) Raster(opt RasArgs) error {
 }
 
 type MLI struct {
-    dataFile
+    DatParFile
 }
 
-func NewMLI(dat, par string) (ret MLI, err error) {
-    ret.dataFile, err = NewDataFile(dat, par, Unknown)
-    return
+func (M *MLI) FromJson(m JSONMap) (err error) {
+    if err = M.DatParFile.FromJson(m); err != nil {
+        return
+    }
+    
+    if M.DType != Float {
+        err = fmt.Errorf("expected float datatype for MLI, got '%s'",
+            dtype2str(M.DType))
+        return
+    }
 }
 
-func (m MLI) TypeStr() string {
-    return "MLI"
-}
-
-func (d MLI) PlotCmd() string {
-    return "MLI"
-}
 
 func (m MLI) Raster(opt RasArgs) error {
     err := opt.Parse(m)

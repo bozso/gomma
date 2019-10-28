@@ -52,8 +52,7 @@ var (
         "DOUBLE":    2,
     }
     
-    Imv   = MakeCmd("eog")
-
+    // TODO: get settings path from environment variable
     Settings = loadSettings("/home/istvan/progs/gamma/bin/settings.json")
     Gamma = makeGamma()
 )

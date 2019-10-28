@@ -13,6 +13,7 @@ import (
 )
 
 type (
+    /*
     DataFile interface {
         Datfile() string
         Parfile() string
@@ -30,16 +31,25 @@ type (
         Raster(RasArgs) error
         Save(string) error
     }
+    */
+    
+    IDatFile interface {
+        jsonMap() (JSONMap, error)
+        FromJson(JSONMap) error
+    }
+    
+    IDatParFile interface {
+        IDatFile
+        ParseRng() (int, error)
+        ParseAzi() (int, error)
+        ParseDate() (time.Time, error)
+        ParseFmt() (string, error)
+        
+        // TODO: implement this
+        // ParseDType() (DType, error)
+    }
     
     DType int
-    
-    dataFile struct {
-        Dat   string    `json:"datafile" name:"dat"`
-        Dtype DType
-        Params
-        RngAzi
-        time.Time       `json:"-"`
-    }
 )
 
 
@@ -52,52 +62,56 @@ const (
     UChar
     Short
     Unknown
+    Any
 )
 
-func str2dtype(in string) (ret DType, err error) {
+func str2dtype(in string) DType {
     in = str.ToUpper(in)
     
     switch in {
     case "FLOAT":
-        return Float, nil
+        return Float
     case "DOUBLE":
-        return Double, nil
+        return Double
     case "SCOMPLEX":
-        return ShortCpx, nil
+        return ShortCpx
     case "FCOMPLEX":
-        return FloatCpx, nil
+        return FloatCpx
     case "SUN", "RASTER", "BMP":
-        return Raster, nil
+        return Raster
     case "UNSIGNED CHAR":
-        return UChar, nil
+        return UChar
     case "SHORT":
-        return Short, nil
+        return Short
+    case "ANY":
+        return Any
     default:
-        return ret, fmt.Errorf("unrecognized data type: '%s'", in)
+        return Unknown
     }
 }
 
-func dtype2str(in DType) (ret string, err error) {
+func (in DType) ToString() string {
     switch in {
     case Float:
-        return "FLOAT", nil
+        return "FLOAT"
     case Double:
-        return "DOUBLE", nil
+        return "DOUBLE"
     case ShortCpx:
-        return "SCOMPLEX", nil
+        return "SCOMPLEX"
     case FloatCpx:
-        return "FCOMPLEX", nil
+        return "FCOMPLEX"
     case Raster:
-        return "RASTER", nil
+        return "RASTER"
     case UChar:
-        return "UNSIGNED CHAR", nil
+        return "UNSIGNED CHAR"
     case Short:
-        return "SHORT", nil
+        return "SHORT"
+    case Any:
+        return "ANY"
     default:
-        return ret, fmt.Errorf("unrecognized data type: '%s'", in)
+        return "UNLNOWN"
     }
 }
-
 
 func NewGammaParam(path string) Params {
     return Params{Par: path, Sep: ":", contents: nil}
@@ -107,30 +121,182 @@ const (
     DataCreateErr Werror = "failed to create %s Struct"
 )
 
-func Newdatafile(dat, par string) (ret dataFile, err error) {
-    if len(dat) == 0 {
-        err = Handle(err, "'dat' should not be an empty string")
+type DatFile struct {
+    Dat string
+    RngAzi
+    DType
+}
+
+func (d DatFile) jsonMap() JSONMap {
+    return JSONMap{
+        "datafile": d.Dat,
+        "range_samples": d.Rng,
+        "azimuth_lines": d.Azi,
+        "dtype": d.DTypeTo.String(),
+    }
+}
+
+func (d *DatFile) FromJson(m JSONMap) (err error) {
+    if d.Dat, err = m.String("datafile"); err != nil {
+        err = Handle(err, "failed to retreive datafile")
         return
     }
     
-    ret.Dat = dat
+    dt := ""
+    if dt, err = m.String("dtype"); err != nil {
+        err = Handle(err, "failed to retreive dtype")
+        return
+    }
+    
+    if d.DType, err = str2dtype(dt); err != nil {
+        return
+    }
+    
+    if d.Rng, err = m.Int("range_samples"); err != nil {
+        //err = RngError.Wrap(err, path)
+        return
+    }
+    
+    if d.Azi, err = m.Int("azimuth_lines"); err != nil {
+        //err = AziError.Wrap(err, path)
+        return
+    }
+    
+    return nil
+}
+
+func (d DatFile) Move(dir string) (ret DatFile, err error) {
+    if ret.Dat, err = Move(d.Dat, dir); err != nil {
+        return
+    }
+    
+    ret.RngAzi, ret.DType = d.RngAzi, d.DType
+    
+    return ret, nil
+}
+
+func (d DatFile) Exist() (ret bool, err error) {
+    if ret, err = Exist(d.Dat); err != nil {
+        return
+    }
+
+    if !ret {
+        return false, nil
+    }
+}
+    
+
+type DatPar struct {
+    Dat, Par string
+}
+
+func NewDatPar(dat, par string) (ret DatPar, err error) {
+    if len(dat) == 0 {
+        err = fmt.Errorf("datafile path should not be an empty string")
+        return
+    }
     
     if len(par) == 0 {
         par = dat + ".par"
     }
     
-    ret.Params = NewGammaParam(par)
+    return DatPar{Dat: dat, Par: par}, nil
+}
+
+func (d DatPar) ToFile(dtype DType) (ret DatParFile, err error) {
+    ret = DatParFile{Dat: d.Dat, Par: d.Par, Sep: ":"}
+    
+    if dtype == Unknown {
+        var dt string
+        if dt, err = ret.ParseFmt(); err != nil {
+            return
+        }
+        
+        dtype = str2dtype(dt)
+    }
+    
+    if dtype == Unknown {
+        err = fmt.Errorf("Unknown datatype")
+        return
+    }
+    
+    ret.DType = dtype
+    
+    if ret.Rng, err = ret.ParseRng(); err != nil {
+        return
+    }
+    
+    if ret.Azi, err = ret.ParseAzi(); err != nil {
+        return
+    }
+    
+    if ret.Time, err = ret.ParseDate(); err != nil {
+        return
+    }
     
     return ret, nil
 }
 
-func TmpDataFile() (ret dataFile, err error) {
+func TmpDatPar() (ret DatPar, err error) {
     dat, err := TmpFileExt("dat")
     if err != nil {
         return ret, err
     }
     
-    return Newdatafile(dat, "")
+    return NewDatPar(dar, "")
+}
+
+type DatParFile struct {
+    DatFile
+    Params
+    time.Time `json:"-"`
+}
+
+func (d DatParFile) Move(dir string) (ret DataFile, err error) {
+    if ret.DatFile, err = d.DatFile.Move(dir); err != nil {
+        return
+    }
+    
+    if ret.Par, err = Move(d.Par, dir); err != nil {
+        return
+    }
+    
+    return ret, nil
+}
+
+func (d DatParFile) Exist() (ret bool, err error) {
+    var de, pe bool
+    
+    if de, err = d.DatFile.Exist(); err != nil {
+        return
+    }
+    
+    if pe, err = Exist(d.Par); err != nil {
+        return
+    }
+    
+    return de && pe
+}
+
+func (d DatParFile) jsonMap() JSONMap {
+    ret := d.DatFile.jsonMap()
+    ret["parameterfile"] = d.Par
+    
+    return ret
+}
+
+func (d *DatParFile) FromJson(m JSONMap) (err error) {
+    if err = d.DatFile.FromJson(m); err != nil {
+        return
+    }
+    
+    if d.Par, err = m.String("parameterfile"); err != nil {
+        err = Handle(err, "failed to retreive paramfile")
+        return
+    }
+    d.Sep = ":"
+    
+    return nil    
 }
 
 const (
@@ -138,91 +304,7 @@ const (
     AziError Werror = "failed to retreive azimuth lines from '%s'"
 )
 
-
-func NewDataFile(dat, par string, dt DType) (ret dataFile, err error) {
-    if ret, err = Newdatafile(dat, par); err != nil {
-        err = DataCreateErr.Wrap(err, "dataFile")
-        return
-    }
-    
-    if ret.Rng, err = ret.rng(); err != nil {
-        err = RngError.Wrap(err, par)
-        return
-    }
-    
-    if ret.Azi, err = ret.azi(); err != nil {
-        err = AziError.Wrap(err, par)
-        return
-    }
-    
-    if ret.Time, err = ret.Date(); err != nil {
-        err = Handle(err, "failed to retreive date from '%s'", par)
-        return
-    }
-    
-    if dt == Unknown {
-        var format string
-        if format, err = ret.imgfmt(); err != nil {
-            err = Handle(err, "failed to retreive image format from '%s'", par)
-            return
-        }
-        
-        if ret.Dtype, err = str2dtype(format); err != nil {
-            err = Handle(err, "failed to retreive datatype")
-            return
-        }
-    } else {
-        ret.Dtype = dt
-    }
-    
-    return ret, nil
-}
-
-// TODO: implement
-func FromLine(line string) (ret DataFile, err error) {
-    
-    return ret, nil
-}
-
-func (d dataFile) Exist() (ret bool, err error) {
-    if ret, err = Exist(d.Dat); err != nil {
-        //err = Handle(err, "stat on file '%s' failed", d.Dat)
-        return
-    }
-
-    if !ret {
-        return false, nil
-    }
-    
-    if ret, err = Exist(d.Par); err != nil {
-        //err = Handle(err, "stat on file '%s' failed", d.Par)
-        return
-    }
-
-    return ret, nil
-}
-
-func (d dataFile) Datfile() string {
-    return d.Dat
-}
-
-func (d dataFile) Parfile() string {
-    return d.Par
-}
-
-func (d dataFile) GetRng() int {
-    return d.Rng
-}
-
-func (d dataFile) GetAzi() int {
-    return d.Azi
-}
-
-func (d dataFile) GetDate() time.Time {
-    return d.Time
-}
-
-func (d dataFile) TimeStr(format dateFormat) string {
+func (d DatParFile) TimeStr(format dateFormat) string {
     switch format {
     case DShort:
         return d.Time.Format(DateShort)
@@ -232,27 +314,23 @@ func (d dataFile) TimeStr(format dateFormat) string {
     return ""
 }
 
-func (d dataFile) rng() (int, error) {
+func (d DatParFile) ParseRng() (int, error) {
     return d.Int("range_samples", 0)
 }
 
-func (d dataFile) azi() (int, error) {
+func (d DatParFile) ParseAzi() (int, error) {
     return d.Int("azimuth_lines", 0)
 }
 
-func (d dataFile) imgfmt() (string, error) {
+func (d DatParFile) ParseFmt() (string, error) {
     return d.Param("image_format")
-}
-
-func ID(one DataFile, two DataFile, format dateFormat) string {
-    return fmt.Sprintf("%s_%s", one.TimeStr(format), two.TimeStr(format))
 }
 
 const (
     TimeParseErr Werror = "failed retreive %s from date string '%s'"
 )
 
-func (d dataFile) Date() (ret time.Time, err error) {
+func (d DatParFile) ParseDate() (ret time.Time, err error) {
 
     dateStr, err := d.Param("date")
     
@@ -341,113 +419,86 @@ func (d dataFile) Date() (ret time.Time, err error) {
     return time.Date(year, month, day, hour, min, int(sec), 0, time.UTC), nil
 }
 
-func (d dataFile) TypeStr() string {
-    return "Unknown"
+func ID(one IDatParFile, two IDatParFile, format dateFormat) string {
+    return fmt.Sprintf("%s_%s", one.TimeStr(format), two.TimeStr(format))
 }
 
-func (d dataFile) PlotCmd() string {
-    return ""
-}
-
-func (d dataFile) Save(path string) error {
-    return SaveJson(path, &d)
-}
-
-func (d dataFile) Move(dir string) (ret DataFile, err error) {
-    var dat, par string
+//func Display(dat DataFile, opt DisArgs) error {
+    //err := opt.Parse(dat)
     
-    if dat, err = Move(d.Dat, dir); err != nil {
-        return
-    }
+    //if err != nil {
+        //return Handle(err, "failed to parse display options")
+    //}
     
-    if par, err = Move(d.Par, dir); err != nil {
-        return
-    }
+    //cmd := opt.Cmd
+    //fun := Gamma.Must("dis" + cmd)
     
-    if ret, err = NewDataFile(dat, par, d.Dtype); err != nil {
-        err = DataCreateErr.Wrap(err, "DataFile")
-        return
-    }
-    
-    return ret, nil
-}
-
-func Display(dat DataFile, opt DisArgs) error {
-    err := opt.Parse(dat)
-    
-    if err != nil {
-        return Handle(err, "failed to parse display options")
-    }
-    
-    cmd := opt.Cmd
-    fun := Gamma.Must("dis" + cmd)
-    
-    if cmd == "SLC" {
-        _, err := fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines, opt.Scale,
-                      opt.Exp)
+    //if cmd == "SLC" {
+        //_, err := fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines, opt.Scale,
+                      //opt.Exp)
         
-        if err != nil {
-            return Handle(err, "failed to execute display command")
-        }
-    }
-    return nil
-}
+        //if err != nil {
+            //return Handle(err, "failed to execute display command")
+        //}
+    //}
+    //return nil
+//}
 
 // TODO: implement proper selection of plot command
-func (d dataFile) Raster(opt RasArgs) (err error) {
-    err = opt.Parse(d)
+//func (d DatFile) Raster(opt RasArgs) (err error) {
+    //err = opt.Parse(d)
     
-    if err != nil {
-        return Handle(err, "failed to parse display options")
-    }
-    /*
-    cmd := opt.Cmd
-    fun := Gamma.Must("ras" + cmd)
+    //if err != nil {
+        //return Handle(err, "failed to parse display options")
+    //}
+    //
+    //cmd := opt.Cmd
+    //fun := Gamma.Must("ras" + cmd)
     
-    switch cmd {
-        case "SLC":
-            err = rasslc(opt)
+    //switch cmd {
+        //case "SLC":
+            //err = rasslc(opt)
             
-            if err != nil {
-                return
-            }
+            //if err != nil {
+                //return
+            //}
             
-        case "MLI":
-            err = raspwr(opt)
+        //case "MLI":
+            //err = raspwr(opt)
             
-            if err != nil {
-                return
-            }
+            //if err != nil {
+                //return
+            //}
         
-        default:
-            err = Handle(nil, "unrecognized command type '%s'", cmd)
-            return
-    }
+        //default:
+            //err = Handle(nil, "unrecognized command type '%s'", cmd)
+            //return
+    //}
     
-    if cmd == "SLC" {
-        _, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
-            opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
-            opt.ImgFmt, opt.HeaderSize, opt.Raster)
+    //if cmd == "SLC" {
+        //_, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+            //opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
+            //opt.ImgFmt, opt.HeaderSize, opt.Raster)
 
-    } else {
-        if len(sec) == 0 {
-            _, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
-                opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
-                opt.LR, opt.Raster, opt.ImgFmt, opt.HeaderSize)
+    //} else {
+        //if len(sec) == 0 {
+            //_, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+                //opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
+                //opt.LR, opt.Raster, opt.ImgFmt, opt.HeaderSize)
 
-        } else {
-            _, err = fun(opt.Datfile, sec, opt.Rng, opt.Start, opt.Nlines,
-                opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
-                opt.LR, opt.Raster, opt.ImgFmt, opt.HeaderSize, opt.Raster)
-        }
-    }
+        //} else {
+            //_, err = fun(opt.Datfile, sec, opt.Rng, opt.Start, opt.Nlines,
+                //opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
+                //opt.LR, opt.Raster, opt.ImgFmt, opt.HeaderSize, opt.Raster)
+        //}
+    //}
     
-    if err != nil {
-        return Handle(err, "failed to create rasterfile '%s'", opt.Raster)
-    }
-    */
-    return nil
-}
+    //if err != nil {
+        //return Handle(err, "failed to create rasterfile '%s'", opt.Raster)
+    //}
+    //
+    //return nil
+//}
 
 type(
     Subset struct {
@@ -484,24 +535,17 @@ func Move(path string, dir string) (ret string, err error) {
     return dst, nil
 }
 
-// TODO: implement dtype2str
-func (d dataFile) MarshalJSON() ([]byte, error) {
-    dt, err := dtype2str(d.Dtype)
-    if err != nil {
-        return nil, err
+func Save(path string, d IDatFile) (err error) {
+    var m JSONMap
+    
+    if m, err = d.jsonMap(); err != nil {
+        return
     }
     
-    return json.Marshal(JSONMap{
-        "datafile": d.Dat,
-        "paramfile": d.Par,
-        "range_samples": d.Rng,
-        "azimuth_lines": d.Azi,
-        "dtype": dt,
-        "ftype": d.TypeStr(),
-    })
+    return SaveJson(path, m)
 }
 
-func LoadDataFile(path string) (ret DataFile, err error) {
+func Load(path string, d IDatFile) (err error) {
     
     data, err := ReadFile(path)
     if err != nil {
@@ -516,105 +560,5 @@ func LoadDataFile(path string) (ret DataFile, err error) {
         return
     }
     
-    ti, ok := m["ftype"]
-    if !ok {
-        err = KeyErr.Make("ftype", m)
-        return
-    }
-    
-    t, ok := ti.(string)
-    if !ok {
-        err = TypeErr.Make(t, ti, "string")
-        return
-    }
-    
-    
-    var (
-        dat, par, dt, quality, diffPar, simUnwrap string
-        ra RngAzi
-    )
-    
-    t = str.ToUpper(t)
-    
-    switch t {
-    case "SLC", "MLI":
-        if dat, err = m.String("datafile"); err != nil {
-            err = Handle(err, "failed to retreive datafile")
-            return
-        }
-        
-        if par, err = m.String("paramfile"); err != nil {
-            err = Handle(err, "failed to retreive paramfile")
-            return
-        }
-        
-        if dt, err = m.String("dtype"); err != nil {
-            err = Handle(err, "failed to retreive dtype")
-            return
-        }
-        
-        if ra.Rng, err = m.Int("range_samples"); err != nil {
-            err = RngError.Wrap(err, path)
-            return
-        }
-        
-        if ra.Azi, err = m.Int("azimuth_lines"); err != nil {
-            err = AziError.Wrap(err, path)
-            return
-        }
-        
-        switch t {
-        case "IFG":
-            if quality, err = m.String("quality"); err != nil {
-                err = Handle(err, "failed to retreive quality file")
-                return
-            }
-            
-            if diffPar, err = m.String("diffparfile"); err != nil {
-                err = Handle(err, "failed to diffparfile")
-                return
-            }
-            
-            if simUnwrap, err = m.String("simulated_unwrapped"); err != nil {
-                err = Handle(err, "failed to simulated unwrapped datafile")
-                return
-            }
-        }
-    }
-        
-    switch t {
-    case "SLC":
-        if ret, err = NewSLC(dat, par); err != nil {
-            err = DataCreateErr.Wrap(err, "SLC")
-            //err = Handle(err, "failed to create SLC struct")
-            return
-        }
-    case "MLI":
-        if ret, err = NewMLI(dat, par); err != nil {
-            err = DataCreateErr.Wrap(err, "MLI")
-            //err = Handle(err, "failed to create MLI struct")
-            return
-        }
-    case "IFG":
-        ret, err = NewIFG(dat, par, simUnwrap, diffPar, quality)
-        if err != nil {
-            err = DataCreateErr.Wrap(err, "IFG")
-            //err = Handle(err, "failed to create IFG struct")
-            return
-        }
-    default:
-        var dtype DType
-        if dtype, err = str2dtype(dt); err != nil {
-            err = Handle(err, "failed to retreive datatype from string '%s'",
-                dt)
-            return
-        }
-        
-        if ret, err = NewDataFile(dat, par, dtype); err != nil {
-            err = DataCreateErr.Wrap(err, "DataFile")
-            return
-        }
-    }
-    
-    return ret, nil
+    return d.FromJson(m) 
 }

@@ -15,12 +15,10 @@ type (
     CpxToReal  int
     
     IFG struct {
-        dataFile
+        DatParFile
         DiffPar Params          `json:"diffparfile"`
         Quality   string        `json:"quality"`
         SimUnwrap string        `json:"simulated_unwrapped"`
-        SLC1      SLC           `json:"slc1"`
-        SLC2      SLC           `json:"slc2"`
         DeltaT    time.Duration `json:"-"`
     }
     
@@ -69,49 +67,44 @@ var (
     }
 )
 
-// TODO: check datatype of coherence file
-func NewCoherence(dat, par string) (ret Coherence, err error) {
-    ret.dataFile, err = NewDataFile(dat, par, Float)
-    return
+func (i IFG) jsonMap() JSONMap {
+    ret := i.DatParFile.jsonMap()
+    
+    ret["quality"] = i.Quality
+    ret["diffparfile"] = i.DiffPar
+    ret["simulated_unwrapped"] = i.SimUnwrap
+    
+    return ret
 }
 
-func NewIFG(dat, par, simUnw, diffPar, quality string) (ret IFG, err error) {
-    if len(dat) == 0 {
-        err = Handle(nil, "'dat' should not be an empty string")
+
+func (i *IFG) FromJson(m JSONMap) (err error) {
+    if err = i.DatParFile.FromJson(m); err != nil {
         return
     }
     
-    ret.Dat = dat
-    
-    base := NoExt(dat)
-    
-    if len(par) == 0 {
-        par = base + ".off"
+    if i.DType != FloatCpx {
+        return TypeMismatch.Make("IFG", i.DType.ToString())
     }
     
-    ret.Params = NewGammaParam(par)
-    
-    if len(simUnw) == 0 {
-        simUnw = base + ".sim_unw"
-    }
-    
-    ret.Quality, ret.SimUnwrap = quality, simUnw
-    
-    ret.DiffPar = NewGammaParam(diffPar)
-    
-    if ret.Rng, err = ret.rng(); err != nil {
-        err = Handle(err, "failed to retreive range samples from '%s'", par)
+    if i.Quality, err = m.String("quality"); err != nil {
+        err = Handle(err, "failed to retreive quality file")
         return
     }
     
-    if ret.Azi, err = ret.azi(); err != nil {
-        err = Handle(err, "failed to retreive azimuth lines from '%s'", par)
+    if i.DiffPar.Par, err = m.String("diffparfile"); err != nil {
+        err = Handle(err, "failed to diffparfile")
+        return
+    }
+    i.DiffPar.Sep = ":"
+    
+    
+    if i.SimUnwrap, err = m.String("simulated_unwrapped"); err != nil {
+        err = Handle(err, "failed to simulated unwrapped datafile")
         return
     }
     
-    ret.Dtype = FloatCpx
-    
-    return ret, nil
+    return nil
 }
 
 func (i IFG) TypeStr() string {
