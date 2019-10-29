@@ -8,9 +8,15 @@ type SLC struct {
     DatParFile
 }
 
-const (
-    TypeMismatch Werror = "expected complex datatype for %s datafile, got '%s'"
-)
+func NewSLC(dat, par string) (ret SLC, err error) {
+    ret.DatParFile, err = NewDatParFile(dat, par, "par", FloatCpx)
+    return
+}
+
+func TmpSLC() (ret SLC, err error) {
+    ret.DatParFile, err = TmpDatParFile("slc", "par", FloatCpx)
+    return
+}
 
 func (s *SLC) FromJson(m JSONMap) (err error) {
     if err = s.DatParFile.FromJson(m); err != nil {
@@ -18,11 +24,10 @@ func (s *SLC) FromJson(m JSONMap) (err error) {
     }
     
     if s.DType != ShortCpx && s.DType != FloatCpx {
-        err = TypeMismatch.Make("SLC", s.DType.String())
-        fmt.Errorf("expected complex datatype for SLC, got '%s'",
-            dtype2str(s.DType))
+        err = TypeMismatchError{ftype:"SLC", expected:"complex", DType:s.DType}
         return
     }
+    return nil
 }
 
 var multiLook = Gamma.Must("multi_look")
@@ -51,8 +56,7 @@ func (opt *MLIOpt) Parse() {
 func (s SLC) MakeMLI(opt MLIOpt) (ret MLI, err error) {
     opt.Parse()
     
-    var dp DatPar
-    if dp, err = TmpDatPar(); err != nil {
+    if ret, err = TmpMLI(); err != nil {
         return
     }
     
@@ -65,7 +69,7 @@ func (s SLC) MakeMLI(opt MLIOpt) (ret MLI, err error) {
         return
     }
     
-    return ret, err = dp.ToFile(Float)
+    return ret, nil
 }
 
 type (
@@ -96,22 +100,11 @@ func (opt *SBIOpt) Default() {
 func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (ret SBIOut, err error) {
     opt.Default()
     
-    tmp := ""
-    
-    if tmp, err = TmpFile(); err != nil {
-        //err = Handle(err, "failed to create tmp file")
-        return ret, err
-    }
-    
-    if ret.Ifg, err = NewIFG(tmp + ".diff", "", "", "", ""); err != nil {
-        err = DataCreateErr.Wrap(err, "IFG")
-        //err = Handle(err, "failed to create IFG struct")
+    if ret.Ifg, err = TmpIFG(); err != nil {
         return
     }
     
-    if ret.Mli, err = NewMLI(tmp + ".mli", ""); err != nil {
-        err = DataCreateErr.Wrap(err, "MLI")
-        //err = Handle(err, "failed to create MLI struct")
+    if ret.Mli, err = TmpMLI(); err != nil {
         return
     }
     
@@ -146,7 +139,7 @@ type (
     
     SSIOut struct {
         Ifg IFG
-        Unw dataFile
+        Unw DatFile
     }
 )
 
@@ -184,7 +177,7 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err
     return ret, nil
 }
 
-func (s SLC) Raster(opt RasArgs) error {
+func (s *SLC) Raster(opt RasArgs) error {
     err := opt.Parse(s)
     
     if err != nil {
@@ -198,20 +191,30 @@ type MLI struct {
     DatParFile
 }
 
+func NewMLI(dat, par string) (ret MLI, err error) {
+    ret.DatParFile, err = NewDatParFile(dat, par, "par", Float)
+    return
+}
+
+func TmpMLI() (ret MLI, err error) {
+    ret.DatParFile, err = TmpDatParFile("mli", "par", FloatCpx)
+    return
+}
+
 func (M *MLI) FromJson(m JSONMap) (err error) {
     if err = M.DatParFile.FromJson(m); err != nil {
         return
     }
     
     if M.DType != Float {
-        err = fmt.Errorf("expected float datatype for MLI, got '%s'",
-            dtype2str(M.DType))
+        err = TypeMismatchError{ftype:"MLI", expected:"float", DType:M.DType}
         return
     }
+    return nil
 }
 
 
-func (m MLI) Raster(opt RasArgs) error {
+func (m *MLI) Raster(opt RasArgs) error {
     err := opt.Parse(m)
     
     if err != nil {

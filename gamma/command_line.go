@@ -337,8 +337,8 @@ func (b Batcher) Raster() error {
             continue
         }
         
-        var data DataFile
-        if data, err = LoadDataFile(line); err != nil {
+        var data DatFile
+        if err = Load(line, &data); err != nil {
             return Handle(err, "failed to load datafile from '%s'", line)
         }
         
@@ -453,7 +453,7 @@ type Creater struct {
     Dtype      string `name:"dtype"`
     Ftype      string `name:"ftype"`
     ParfileExt string `name:"parExt"`
-    dataFile
+    DatParFile
     MetaFile
 }
 
@@ -468,7 +468,7 @@ func create(args Args) (err error) {
     dat := c.Dat
     
     if len(dat) == 0 {
-        if dat, err = TmpFile(); err != nil {
+        if err = c.DatParFile.Tmp(); err != nil {
             return
         }
     }
@@ -633,28 +633,25 @@ type (
 
 var imgStat = Gamma.Must("image_stat")
 
-func stat(args Args) error {
+func stat(args Args) (err error) {
     s := Stat{}
     
     if err := args.ParseStruct(&s); err != nil {
         return ParseErr.Wrap(err)
     }
     
-    dat, err := LoadDataFile(s.Meta)
-    if err != nil {
-        return err
+    var dat DatFile
+    
+    if err = Load(s.Meta, &dat); err != nil {
+        return
     }
     
-    s.Subset.Parse(dat)
+    //s.Subset.Parse(dat)
     
-    _, err = imgStat(dat.Datfile(), dat.GetRng(), s.RngOffset, s.AziOffset,
+    _, err = imgStat(dat.Datfile(), dat.Rng(), s.RngOffset, s.AziOffset,
                      s.RngWidth, s.AziLines, s.Out)
     
-    if err != nil {
-        return err
-    }
-
-    return nil
+    return
 }
 
 /*

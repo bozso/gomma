@@ -20,7 +20,7 @@ type (
     CoregOut struct {
         RSLC SLC
         Rslc S1SLC
-        Ifg DataFile
+        Ifg IFG
         Ok bool
     }
 )
@@ -62,9 +62,7 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
     if exist {
         log.Printf("Coregistered RSLC already exists, moving it to directory.")
         
-        err = ret.Rslc.Move(self.RslcPath)
-        
-        if err != nil {
+        if ret.Rslc, err = ret.Rslc.Move(self.RslcPath); err != nil {
             err = Handle(err, "failed to move '%s' to RSLC directory",
                 ret.Rslc.Tab)
             return
@@ -113,8 +111,13 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
     
     ID := fmt.Sprintf("%s_%s", slc1ID, slc2ID)
     
-    ifg, err := NewIFG(ID + ".diff", ID + ".off", "", ID + ".diff_par",
-        ID + ".results")
+    var ifg IFG
+    if ifg, err = NewIFG(ID + ".diff", ID + ".off", ID + ".diff_par");
+       err != nil {
+        return
+    }
+    
+    ifg.Quality = ID + ".results"
     
     if err != nil {
         err = Handle(err, "failed to create IFG '%s'", ID + ".diff")
@@ -131,7 +134,7 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
         return ret, nil
     }
     
-    if err = ret.Rslc.Move(self.RslcPath); err != nil {
+    if ret.Rslc, err = ret.Rslc.Move(self.RslcPath); err != nil {
         err = Handle(err, "failed to move '%s' to RSLC directory", ret.Rslc.Tab)
         return
     }

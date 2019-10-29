@@ -12,7 +12,6 @@ import (
 
 const (
     nMaxBurst = 10
-    maxIW     = 3
     burstTpl  = "burst_asc_node_%d"
     nTemplate = 6
 )
@@ -54,28 +53,6 @@ type (
     
     S1Zips []*S1Zip
     ByDate S1Zips
-
-    IWInfo struct {
-        nburst int
-        extent Rect
-        bursts [nMaxBurst]float64
-    }
-    
-    IWInfos [maxIW]IWInfo
-
-    S1IW struct {
-        dataFile
-        TOPS_par Params
-    }
-
-    IWs [maxIW]S1IW
-
-    S1SLC struct {
-        nIW int
-        Tab string
-        time.Time
-        IWs
-    }
 )
 
 var (
@@ -185,28 +162,58 @@ func (s1 *S1Zip) Info(exto *ExtractOpt) (ret IWInfos, err error) {
     return ret, nil
 }
 
-func NewIW(dat, par, TOPS_par string) (ret S1IW, err error) {
-    ret.dataFile, err = NewDataFile(dat, par, Unknown)
+const maxIW = 3
 
-    if err != nil {
-        err = Handle(err,
-            "failed to create DataFile with dat: '%s' and par '%s'",
-            dat, par)
-        return
+type(  
+    S1IW struct {
+        DatParFile
+        TOPS_par Params
     }
 
+    IWs [maxIW]S1IW
+)
+
+func NewIW(dat, par, TOPS_par string) (ret S1IW) {
+    ret.Dat = dat
+    
+    if len(par) == 0 {
+        par = dat + ".par"
+    }
+    
+    ret.Params = Params{Par: par, Sep: ":"}
+    
     if len(TOPS_par) == 0 {
         TOPS_par = dat + ".TOPS_par"
     }
 
-    ret.TOPS_par = NewGammaParam(TOPS_par)
+    ret.TOPS_par = Params{Par: TOPS_par, Sep: ":"}
 
+    return ret
+}
+
+func (iw S1IW) Move(dir string) (ret S1IW, err error) {
+    if ret.DatParFile, err = iw.DatParFile.Move(dir); err != nil {
+        return
+    }
+    
+    if ret.TOPS_par.Par, err = Move(iw.TOPS_par.Par, dir); err != nil {
+        return
+    }
+    
     return ret, nil
 }
+
 
 const (
     ParseTabErr Werror = "failed to parse tabfile '%s'"
 )
+
+type S1SLC struct {
+    nIW int
+    Tab string
+    time.Time
+    IWs
+}
 
 func FromTabfile(tab string) (ret S1SLC, err error) {
     fmt.Printf("Parsing tabfile: '%s'.\n", tab)
@@ -228,7 +235,7 @@ func FromTabfile(tab string) (ret S1SLC, err error) {
         
         log.Printf("Parsing IW%d\n", ret.nIW + 1)
         
-        ret.IWs[ret.nIW], err = NewIW(split[0], split[1], split[2])
+        ret.IWs[ret.nIW] = NewIW(split[0], split[1], split[2])
         
         if err != nil {
             err = Handle(err, "failed to parse IW files from line '%s'", line)
@@ -240,7 +247,7 @@ func FromTabfile(tab string) (ret S1SLC, err error) {
     
     ret.Tab = tab
         
-    ret.Time, err = ret.IWs[0].Date()
+    ret.Time, err = ret.IWs[0].ParseDate()
     
     if err != nil {
         err = Handle(err, "failed to retreive date for '%s'", tab)
@@ -250,11 +257,40 @@ func FromTabfile(tab string) (ret S1SLC, err error) {
     return ret, nil
 }
 
-func (s1 S1SLC) TypeStr() string {
-    return "S1SLC"
+func (s1 S1SLC) Move(dir string) (ret S1SLC, err error) {
+    newtab := fp.Join(dir, fp.Base(s1.Tab))
+    
+    file, err := os.Create(newtab)
+    
+    if err != nil {
+        err = FileOpenErr.Wrap(err, newtab)
+        return
+    }
+    
+    defer file.Close()
+    
+    for ii := 0; ii < s1.nIW; ii++ {
+        if ret.IWs[ii], err = s1.IWs[ii].Move(dir); err != nil {
+            return
+        }
+        
+        IW := ret.IWs[ii]
+        
+        line := fmt.Sprintf("%s %s %s\n", IW.Dat, IW.Par, IW.TOPS_par.Par)
+        
+        _, err = file.WriteString(line)
+        
+        if err != nil {
+            err = FileWriteErr.Wrap(err, newtab)
+            return 
+        }
+    }
+    
+    ret.Tab, ret.nIW, ret.Time = newtab, s1.nIW, s1.Time
+    return ret, nil
 }
 
-func (s1 *S1SLC) Exist() (ret bool, err error) {
+func (s1 S1SLC) Exist() (ret bool, err error) {
     var exist bool
     for _, iw := range s1.IWs {
         exist, err = iw.Exist()
@@ -271,73 +307,6 @@ func (s1 *S1SLC) Exist() (ret bool, err error) {
     return true, nil
 }
 
-func (iw *S1IW) Move(dir string) error {
-    slc, par, TOPS_par := iw.dataFile.Dat, iw.dataFile.Params.Par, iw.TOPS_par.Par
-    
-    dst := fp.Join(dir, fp.Base(slc))
-    err := os.Rename(slc, dst)
-
-    if err != nil {
-        return MoveErr.Wrap(err, slc, dst)
-        //return Handle(err, "failed to move file '%s' to '%s'", slc, dst)
-    }
-    
-    iw.dataFile.Dat = dst
-    
-    dst = fp.Join(dir, fp.Base(par))
-    err = os.Rename(par, dst)
-
-    if err != nil {
-        return MoveErr.Wrap(err, par, dst)
-    }
-    
-    iw.dataFile.Params.Par = dst
-    
-    dst = fp.Join(dir, fp.Base(TOPS_par))
-    err = os.Rename(TOPS_par, dst)
-
-    if err != nil {
-        return MoveErr.Wrap(err, TOPS_par, dst)
-    }
-    
-    iw.TOPS_par.Par = dst
-    
-    return nil
-}
-
-func (s1 *S1SLC) Move(dir string) error {
-    newtab := fp.Join(dir, fp.Base(s1.Tab))
-    
-    file, err := os.Create(newtab)
-    
-    if err != nil {
-        return FileOpenErr.Wrap(err, newtab)
-    }
-    
-    defer file.Close()
-    
-    for ii := 0; ii < s1.nIW; ii++ {
-        IW := &s1.IWs[ii]
-        
-        err := IW.Move(dir)
-        
-        if err != nil {
-            return err
-        }
-        
-        line := fmt.Sprintf("%s %s %s\n", IW.Dat, IW.Par, IW.TOPS_par.Par)
-        
-        _, err = file.WriteString(line)
-        
-        if err != nil {
-            return FileWriteErr.Wrap(err, newtab)
-        }
-    }
-    
-    s1.Tab = newtab
-    return nil
-}
-
 type MosaicOpts struct {
     Looks RngAzi
     BurstWindowFlag bool
@@ -346,7 +315,7 @@ type MosaicOpts struct {
 
 var mosaic = Gamma.Must("SLC_mosaic_S1_TOPS")
 
-func (s1 *S1SLC) Mosaic(opts MosaicOpts) (ret SLC, err error) {
+func (s1 S1SLC) Mosaic(opts MosaicOpts) (ret SLC, err error) {
     opts.Looks.Default()
     
     bflg := 0
@@ -361,18 +330,10 @@ func (s1 *S1SLC) Mosaic(opts MosaicOpts) (ret SLC, err error) {
         ref = opts.RefTab
     }
     
-    tmp := ""
-    
-    if tmp, err = TmpFileExt("slc"); err != nil {
-        //err = Handle(err, "failed to create tmp file")
-        return ret, err
-    }
-    
-    if ret, err = NewSLC(tmp, ""); err != nil {
-        err = DataCreateErr.Wrap(err, "SLC")
+    if ret, err = TmpSLC(); err != nil {
         return
     }
-    
+
     _, err = mosaic(s1.Tab, ret.Dat, ret.Par, opts.Looks.Rng, opts.Looks.Azi,
                     bflg, ref)
     
@@ -386,7 +347,7 @@ func (s1 *S1SLC) Mosaic(opts MosaicOpts) (ret SLC, err error) {
 
 var derampRef = Gamma.Must("S1_deramp_TOPS_reference")
 
-func (s1 *S1SLC) DerampRef() (ret S1SLC, err error) {
+func (s1 S1SLC) DerampRef() (ret S1SLC, err error) {
     tab := s1.Tab
     
     if _, err = derampRef(tab); err != nil {
@@ -405,7 +366,7 @@ func (s1 *S1SLC) DerampRef() (ret S1SLC, err error) {
 
 var derampSlave = Gamma.Must("S1_deramp_TOPS_slave")
 
-func (s1 *S1SLC) DerampSlave(ref *S1SLC, looks RngAzi, keep bool) (ret S1SLC, err error) {
+func (s1 S1SLC) DerampSlave(ref *S1SLC, looks RngAzi, keep bool) (ret S1SLC, err error) {
     looks.Default()
     
     reftab, tab, id := ref.Tab, s1.Tab, s1.Format(DateShort)
@@ -433,6 +394,69 @@ func (s1 *S1SLC) DerampSlave(ref *S1SLC, looks RngAzi, keep bool) (ret S1SLC, er
     return ret, nil
 }
 
+func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
+    tab := fp.Join(outDir, str.ReplaceAll(fp.Base(s1.Tab), "SLC_tab", "RSLC_tab"))
+
+    file, err := os.Create(tab)
+
+    if err != nil {
+        err = FileCreateErr.Wrap(err, tab)
+        return
+    }
+    
+    defer file.Close()
+
+    for ii := 0; ii < s1.nIW; ii++ {
+        IW := s1.IWs[ii]
+        
+        dat := fp.Join(outDir, str.ReplaceAll(fp.Base(IW.Dat), "slc", "rslc"))
+        par, TOPS_par := dat + ".par", dat + ".TOPS_par"
+        
+        ret.IWs[ii] = NewIW(dat, par, TOPS_par)
+        
+        //if err != nil {
+            //err = DataCreateErr.Wrap(err, "IW")
+            ////err = Handle(err, "failed to create new IW")
+            //return
+        //}
+        
+        line := fmt.Sprintf("%s %s %s\n", dat, par, TOPS_par)
+
+        _, err = file.WriteString(line)
+
+        if err != nil {
+            err = FileWriteErr.Wrap(err, tab)
+            return
+        }
+    }
+
+    ret.Tab, ret.nIW = tab, s1.nIW
+
+    return ret, nil
+}
+
+var MLIFun = Gamma.selectFun("multi_look_ScanSAR", "multi_S1_TOPS")
+
+func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
+    opt.Parse()
+    
+    wflag := 0
+    
+    if opt.windowFlag {
+        wflag = 1
+    }
+    
+    _, err := MLIFun(s1.Tab, mli.Dat, mli.Par, opt.Looks.Rng, opt.Looks.Azi,
+                     wflag, opt.refTab)
+    
+    if err != nil {
+        return StructCreateError.Wrap(err, "MLI")
+        //return Handle(err, "failed to create MLI file '%s'", mli.Dat)
+    }
+    
+    return nil
+}
+
 func makePoint(info Params, max bool) (ret Point, err error) {
     var tpl_lon, tpl_lat string
 
@@ -455,6 +479,16 @@ func makePoint(info Params, max bool) (ret Point, err error) {
     return ret, nil
 }
 
+type(
+    IWInfo struct {
+        nburst int
+        extent Rect
+        bursts [nMaxBurst]float64
+    }
+    
+    IWInfos [maxIW]IWInfo
+)
+
 func iwInfo(path string) (ret IWInfo, err error) {
     // num, err := conv.Atoi(str.Split(path, "iw")[1][0]);
 
@@ -466,17 +500,13 @@ func iwInfo(path string) (ret IWInfo, err error) {
 
     // Check(err, "Failed to retreive IW number from %s", path);
 
-    par, err := TmpFile()
+    par, err := TmpFile("")
 
     if err != nil {
         return ret, err
     }
 
-    TOPS_par, err := TmpFile()
-
-    if err != nil {
-        return ret, err
-    }
+    TOPS_par := par + ".TOPS_par"
 
     _, err = Gamma["par_S1_SLC"](nil, path, nil, nil, par, nil, TOPS_par)
 
@@ -535,7 +565,7 @@ func iwInfo(path string) (ret IWInfo, err error) {
         bursts: numbers}, nil
 }
 
-func (p *Point) inIWs(IWs IWInfos) bool {
+func (p Point) inIWs(IWs IWInfos) bool {
     for _, iw := range IWs {
         if p.InRect(&iw.extent) {
             return true
@@ -559,7 +589,7 @@ func diffBurstNum(burst1, burst2 float64) int {
     dburst := burst1 - burst2
     diffSqrt := math.Sqrt(dburst)
 
-    return int(dburst + 1.0 + (dburst/(0.001+diffSqrt))*0.5)
+    return int(dburst + 1.0 + (dburst / (0.001 + diffSqrt)) * 0.5)
 }
 
 func checkBurstNum(one, two IWInfos) bool {
@@ -629,12 +659,7 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
 
     for ii := 1; ii < 4; ii++ {
         dat, par, TOPS_par := s1.SLCNames(mode, pol, ii)
-        ret.IWs[ii-1], err = NewIW(dat, par, TOPS_par)
-
-        if err != nil {
-            err = DataCreateErr.Wrap(err, "IW")
-            return
-        }
+        ret.IWs[ii-1] = NewIW(dat, par, TOPS_par)
     }
 
     ret.Tab, ret.nIW = tab, 3
@@ -642,99 +667,39 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
     return ret, nil
 }
 
-func (s1 *S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
-    tab := fp.Join(outDir, str.ReplaceAll(fp.Base(s1.Tab), "SLC_tab", "RSLC_tab"))
-
-    file, err := os.Create(tab)
-
-    if err != nil {
-        err = FileCreateErr.Wrap(err, tab)
-        return
-    }
-    
-    defer file.Close()
-
-    for ii := 0; ii < s1.nIW; ii++ {
-        IW := s1.IWs[ii]
-        
-        dat := fp.Join(outDir, str.ReplaceAll(fp.Base(IW.Dat), "slc", "rslc"))
-        par := dat + ".par"
-        TOPS_par := dat + ".TOPS_par"
-        
-        ret.IWs[ii], err = NewIW(dat, par, TOPS_par)
-
-        if err != nil {
-            err = DataCreateErr.Wrap(err, "IW")
-            //err = Handle(err, "failed to create new IW")
-            return
-        }
-        
-        line := fmt.Sprintf("%s %s %s\n", dat, par, TOPS_par)
-
-        _, err = file.WriteString(line)
-
-        if err != nil {
-            err = FileWriteErr.Wrap(err, tab)
-            return
-        }
-    }
-
-    ret.Tab, ret.nIW = tab, s1.nIW
-
-    return ret, nil
-}
-
-var MLIFun = Gamma.selectFun("multi_look_ScanSAR", "multi_S1_TOPS")
-
-func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
-    opt.Parse()
-    
-    wflag := 0
-    
-    if opt.windowFlag {
-        wflag = 1
-    }
-    
-    _, err := MLIFun(s1.Tab, mli.Dat, mli.Par, opt.Looks.Rng, opt.Looks.Azi,
-                     wflag, opt.refTab)
-    
-    if err != nil {
-        return DataCreateErr.Wrap(err, "MLI")
-        //return Handle(err, "failed to create MLI file '%s'", mli.Dat)
-    }
-    
-    return nil
-}
-
 func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
-    path := fp.Join(s1.Root, mode)
+    //path := fp.Join(s1.Root, mode)
+    
+    if ret, err = TmpMLI(); err != nil {
+        return
+    }
 
-    dat := fp.Join(path, fmt.Sprintf("%s.%s", pol, mode))
-    par := dat + ".par"
+    //dat := fp.Join(path, fmt.Sprintf("%s.%s", pol, mode))
+    //par := dat + ".par"
     
-    ret, err = NewMLI(dat, par)
+    //ret, err = NewMLI(dat, par)
     
-    if err != nil {
-        err = DataCreateErr.Wrap(err, "MLI")
-        return
-    }
+    //if err != nil {
+        //err = DataCreateErr.Wrap(err, "MLI")
+        //return
+    //}
     
-    exist, err := ret.Exist()
+    //exist, err := ret.Exist()
     
-    if err != nil {
+    //if err != nil {
         //err = FileExistErr.Wrap(err, 
-        err = Handle(err, "failed to check whether MLI exists")
-        return
-    }
+        //err = Handle(err, "failed to check whether MLI exists")
+        //return
+    //}
     
-    if exist {
-        return ret, nil
-    }
+    //if exist {
+        //return ret, nil
+    //}
     
     slc, err := s1.SLC(pol)
     
     if err != nil {
-        err = DataCreateErr.Wrap(err, "S1SLC")
+        err = StructCreateError.Wrap(err, "S1SLC")
         return
     }
     

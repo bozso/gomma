@@ -10,7 +10,7 @@ import (
     // "time"
     fp "path/filepath"
     //conv "strconv"
-    str "strings"
+    //str "strings"
 )
 
 type(
@@ -329,14 +329,12 @@ func stepImport(self *Config) error {
         for ii := 0; ii < nIWs; ii++ {
             dat := fmt.Sprintf("%s.slc.iw%d", base, ii + 1)
             
-            slc.IWs[ii].dataFile.Dat = dat
-            slc.IWs[ii].dataFile.Params = NewGammaParam(dat + ".par")
+            slc.IWs[ii].Dat = dat
+            slc.IWs[ii].Params = NewGammaParam(dat + ".par")
             slc.IWs[ii].TOPS_par = NewGammaParam(dat + ".TOPS_par")
         }
         
-        err = slc.Move(slcDir)
-        
-        if err != nil {
+        if slc, err = slc.Move(slcDir); err != nil {
             return Handle(err, "failed to move S1SLC")
         }
         
@@ -353,24 +351,24 @@ func stepImport(self *Config) error {
     return nil
 }
 
-func stepGeocode (c *Config) error {
-    outDir := c.General.OutputDir
+//func stepGeocode (c *Config) error {
+    //outDir := c.General.OutputDir
     
-    geocode, err := c.Geocoding.Run(outDir)
+    //geocode, err := c.Geocoding.Run(outDir)
     
-    if err != nil {
-        return Handle(err, "geocoding failed")
-    }
+    //if err != nil {
+        //return Handle(err, "geocoding failed")
+    //}
     
-    // TODO: make geocode.json a setting in configuration file?
-    err = SaveJson(fp.Join(outDir, "geocode.json"), geocode)
+    //// TODO: make geocode.json a setting in configuration file?
+    //err = SaveJson(fp.Join(outDir, "geocode.json"), geocode)
     
-    if err != nil {
-        return Handle(err, "failed to save geocode data")
-    }
+    //if err != nil {
+        //return Handle(err, "failed to save geocode data")
+    //}
     
-    return nil
-}
+    //return nil
+//}
 
 /*
 func stepCheckGeo(c *Config) error {
@@ -431,166 +429,166 @@ func stepCheckGeo(c *Config) error {
 }
 */
 
-func stepCoreg(self *Config) error {
-    outDir := self.General.OutputDir
+//func stepCoreg(self *Config) error {
+    //outDir := self.General.OutputDir
     
-    path := self.infile
-    file, err := NewReader(path)
+    //path := self.infile
+    //file, err := NewReader(path)
     
-    if err != nil {
-        return Handle(err, "failed to open file '%s'", path)
-    }
+    //if err != nil {
+        //return Handle(err, "failed to open file '%s'", path)
+    //}
     
-    defer file.Close()
+    //defer file.Close()
     
-    S1SLCs := []S1SLC{}
+    //S1SLCs := []S1SLC{}
     
-    for file.Scan() {
-        line := str.TrimSpace(file.Text())
+    //for file.Scan() {
+        //line := str.TrimSpace(file.Text())
         
-        s1, err := FromTabfile(line)
+        //s1, err := FromTabfile(line)
         
-        if err != nil {
-            return Handle(err, "failed to parse S1SLC file from '%s'",
-                line)
-        }
+        //if err != nil {
+            //return Handle(err, "failed to parse S1SLC file from '%s'",
+                //line)
+        //}
         
-        S1SLCs = append(S1SLCs, s1)
-    }
+        //S1SLCs = append(S1SLCs, s1)
+    //}
     
-    midx := self.Coreg.MasterIdx - 1
+    //midx := self.Coreg.MasterIdx - 1
     
-    mslc := S1SLCs[midx]
-    mdate := mslc.Format(DateShort)
+    //mslc := S1SLCs[midx]
+    //mdate := mslc.Format(DateShort)
     
-    fmt.Printf("Master date: %s\n", mdate)
+    //fmt.Printf("Master date: %s\n", mdate)
     
-    meta := GeoMeta{}
-    path = fp.Join(self.General.OutputDir, "geocode.json")
-    err = LoadJson(path, &meta)
+    //meta := GeoMeta{}
+    //path = fp.Join(self.General.OutputDir, "geocode.json")
+    //err = LoadJson(path, &meta)
     
-    if err != nil {
-        return Handle(err, "failed to parse meta json file '%s'", path)
-    }
+    //if err != nil {
+        //return Handle(err, "failed to parse meta json file '%s'", path)
+    //}
     
-    mli, err := NewMLI(meta.Geo.Dat, meta.Geo.Par)
+    //mli, err := NewMLI(meta.Geo.Dat, meta.Geo.Par)
     
-    if err != nil {
-        return Handle(err, "failed to make master MLI struct")
-    }
+    //if err != nil {
+        //return Handle(err, "failed to make master MLI struct")
+    //}
     
-    rslc, ifg := fp.Join(outDir, "RSLC"), fp.Join(outDir, "IFG")
+    //rslc, ifg := fp.Join(outDir, "RSLC"), fp.Join(outDir, "IFG")
     
-    err = os.MkdirAll(rslc, os.ModePerm)
+    //err = os.MkdirAll(rslc, os.ModePerm)
     
-    if err != nil {
-        return Handle(err, "failed to create directory '%s'", rslc)
-    }
+    //if err != nil {
+        //return Handle(err, "failed to create directory '%s'", rslc)
+    //}
     
-    err = os.MkdirAll(ifg, os.ModePerm)
+    //err = os.MkdirAll(ifg, os.ModePerm)
     
-    if err != nil {
-        return Handle(err, "failed to create directory '%s'", ifg)
-    }
+    //if err != nil {
+        //return Handle(err, "failed to create directory '%s'", ifg)
+    //}
     
-    master := S1Coreg{
-        Tab: mslc.Tab,
-        ID: mdate,
-        CoregOpt: self.Coreg,
-        Hgt: meta.Geo.Hgt,
-        Poly1: "-",
-        Poly2: "-",
-        Looks: self.General.Looks,
-        Clean: false,
-        UseInter: true,
-        OutDir: outDir,
-        RslcPath: rslc,
-        IfgPath: ifg,
-    }
+    //master := S1Coreg{
+        //Tab: mslc.Tab,
+        //ID: mdate,
+        //CoregOpt: self.Coreg,
+        //Hgt: meta.Geo.Hgt,
+        //Poly1: "-",
+        //Poly2: "-",
+        //Looks: self.General.Looks,
+        //Clean: false,
+        //UseInter: true,
+        //OutDir: outDir,
+        //RslcPath: rslc,
+        //IfgPath: ifg,
+    //}
     
-    var prev *S1SLC = nil
-    nzip := len(S1SLCs)
+    //var prev *S1SLC = nil
+    //nzip := len(S1SLCs)
     
-    opt := RasArgs{DisArgs:DisArgs{Sec: mli.Dat}}
+    //opt := RasArgs{DisArgs:DisArgs{Sec: mli.Dat}}
     
-    for ii := midx + 1; ii < nzip; ii++ {
-        curr := &S1SLCs[ii]
+    //for ii := midx + 1; ii < nzip; ii++ {
+        //curr := &S1SLCs[ii]
         
-        out, err := master.Coreg(curr, prev)
+        //out, err := master.Coreg(curr, prev)
         
-        if err != nil {
-            return Handle(err, "coregistration failed")
-        }
+        //if err != nil {
+            //return Handle(err, "coregistration failed")
+        //}
         
-        if !out.Ok {
-            log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
-                curr.Format(DateShort))
-            continue
-        }
+        //if !out.Ok {
+            //log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
+                //curr.Format(DateShort))
+            //continue
+        //}
         
-        err = out.Ifg.Raster(opt)
+        //err = out.Ifg.Raster(opt)
         
-        if err != nil {
-            return Handle(err, "failed to create raster image for interferogram '%s",
-                out.Ifg.Datfile())
-        }
+        //if err != nil {
+            //return Handle(err, "failed to create raster image for interferogram '%s",
+                //out.Ifg.Dat)
+        //}
         
-        prev = &out.Rslc
-    }
+        //prev = &out.Rslc
+    //}
     
     
-    prev = nil
+    //prev = nil
     
-    for ii := midx - 1; ii > -1; ii-- {
-        curr := &S1SLCs[ii]
+    //for ii := midx - 1; ii > -1; ii-- {
+        //curr := &S1SLCs[ii]
         
-        out, err := master.Coreg(curr, prev)
+        //out, err := master.Coreg(curr, prev)
         
-        if err != nil {
-            return Handle(err, "coregistration failed")
-        }
+        //if err != nil {
+            //return Handle(err, "coregistration failed")
+        //}
         
-        if !out.Ok {
-            log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
-                curr.Format(DateShort))
-            continue
-        }
+        //if !out.Ok {
+            //log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
+                //curr.Format(DateShort))
+            //continue
+        //}
         
-        err = out.Ifg.Raster(opt)
+        //err = out.Ifg.Raster(opt)
         
-        if err != nil {
-            return Handle(err, "failed to create raster image for interferogram '%s",
-                out.Ifg.Datfile())
-        }
+        //if err != nil {
+            //return Handle(err, "failed to create raster image for interferogram '%s",
+                //out.Ifg.Datfile())
+        //}
         
-        prev = &out.Rslc
-    }
+        //prev = &out.Rslc
+    //}
     
-    /*
+    ///*
     
-    for ii, S1 := range s1zips {
-        if ii == midx {
-            continue
-        }
+    //for ii, S1 := range s1zips {
+        //if ii == midx {
+            //continue
+        //}
         
-        date1 := S1.Center()
-        date2 := s1zips[0].Center()
+        //date1 := S1.Center()
+        //date2 := s1zips[0].Center()
         
-        idx, diff1 := 0, math.Abs(float64(date1.Sub(date2)))
+        //idx, diff1 := 0, math.Abs(float64(date1.Sub(date2)))
         
-        for jj := 1; jj < nzip; jj++ {
-            diff2 := math.Abs(float64(date1.Sub(s1zips[jj].Center())))
+        //for jj := 1; jj < nzip; jj++ {
+            //diff2 := math.Abs(float64(date1.Sub(s1zips[jj].Center())))
             
-            if diff2 < diff1 {
-                idx = jj
-            }
-        }
+            //if diff2 < diff1 {
+                //idx = jj
+            //}
+        //}
         
-        // S1Coreg(mslc, )
-    }
-    */
-    return nil
-}
+        //// S1Coreg(mslc, )
+    //}
+    //*/
+    //return nil
+//}
 
 
 func Search(s1 *S1Zip, zips []*S1Zip) *S1Zip {

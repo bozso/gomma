@@ -14,16 +14,8 @@ type (
     OffsetAlgo int
     CpxToReal  int
     
-    IFG struct {
-        DatParFile
-        DiffPar Params          `json:"diffparfile"`
-        Quality   string        `json:"quality"`
-        SimUnwrap string        `json:"simulated_unwrapped"`
-        DeltaT    time.Duration `json:"-"`
-    }
-    
     Coherence struct {
-        dataFile
+        DatFile
     }
         
     IfgOpt struct {
@@ -67,6 +59,40 @@ var (
     }
 )
 
+type IFG struct {
+    DatParFile
+    DiffPar Params          `json:"diffparfile"`
+    Quality   string        `json:"quality"`
+    SimUnwrap string        `json:"simulated_unwrapped"`
+    DeltaT    time.Duration `json:"-"`
+}
+
+func NewIFG(dat, off, diffpar string) (ret IFG, err error) {
+    if ret.DatParFile, err = NewDatParFile(dat, off, "off", FloatCpx);
+       err != nil {
+        return
+    }
+    
+    if len(diffpar) == 0 {
+        diffpar = dat + ".diff_par"
+    }
+    
+    ret.DiffPar = NewGammaParam(diffpar)
+    
+    return ret, nil
+}
+
+func TmpIFG() (ret IFG, err error) {
+    if ret.DatParFile, err = TmpDatParFile("diff", "off", FloatCpx); err != nil {
+        return
+    }
+    
+    ret.DiffPar = Params{Par: ret.Dat + ".par", Sep: ":"}
+    ret.SimUnwrap = ret.Dat + ".sim_unw"
+    
+    return ret, nil
+}
+
 func (i IFG) jsonMap() JSONMap {
     ret := i.DatParFile.jsonMap()
     
@@ -84,7 +110,8 @@ func (i *IFG) FromJson(m JSONMap) (err error) {
     }
     
     if i.DType != FloatCpx {
-        return TypeMismatch.Make("IFG", i.DType.ToString())
+        err = TypeMismatchError{ftype:"IFG", expected:"complex", DType:i.DType}
+        return
     }
     
     if i.Quality, err = m.String("quality"); err != nil {
@@ -106,10 +133,6 @@ func (i *IFG) FromJson(m JSONMap) (err error) {
     
     return nil
 }
-
-func (i IFG) TypeStr() string {
-    return "IFG"
-}
     
 func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ret IFG, err error) {
     inter := 0
@@ -120,63 +143,50 @@ func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ret IFG, err error) {
     
     rng, azi := opt.Looks.Rng, opt.Looks.Azi
     
-    // TODO: figure out where IFGs will be placed
-    off := "%s.off"
-    simUnw := "%s.sim_unw"
-    diff := "%s.diff"
-    
     par1, par2 := slc1.Par, slc2.Par
     
-    _, err = createOffset(par1, par2, off, opt.algo, rng, azi, inter)
+    _, err = createOffset(par1, par2, ret.Par, opt.algo, rng, azi, inter)
     
     if err != nil {
         err = Handle(err, "failed to create offset table")
         return
     }
     
-    slcRefPar := ""
+    slcRefPar := "-"
     
     if ref != nil {
         slcRefPar = ref.Par
     }
     
-    _, err = phaseSimOrb(par1, par2, off, opt.hgt, simUnw, slcRefPar,
+    if ret, err = TmpIFG(); err != nil {
+        return
+    }
+    
+    _, err = phaseSimOrb(par1, par2, ret.Par, opt.hgt, ret.SimUnwrap, slcRefPar,
                          nil, nil, 1)
     
-    if err != nil {
-        err = Handle(err, "failed to create simulated orbital phase")
-        return
-    }
+    dat1, dat2 := slc1.Dat, slc2.Dat
+    _, err = slcDiffIntf(dat1, dat2, par1, par2, ret.Par,
+                         ret.SimUnwrap, ret.DiffPar, rng, azi, 0, 0)
     
-    dat1, dat2 := slc1.Datfile(), slc2.Datfile()
-    _, err = slcDiffIntf(dat1, dat2, par1, par2, off,
-                         simUnw, diff, rng, azi, 0, 0)
     
-    if err != nil {
-        err = Handle(err, "failed to create differential interferogram")
-        return
-    }
-    
-    if ret, err = NewIFG(diff, off, "", "", ""); err != nil {
-        err = Handle(err, "failed to create new interferogram struct")
+    if err = ret.Parse(); err != nil {
         return
     }
     
     // TODO: Check date difference order
-    ret.SLC1, ret.SLC2, ret.DeltaT = *slc1, *slc2, slc1.Time.Sub(slc2.Time)
+    ret.DeltaT = slc1.Time.Sub(slc2.Time)
     
     return ret, nil
 }
 
 var cpxToReal = Gamma.Must("cpx_to_real")
 
-func (ifg IFG) ToReal(mode CpxToReal) (ret dataFile, err error) {
-    if ret, err = TmpDataFile(); err != nil {
-        err = Handle(err, "failed to create temporary datafile")
+func (ifg IFG) ToReal(mode CpxToReal) (ret DatFile, err error) {
+    if ret, err = TmpDatFile("real", Float); err != nil {
         return
     }
-    
-    ret.RngAzi, ret.Dtype = ifg.RngAzi, Float
+    ret.URngAzi = ifg.URngAzi
     
     Mode := 0
     
@@ -205,7 +215,7 @@ func (ifg IFG) ToReal(mode CpxToReal) (ret dataFile, err error) {
 
 var rasmph_pwr24 = Gamma.Must("rasmph_pwr24")
 
-func (ifg IFG) Raster(opt RasArgs) error {
+func (ifg *IFG) Raster(opt RasArgs) error {
     if err := opt.Parse(ifg); err != nil {
         return Handle(err, "failed to parse IFG raster arguments")
     }
@@ -303,49 +313,49 @@ func (self IFG) CheckQuality() (ret bool, err error) {
     return ret, nil
 }
 
-func (self IFG) AdaptFilt(opt AdaptFiltOpt) (ret IFG, cc Coherence, err error) {
-    step := float64(opt.FFTWindow) / 8.0
+//func (self IFG) AdaptFilt(opt AdaptFiltOpt) (ret IFG, cc Coherence, err error) {
+    //step := float64(opt.FFTWindow) / 8.0
     
-    if opt.step > 0.0 {
-        step = opt.step
-    }
+    //if opt.step > 0.0 {
+        //step = opt.step
+    //}
     
-    // TODO: figure out the name of the output files
-    ret, err = NewIFG(self.Dat + ".filt", "", "", "", "")
+    //// TODO: figure out the name of the output files
+    //ret, err = NewIFG(self.Dat + ".filt", "", "", "", "")
     
-    if err != nil {
-        err = Handle(err, "failed to create new interferogram struct")
-        return
-    }
+    //if err != nil {
+        //err = Handle(err, "failed to create new interferogram struct")
+        //return
+    //}
     
-    cc, err = NewCoherence("", "")
+    //cc, err = NewCoherence("", "")
     
-    if err != nil {
-        err = Handle(err, "failed to create new dataFile struct")
-        return
-    }
+    //if err != nil {
+        //err = Handle(err, "failed to create new dataFile struct")
+        //return
+    //}
     
-    /*
-    if Empty(filt):
-        filt = 
+    ///*
+    //if Empty(filt):
+        //filt = 
     
-    if empty(cc is None:
-        cc = self.datfile + ".cc"
-    */
+    //if empty(cc is None:
+        //cc = self.datfile + ".cc"
+    //*/
     
-    rng := self.Rng
+    //rng := self.Rng
     
-    _, err = adf(self.Dat, ret.Dat, cc.Dat, rng, opt.alpha, opt.FFTWindow,
-                 opt.cohWindow, step, opt.offset.Azi, opt.offset.Rng,
-                 opt.frac)
+    //_, err = adf(self.Dat, ret.Dat, cc.Dat, rng, opt.alpha, opt.FFTWindow,
+                 //opt.cohWindow, step, opt.offset.Azi, opt.offset.Rng,
+                 //opt.frac)
     
-    if err != nil {
-        err = Handle(err, "adaptive filtering failed")
-        return
-    }
+    //if err != nil {
+        //err = Handle(err, "adaptive filtering failed")
+        //return
+    //}
     
-    return ret, cc, nil
-}
+    //return ret, cc, nil
+//}
 
 func (self IFG) Coherence(opt CoherenceOpt) (ret Coherence, err error) {
     weightFlag := CoherenceWeight[opt.WeightType]

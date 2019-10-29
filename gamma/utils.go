@@ -446,25 +446,13 @@ func (self Params) Float(name string, idx int) (ret float64, err error) {
     */
 }
 
-func TmpFile() (ret string, err error) {
-    file, err := io.TempFile("", "*")
-
-    if err != nil {
-        err = Handle(err, "failed to create a temporary file")
-        return
+func TmpFile(ext string) (ret string, err error) {
+    var file *os.File
+    if len(ext) > 0 {
+        file, err = io.TempFile("", "*." + ext)
+    } else {
+        file, err = io.TempFile("", "*")
     }
-
-    defer file.Close()
-
-    name := file.Name()
-
-    tmp.files = append(tmp.files, name)
-
-    return name, nil
-}
-
-func TmpFileExt(ext string) (ret string, err error) {
-    file, err := io.TempFile("", "*." + ext)
 
     if err != nil {
         err = Handle(err, "failed to create a temporary file")
@@ -487,6 +475,10 @@ func RemoveTmp() {
             log.Printf("Failed to remove temporary file '%s': %s\n", file, err)
         }
     }
+}
+
+func Wrap(err1 error, err2 error) error {
+    return fmt.Errorf("%w: %w", err1, err2)
 }
 
 type Werror string

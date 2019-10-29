@@ -15,7 +15,6 @@ import (
 type (
     /*
     DataFile interface {
-        Datfile() string
         Parfile() string
         GetRng() int
         GetAzi() int
@@ -34,8 +33,13 @@ type (
     */
     
     IDatFile interface {
+        Datfile() string
+        Rng() int
+        Azi() int
+        Dtype() DType
         jsonMap() (JSONMap, error)
         FromJson(JSONMap) error
+        Raster(opt RasArgs) error
     }
     
     IDatParFile interface {
@@ -44,6 +48,7 @@ type (
         ParseAzi() (int, error)
         ParseDate() (time.Time, error)
         ParseFmt() (string, error)
+        TimeStr(dateFormat) string
         
         // TODO: implement this
         // ParseDType() (DType, error)
@@ -109,8 +114,23 @@ func (in DType) ToString() string {
     case Any:
         return "ANY"
     default:
-        return "UNLNOWN"
+        return "UNKNOWN"
     }
+}
+
+type TypeMismatchError struct {
+    ftype, expected string
+    DType
+    Err error
+}
+
+func (e TypeMismatchError) Error() string {
+    return fmt.Sprintf("expected datatype '%s' for %s datafile, got '%s'",
+        e.expected, e.ftype, e.DType.ToString)
+}
+
+func (e TypeMismatchError) Unwrap() error {
+    return e.Err
 }
 
 func NewGammaParam(path string) Params {
@@ -118,13 +138,57 @@ func NewGammaParam(path string) Params {
 }
 
 const (
-    DataCreateErr Werror = "failed to create %s Struct"
+    StructCreateError Werror = "failed to create %s Struct"
 )
 
-type DatFile struct {
-    Dat string
-    RngAzi
-    DType
+type (
+    URngAzi struct {
+        rng int `name:"rng" default:"0"`
+        azi int `name:"azi" default:"0"`
+    }
+    
+    DatFile struct {
+        Dat string `name:"dat"`
+        URngAzi
+        DType
+    }
+)
+
+func NewDatFile(path string, dt DType) (ret DatFile, err error) {
+    if len(path) == 0 {
+        err = fmt.Errorf("expected datafile path to be a non empty string")
+        return
+    }
+    
+    return DatFile{Dat: path, DType: dt}, nil
+}
+
+func TmpDatFile(ext string, dt DType) (ret DatFile, err error) {
+    var dat string
+    if dat, err = TmpFile(ext); err != nil {
+        return
+    }
+    
+    ret.Dat = fmt.Sprintf("%s.%s", dat, ext)
+    ret.DType = dt
+    
+    return ret, nil
+}
+
+func (d DatFile) Datfile() string {
+    return d.Dat
+}
+
+func (d DatFile) Rng() int {
+    return d.rng
+}
+
+func (d DatFile) Azi() int {
+    return d.azi
+}
+
+func (d DatFile) Dtype() DType {
+    return d.DType
 }
 
 func (d DatFile) jsonMap() JSONMap {
@@ -132,7 +196,7 @@ func (d DatFile) jsonMap() JSONMap {
         "datafile": d.Dat,
         "range_samples": d.Rng,
         "azimuth_lines": d.Azi,
-        "dtype": d.DTypeTo.String(),
+        "dtype": d.DType.ToString(),
     }
 }
 
@@ -148,16 +212,14 @@ func (d *DatFile) FromJson(m JSONMap) (err error) {
         return
     }
     
-    if d.DType, err = str2dtype(dt); err != nil {
-        return
-    }
+    d.DType = str2dtype(dt)
     
-    if d.Rng, err = m.Int("range_samples"); err != nil {
+    if d.rng, err = m.Int("range_samples"); err != nil {
         //err = RngError.Wrap(err, path)
         return
     }
     
-    if d.Azi, err = m.Int("azimuth_lines"); err != nil {
+    if d.azi, err = m.Int("azimuth_lines"); err != nil {
         //err = AziError.Wrap(err, path)
         return
     }
@@ -170,89 +232,68 @@ func (d DatFile) Move(dir string) (ret DatFile, err error) {
         return
     }
     
-    ret.RngAzi, ret.DType = d.RngAzi, d.DType
+    ret.URngAzi, ret.DType = d.URngAzi, d.DType
     
     return ret, nil
 }
 
 func (d DatFile) Exist() (ret bool, err error) {
-    if ret, err = Exist(d.Dat); err != nil {
-        return
-    }
-
-    if !ret {
-        return false, nil
-    }
+    ret, err = Exist(d.Dat)
+    return
 }
     
-
-type DatPar struct {
-    Dat, Par string
-}
-
-func NewDatPar(dat, par string) (ret DatPar, err error) {
-    if len(dat) == 0 {
-        err = fmt.Errorf("datafile path should not be an empty string")
-        return
-    }
-    
-    if len(par) == 0 {
-        par = dat + ".par"
-    }
-    
-    return DatPar{Dat: dat, Par: par}, nil
-}
-
-func (d DatPar) ToFile(dtype DType) (ret DatParFile, err error) {
-    ret = DatParFile{Dat: d.Dat, Par: d.Par, Sep: ":"}
-    
-    if dtype == Unknown {
-        var dt string
-        if dt, err = ret.ParseFmt(); err != nil {
-            return
-        }
-        
-        dtype = str2dtype(dt)
-    }
-    
-    if dtype == Unknown {
-        err = fmt.Errorf("Unknown datatype")
-        return
-    }
-    
-    ret.DType = dtype
-    
-    if ret.Rng, err = ret.ParseRng(); err != nil {
-        return
-    }
-    
-    if ret.Azi, err = ret.ParseAzi(); err != nil {
-        return
-    }
-    
-    if ret.Time, err = ret.ParseDate(); err != nil {
-        return
-    }
-    
-    return ret, nil
-}
-
-func TmpDatPar() (ret DatPar, err error) {
-    dat, err := TmpFileExt("dat")
-    if err != nil {
-        return ret, err
-    }
-    
-    return NewDatPar(dar, "")
-}
-
 type DatParFile struct {
     DatFile
     Params
     time.Time `json:"-"`
 }
 
-func (d DatParFile) Move(dir string) (ret DataFile, err error) {
+func NewDatParFile(dat, par, ext string, dt DType) (ret DatParFile, err error) {
+    if ret.DatFile, err = NewDatFile(dat, dt); err != nil {
+        return
+    }
+    
+    if len(par) == 0 {
+        par = fmt.Sprintf("%s.%s", dat, ext)
+    }
+    
+    ret.Par = par
+    ret.Sep = ":"
+    
+    return ret, nil
+}
+
+func TmpDatParFile(ext string, parExt string, dt DType) (ret DatParFile, err error) {
+    if ret.DatFile, err = TmpDatFile(ext, dt); err != nil {
+        return
+    }
+    
+    if len(parExt) == 0 {
+        parExt = "par"
+    }
+    
+    ret.Par = fmt.Sprintf("%s.%s", ret.Dat, parExt)
+    ret.Sep = ":"
+    
+    return ret, nil
+}
+
+func (d *DatParFile) Parse() (err error) {
+    if d.rng, err = d.ParseRng(); err != nil {
+        return
+    }
+    
+    if d.azi, err = d.ParseAzi(); err != nil {
+        return
+    }
+    
+    if d.Time, err = d.ParseDate(); err != nil {
+        return
+    }
+    return nil
+}
+
+func (d DatParFile) Move(dir string) (ret DatParFile, err error) {
     if ret.DatFile, err = d.DatFile.Move(dir); err != nil {
         return
     }
@@ -275,7 +316,7 @@ func (d DatParFile) Exist() (ret bool, err error) {
         return
     }
     
-    return de && pe
+    return de && pe, nil
 }
 
 func (d DatParFile) jsonMap() JSONMap {
@@ -509,15 +550,15 @@ type(
     }
 )
 
-func (s *Subset) Parse(d DataFile) {
-    if s.RngWidth == 0 {
-        s.RngWidth = d.GetRng()
-    }
+//func (s *Subset) Parse(d IDatParFile) {
+    //if s.RngWidth == 0 {
+        //s.RngWidth = d.GetRng()
+    //}
     
-    if s.AziLines == 0 {
-        s.AziLines = d.GetAzi()
-    }
-}
+    //if s.AziLines == 0 {
+        //s.AziLines = d.GetAzi()
+    //}
+//}
 
 func Move(path string, dir string) (ret string, err error) {
     dst, err := fp.Abs(fp.Join(dir, fp.Base(path)));

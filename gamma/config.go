@@ -96,9 +96,9 @@ var (
     steps = map[string]stepFun{
         "select": stepSelect,
         "import": stepImport,
-        "geo": stepGeocode,
+        //"geo": stepGeocode,
         //"check_geo": stepCheckGeo,
-        "coreg":  stepCoreg,
+        //"coreg":  stepCoreg,
     }
 
     stepList = MapKeys(steps)
