@@ -103,6 +103,29 @@ func (i IFG) jsonMap() JSONMap {
     return ret
 }
 
+func (i IFG) Move(dir string) (ret IFG, err error) {
+    if ret.DatParFile, err = i.DatParFile.Move(dir); err != nil {
+        return
+    }
+    
+    if ret.DiffPar.Par, err = Move(i.DiffPar.Par, dir); err != nil {
+        return
+    }
+    ret.DiffPar.Sep = ":"
+    
+    if len(i.SimUnwrap) > 0 {
+        if ret.SimUnwrap, err = Move(i.SimUnwrap, dir); err != nil {
+            return
+        }
+    }
+    
+    if len(i.Quality) > 0 {
+        if ret.Quality, err = Move(i.Quality, dir); err != nil {
+            return
+        }
+    }
+    return ret, nil
+}
 
 func (i *IFG) FromJson(m JSONMap) (err error) {
     if err = i.DatParFile.FromJson(m); err != nil {
@@ -206,7 +229,6 @@ func (ifg IFG) ToReal(mode CpxToReal) (ret DatFile, err error) {
     }
     
     if _, err = cpxToReal(ifg.Dat, ret.Dat, ret.Rng, Mode); err != nil {
-        err = Handle(err, "cpx_to_real failed")
         return
     }
     
@@ -215,35 +237,9 @@ func (ifg IFG) ToReal(mode CpxToReal) (ret DatFile, err error) {
 
 var rasmph_pwr24 = Gamma.Must("rasmph_pwr24")
 
-func (ifg *IFG) Raster(opt RasArgs) error {
-    if err := opt.Parse(ifg); err != nil {
-        return Handle(err, "failed to parse IFG raster arguments")
-    }
-    
-    cc := opt.Coh
-    
-    if len(cc) == 0 {
-        _, err := rasmph_pwr24(opt.Datfile, opt.Sec, opt.Rng, opt.StartCpx,
-                               opt.StartPwr, opt.Nlines, opt.Avg.Rng,
-                               opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
-                               opt.Raster)
-        if err != nil {
-            return Handle(err, "failed to create raster for interferogram '%s'",
-                ifg.Dat)
-        }
-    } else {
-        
-        _, err := rasmph_pwr24(opt.Datfile, opt.Sec, opt.Rng, opt.StartCpx,
-                               opt.StartPwr, opt.Nlines, opt.Avg.Rng,
-                               opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
-                               opt.Raster, cc, opt.StartCC, opt.Min)
-        if err != nil {
-            return Handle(err, "failed to create raster for interferogram '%s'",
-                ifg.Dat)
-        }
-    }
-    
-    return nil
+func (ifg IFG) Raster(opt RasArgs) error {
+    opt.Mode = MagPhasePwr
+    return ifg.Raster(opt)
 }
 
 func (ifg IFG) rng() (int, error) {

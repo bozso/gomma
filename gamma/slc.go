@@ -177,14 +177,9 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err
     return ret, nil
 }
 
-func (s *SLC) Raster(opt RasArgs) error {
-    err := opt.Parse(s)
-    
-    if err != nil {
-        return Handle(err, "failed to parse raster options")
-    }
-    
-    return rasslc(opt)
+func (s SLC) Raster(opt RasArgs) error {
+    opt.Mode = SingleLook
+    return s.Raster(opt)
 }
 
 type MLI struct {
@@ -214,13 +209,8 @@ func (M *MLI) FromJson(m JSONMap) (err error) {
 }
 
 
-func (m *MLI) Raster(opt RasArgs) error {
-    err := opt.Parse(m)
-    
-    if err != nil {
-        return Handle(err, "failed to parse raster options")
-    }
-    
-    return raspwr(opt)
+func (m MLI) Raster(opt RasArgs) error {
+    opt.Mode = Power
+    return m.Raster(opt)
 }
 

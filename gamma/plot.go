@@ -22,37 +22,54 @@ func (se *ScaleExp) Parse() {
 
 type (
     ZeroFlag int
+    Channel int
+    Inverse int
     
     DisArgs struct {
         ScaleExp
         RngAzi
         Minmax
-        Flip     bool    `name:"flip" default:""`
         DType
+        Inverse
+        Channel
+        Mode       PlotMode
+        zeroFlag   ZeroFlag
+        Flip       bool    `name:"flip" default:""`
         //Dtype    string  `name:"dtype" default:""`
-        Datfile  string  `name:"dat" default:""`
-        Cmd      string  `name:"cmd" default:""`
-        Start    int     `name:"start" default:"0"`
-        Nlines   int     `name:"nlines" default:"1"`
-        Sec      string  `name:"sec" default:""`
-        StartCC  int     `name:"startcc"  default:"1"`
-        StartPwr int     `name:"startpwr" default:"1"`
-        StartCpx int     `name:"startcpx" default:"1"`
-        StartHgt int     `name:"starthgt" default:"1"`
-        Coh      string  `name:"coh" default:""`
-        Cycle    float64 `name:"cycle" default:"160.0"`
-        LR       int
-        Elev     float64 `name:"elev" default:""`
-        Orient   float64 `name:"orient" default:""`
-        ColPost  float64 `name:"colpost" default:""`
-        RowPost  float64 `name:"rowpost" default:""`
-        zeroFlag ZeroFlag
+        Datfile    string  `name:"dat" default:""`
+        Start      int     `name:"start" default:"0"`
+        Nlines     int     `name:"nlines" default:"1"`
+        Sec        string  `name:"sec" default:""`
+        StartSec   int     `name:"startSec" default:"1"`
+        StartCC    int     `name:"startCC" default:"1"`
+        Coh        string  `name:"coh" default:""`
+        Cycle      float64 `name:"cycle" default:"160.0"`
+        LR         int
+        Elev       float64 `name:"elev" default:""`
+        Orient     float64 `name:"orient" default:""`
+        ColPost    float64 `name:"colpost" default:""`
+        RowPost    float64 `name:"rowpost" default:""`
+        Offset     float64 `name:"offset" default:"0.0"`
+        PhaseScale float64 `name:"scale" default:"0.0"`
+        CC         string
+        CCMin      float64 `name:"ccMin" default:"0.2"`
     }
 )
 
 const (
     Missing ZeroFlag = iota
     Valid
+)
+
+const (
+    Float2Raster Inverse = 1
+    Raster2Float Inverse = -1
+)
+
+const (
+    Red   Channel = 1
+    Green Channel = 2
+    Blue  Channel = 3
 )
 
 func (arg *DisArgs) Parse(dat IDatFile) {
@@ -75,7 +92,7 @@ func (arg *DisArgs) Parse(dat IDatFile) {
     }
     
     arg.DType = dat.Dtype()
-    
+        
     if arg.Flip {
         arg.LR = -1
     } else {
@@ -94,17 +111,10 @@ func (arg *DisArgs) Parse(dat IDatFile) {
         arg.StartCC = 1
     }
     
-    if arg.StartPwr == 0 {
-        arg.StartPwr = 1
+    if arg.StartSec == 0 {
+        arg.StartSec = 1
     }
     
-    if arg.StartCpx == 0 {
-        arg.StartCpx = 1
-    }
-    
-    if arg.StartHgt == 0 {
-        arg.StartHgt = 1
-    }
     
     if arg.Cycle == 0 {
         arg.Cycle = 160.0
@@ -116,6 +126,24 @@ func (arg *DisArgs) Parse(dat IDatFile) {
     
     if arg.Orient == 0.0 {
         arg.Orient = 135.0
+    }
+    
+    //if arg.Mode == Undefined {
+        //switch opt.DType {
+            
+        //}
+    //}
+    
+    if arg.Inverse == 0 {
+        arg.Inverse = Float2Raster 
+    }
+    
+    if arg.Channel == 0 {
+        arg.Channel = Red
+    }
+    
+    if arg.CCMin == 0.0 {
+        arg.CCMin = 0.2
     }
     
     //if op.colPost == 0.0 {
@@ -162,108 +190,134 @@ func (opt *RasArgs) Parse(dat IDatFile) {
     
     if len(opt.Raster) == 0 {
         opt.Raster = fmt.Sprintf("%s.%s", opt.Datfile, Settings.RasExt)
-    }
+    }    
 }
 
+type PlotMode int
 
-var _rasslc = Gamma.Must("rasSLC")
+const (
+    Byte PlotMode = iota
+    CC
+    Decibel
+    Deform
+    Height
+    Linear
+    MagPhase
+    MagPhasePwr
+    Power
+    SingleLook
+    Unwrapped
+    Undefined
+)
 
-func rasslc(opt RasArgs) error {
-    dtype := 0
+func (d DatFile) Raster(opt RasArgs) (err error) {
+    opt.Parse(d)
+                
+    switch opt.Mode {
+    case Byte:
+        _, err = rasByte(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+                         opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.LR,
+                         opt.Raster)
+    case CC:
+        _, err = rasCC(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
+                       opt.StartSec, opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
+                       opt.Min, opt.Max, opt.Scale, opt.Exp, opt.LR,
+                       opt.Raster)
+    //case Decibel:
+        //_, err = rasdB(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+                       //opt.Avg.Rng, opt.Avg.Azi, opt.Min, opt.Max,
+                       //opt.Offset, opt.LR, opt.Raster, opt.AbsFlag,
+                       //opt.Inverse, opt.Channel)
+    case Deform:
+        _, err = rasdtPwr(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
+                          opt.StartSec, opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
+                          opt.Cycle, opt.Scale, opt.Exp, opt.LR, opt.Raster,
+                          opt.CC, opt.StartCC, opt.CCMin)
+    case Height:
+        _, err = rasHgt(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
+                        opt.StartSec, opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
+                        opt.Cycle, opt.Scale, opt.Exp, opt.LR, opt.Raster)
+    case Linear:
+        _, err = rasLinear(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+                           opt.Avg.Rng, opt.Avg.Azi, opt.Min, opt.Max, opt.LR,
+                           opt.Raster, opt.Inverse, opt.Channel)
+    case MagPhase:
+        dt := 0
+        
+        switch opt.DType {
+        case FloatCpx:
+            dt = 0
+        case ShortCpx:
+            dt = 1
+        default:
+            // Error
+        }
+        _, err = rasMph(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+                        opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
+                        opt.LR, opt.Raster, dt)
+    case MagPhasePwr:    
+        if opt.DType != FloatCpx {
+            // Error
+        }
+        
+        _, err = rasMphPwr(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
+                           opt.StartSec, opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
+                           opt.Scale, opt.Exp, opt.LR, opt.Raster,
+                           opt.CC, opt.StartCC, opt.CCMin)
+    case Power:
+        dt := 0
+        
+        switch opt.DType {
+        case Float:
+            dt = 0
+        case Short:
+            dt = 1
+        case Double:
+            dt = 2
+        default:
+            // Error
+        }
+        
+        _, err = rasPwr(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+                        opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
+                        opt.Raster, dt, opt.HeaderSize)
     
-    switch opt.DType {
-    case FloatCpx:
-        dtype = 0
-    case ShortCpx:
-        dtype = 1
-    default:
-        return Handle(nil, "unrecognized image format '%s' for rasslc",
-            opt.DType.ToString())
+    case SingleLook:
+        dt := 0
+        
+        switch opt.DType {
+        case FloatCpx:
+            dt = 0
+        case ShortCpx:
+            dt = 1
+        default:
+            // Error
+        }
+        
+        _, err = rasSLC(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+                        opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
+                        opt.LR, dt, opt.HeaderSize, opt.Raster)
+    case Unwrapped:
+        _, err = rasRmg(opt.Datfile, opt.Sec, opt.Start, opt.StartSec, 
+                        opt.Nlines, opt.Avg.Rng, opt.Avg.Azi, opt.PhaseScale,
+                        opt.Scale, opt.Exp, opt.Offset, opt.LR, opt.Raster,
+                        opt.CC, opt.StartCC, opt.CCMin)
     }
-    
-    _, err := _rasslc(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
-                      opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
-                      dtype, opt.HeaderSize, opt.Raster)
-    
     return err
 }
 
-var _raspwr = Gamma.Must("raspwr")
 
-func raspwr(opt RasArgs) error {
-    dtype := 0
-    
-    switch opt.DType {
-    case Float:
-        dtype = 0
-    case Short:
-        dtype = 1
-    case Double:
-        dtype = 2
-    default:
-        return Handle(nil, "unrecognized image format '%s' for raspwr",
-            opt.DType.ToString())
-    }
-    
-    _, err := _raspwr(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
-                      opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
-                      opt.LR, opt.Raster, dtype, opt.HeaderSize)
-
-    return err
-}
-
-var _rasmph = Gamma.Must("rasmph")
-
-func rasmph(opt RasArgs) error {
-    dtype := 0
-    
-    switch opt.DType {
-    case FloatCpx:
-        dtype = 0
-    case ShortCpx:
-        dtype = 1
-    default:
-        return Handle(nil, "unrecognized image format '%s' for rasmph",
-            opt.DType.ToString())
-    }
-    
-    _, err := _rasmph(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
-                      opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
-                      opt.LR, opt.Raster, dtype) 
-    
-    return err
-}
-
-
-/*
- * TODO: finish implementation
- * 
-var _rasshd = Gamma.must("rasshd")
-
-func (opt *shdArgs) Parse(d DataFile) error {
-    err := shdArgs.rasArgs.Parse(d)
-    
-    if err != nil {
-        return err
-    }
-}
-
-func rasshd(opt *shdArgs) error {
-    dtype := 0
-    
-    switch opt.ImgFmt {
-    case "FLOAT":
-        dtype = 0
-    case "SHORT INTEGER":
-        dtype = 1
-    default:
-        return Handle(nil, "unrecognized image format '%s'", opt.ImgFmt)
-    }
-    
-    _, err := _rasshd(opt.Datfile, opt.Rng, colPost, RowPost, opt.Start,
-                      opt.Nlines, opt.Avg.Rng, opt.Avg.Azi, opt.Elev,
-                      opt.Orient opt.LR, opt.raster, dtype, opt.zeroFlag) 
-    
-    return err
-}
-*/
+var (
+    rasByte = Gamma.Must("rasbyte")
+    rasCC = Gamma.Must("rascc")
+    rasdB = Gamma.Must("ras_dB")
+    rasHgt = Gamma.Must("rashgt")
+    rasdtPwr = Gamma.Must("rasdt_pwr")
+    rasMph = Gamma.Must("rasmph")
+    rasMphPwr = Gamma.Must("rasmph_pwr")
+    rasPwr = Gamma.Must("raspwr")
+    rasRmg = Gamma.Must("rasrmg")
+    rasShd = Gamma.Must("rasshd")
+    rasSLC = Gamma.Must("rasSLC")
+    rasLinear = Gamma.Must("ras_linear")
+)

@@ -32,13 +32,17 @@ type (
     }
     */
     
+    Serialize interface {
+        jsonMap() JSONMap
+        FromJson(JSONMap) error        
+    }
+    
     IDatFile interface {
         Datfile() string
         Rng() int
         Azi() int
         Dtype() DType
-        jsonMap() (JSONMap, error)
-        FromJson(JSONMap) error
+        Move(string) (DatFile, error)
         Raster(opt RasArgs) error
     }
     
@@ -576,17 +580,11 @@ func Move(path string, dir string) (ret string, err error) {
     return dst, nil
 }
 
-func Save(path string, d IDatFile) (err error) {
-    var m JSONMap
-    
-    if m, err = d.jsonMap(); err != nil {
-        return
-    }
-    
-    return SaveJson(path, m)
+func Save(path string, d Serialize) (err error) {
+    return SaveJson(path, d.jsonMap())
 }
 
-func Load(path string, d IDatFile) (err error) {
+func Load(path string, d Serialize) (err error) {
     
     data, err := ReadFile(path)
     if err != nil {

@@ -1,13 +1,13 @@
 package gamma
 
 import (
-    "log"
+    //"log"
     "encoding/json"
     "fmt"
     "os"
     fp "path/filepath"
     //ref "reflect"
-    str "strings"
+    //str "strings"
 )
 
 type (
@@ -42,9 +42,9 @@ var (
         "proc": process,
         "init": initGamma,
         "batch": batch,
-        "move": move,
-        "make": create,
-        "stat": stat,
+        //"move": move,
+        //"make": create,
+        //"stat": stat,
         //"splitIfg": splitIfg,
     }
     
@@ -367,13 +367,11 @@ func move(args Args) (err error) {
     
     path := m.Meta
     
-    dat, err := LoadDataFile(path)
-    if err != nil {
+    var dat DatParFile
+    if err = Load(path, &dat); err != nil {
         err = Handle(err, "failed to parse json metadatafile '%s'", path)
         return
     }
-    
-    log.Fatalf("%s\n", dat.TypeStr())
     
     out := m.OutDir
     
@@ -395,16 +393,16 @@ func move(args Args) (err error) {
     return nil
 }
 
-type (
-    Coregister struct {
-        CoregOpt
-        Master  string `name:"master" default:""`
-        Slave   string `name:"slave" default:""`
-        Ref     string `name:"ref" default:""`
-        Outfile string `name:"out" default:""`
-    }
+//type (
+    //Coregister struct {
+        //CoregOpt
+        //Master  string `name:"master" default:""`
+        //Slave   string `name:"slave" default:""`
+        //Ref     string `name:"ref" default:""`
+        //Outfile string `name:"out" default:""`
+    //}
 
-)
+//)
 
 /*
 func coreg(args Args) error {
@@ -449,81 +447,82 @@ func coreg(args Args) error {
 }
 */
 
-type Creater struct {
-    Dtype      string `name:"dtype"`
-    Ftype      string `name:"ftype"`
-    ParfileExt string `name:"parExt"`
-    DatParFile
-    MetaFile
-}
 
-func create(args Args) (err error) {
-    c := Creater{}
+//type Creater struct {
+    //Dtype      string `name:"dtype"`
+    //Ftype      string `name:"ftype"`
+    //ParfileExt string `name:"parExt"`
+    //DatParFile
+    //MetaFile
+//}
+
+//func create(args Args) (err error) {
+    //c := Creater{}
     
-    if err = args.ParseStruct(&c); err != nil {
-        err = ParseErr.Wrap(err)
-        return
-    }
+    //if err = args.ParseStruct(&c); err != nil {
+        //err = ParseErr.Wrap(err)
+        //return
+    //}
     
-    dat := c.Dat
+    //dat := c.Dat
     
-    if len(dat) == 0 {
-        if err = c.DatParFile.Tmp(); err != nil {
-            return
-        }
-    }
+    //if len(dat) == 0 {
+        //if err = c.DatParFile.Tmp(); err != nil {
+            //return
+        //}
+    //}
     
-    ext := c.ParfileExt
-    if len(ext) == 0 {
-        ext = "par"
-    }
+    //ext := c.ParfileExt
+    //if len(ext) == 0 {
+        //ext = "par"
+    //}
     
-    par := c.Par
-    if len(par) == 0 {
-        par = fmt.Sprintf("%s.%s", dat, ext)
-    }
+    //par := c.Par
+    //if len(par) == 0 {
+        //par = fmt.Sprintf("%s.%s", dat, ext)
+    //}
     
     
-    dt_, dt := c.Dtype, Unknown
+    //dt_, dt := c.Dtype, Unknown
     
-    if len(dt_) > 0 {
-        dt, err = str2dtype(dt_)
-        if err != nil {
-            return
-        }
-    }
+    //if len(dt_) > 0 {
+        //dt, err = str2dtype(dt_)
+        //if err != nil {
+            //return
+        //}
+    //}
     
-    dat, err = fp.Abs(dat)
-    if err != nil { return }
+    //dat, err = fp.Abs(dat)
+    //if err != nil { return }
     
-    par, err = fp.Abs(par)
-    if err != nil { return }
+    //par, err = fp.Abs(par)
+    //if err != nil { return }
         
-    datf, err := NewDataFile(dat, par, dt) 
-    if err != nil {
-        err = DataCreateErr.Wrap(err, "DataFile")
-        return
-    }
+    //datf, err := NewDataFile(dat, par, dt) 
+    //if err != nil {
+        //err = DataCreateErr.Wrap(err, "DataFile")
+        //return
+    //}
     
     
-    var Dat DataFile
-    ftype := str.ToUpper(c.Ftype)
-    switch ftype {
-    case "MLI":
-        Dat = MLI{dataFile: datf}
-    default:
-        err = fmt.Errorf("unrecognized filetype '%s'", ftype)
-        return
-    }
+    //var Dat DataFile
+    //ftype := str.ToUpper(c.Ftype)
+    //switch ftype {
+    //case "MLI":
+        //Dat = MLI{dataFile: datf}
+    //default:
+        //err = fmt.Errorf("unrecognized filetype '%s'", ftype)
+        //return
+    //}
     
-    if err = Dat.Save(c.Meta); err != nil {
-        err = Handle(err, "failed to save datafile to metafile '%s'",
-            c.MetaFile)
-        return
-    }
+    //if err = Dat.Save(c.Meta); err != nil {
+        //err = Handle(err, "failed to save datafile to metafile '%s'",
+            //c.MetaFile)
+        //return
+    //}
     
-    return nil
-}
+    //return nil
+//}
 
 /*
 type (
