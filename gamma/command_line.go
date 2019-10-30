@@ -48,6 +48,7 @@ var (
         "splitIfg": splitIfg,
         "geocode": geocode,
         "raster": raster,
+        "like": like,
     }
     
     CommandsAvailable = MapKeys(Commands)
@@ -277,12 +278,12 @@ func (b Batcher) Quicklook() error {
     return nil
 }
 
-func (b Batcher) MLI() error {
+func (b Batcher) MLI() (err error) {
     path := b.infile
-    file, err := NewReader(path)
-
-    if err != nil {
-        return err
+    
+    var file FileReader
+    if file, err = NewReader(path); err != nil {
+        return
     }
 
     defer file.Close()
@@ -293,47 +294,54 @@ func (b Batcher) MLI() error {
     
     mliDir := b.OutDir
     
-    err = os.MkdirAll(mliDir, os.ModePerm)
-    
-    if err != nil {
+    if err = os.MkdirAll(mliDir, os.ModePerm); err != nil {
         return Handle(err, "failed to create directory '%s'", mliDir)
     }
     
     for file.Scan() {
         line := file.Text()
-
-        s1, err := FromTabfile(line)
-
-        if err != nil {
-            return Handle(err, "failed to parse S1SLC tabfile '%s'", line)
+        
+        
+        var s1 S1SLC
+        if s1, err = FromTabfile(line); err != nil {
+            err = Handle(err, "failed to parse S1SLC tabfile '%s'", line)
+            return
         }
         
-        dat := fp.Join(mliDir, s1.Format(DateShort) + ".mli")
-        mli, err := NewMLI(dat, "")
-        
-        if err != nil {
-            return Handle(err, "could not create MLI struct")
+        var name string
+        if name, err = fp.Abs(fp.Join(mliDir, s1.Format(DateShort))); err != nil {
+            return
         }
         
-        exist, err := mli.Exist()
-        
-        if err != nil {
-            return err
+        var mli MLI
+        if mli, err = NewMLI(name + ".mli", ""); err != nil {
+            err = Handle(err, "could not create MLI struct")
+            return
         }
+        
+        var exist bool
+        if exist, err = mli.Exist(); err != nil {
+            return
+        }
+        
+        json := name + ".json"
         
         if exist {
-            fmt.Printf("%s %s\n", mli.Dat, mli.Par)
+            if err = Save(json, &mli); err != nil {
+                return
+            }
             continue
         }
         
-        err = s1.MLI(&mli, opt)
-        
-        if err != nil {
+        if err = s1.MLI(&mli, opt); err != nil {
             return Handle(err, "failed to retreive MLI file for '%s'",
                 line)
         }
-
-        fmt.Printf("%s %s\n", mli.Dat, mli.Par)
+        
+        if err = Save(json, &mli); err != nil {
+            return
+        }
+        fmt.Println(json) 
     }
 
     return nil
@@ -368,6 +376,58 @@ func (b Batcher) Raster() error {
     
     return nil
 }
+
+type Like struct {
+    In    string `name:"in"`
+    Out   string `name:"out"`
+    Dtype string `name:"dtype"`
+    Ext   string `name:"ext" default:"dat"`
+}
+
+func like(args Args) (err error) {
+    l := Like{}
+    
+    if err = args.ParseStruct(&l); err != nil {
+        err = ParseErr.Wrap(err)
+        return
+    }
+    
+    in, out := l.In, l.Out
+    
+    if len(in) == 0 && len(out) == 0 {
+        err = fmt.Errorf("expected parameter 'in' and 'out' to be set")
+        return
+    }
+    
+    dt, dtype := l.Dtype, Unknown
+    
+    if len(dt) > 0 {
+        dtype = str2dtype(dt)
+    }
+    
+    var indat DatFile
+    if err = Load(in, &indat); err != nil {
+        return
+    }
+    
+    if dtype == Unknown {
+        dtype = indat.Dtype()
+    }
+    
+    
+    if out, err = fp.Abs(out); err != nil {
+        return
+    }
+    
+    outdat := DatFile{
+        Dat: fmt.Sprintf("%s.%s", out, l.Ext),
+        URngAzi: indat.URngAzi,
+        DType: dtype,
+    }
+    
+    return Save(out + ".json", &outdat)
+}
+
 
 type(
     Mover struct {

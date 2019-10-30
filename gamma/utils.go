@@ -174,7 +174,6 @@ func (h Args) parseStruct(v ref.Value) error {
             name = sField.Name
         }
         
-        
         if kind == ref.Bool {
             val := false
             for _, pos := range h.pos {
