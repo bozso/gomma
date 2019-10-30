@@ -1,413 +1,403 @@
 package gamma
 
-//import (
+import (
     //"log"
-    //"fmt"
+    "fmt"
     //"os"
     //fp "path/filepath"
-    //str "strings"
-    //conv "strconv"
-//)
+    str "strings"
+    conv "strconv"
+)
 
 
-//type DEM struct {
-    //DatParFile
-//}
+type DEM struct {
+    DatParFile
+}
 
-//func TmpDEM() (ret DEM, err error) {
-    //ret.DatParFile, err = TmpDatParFile("dem", "par", Float)
-    //return
-//}
+func TmpDEM() (ret DEM, err error) {
+    ret.DatParFile, err = TmpDatParFile("dem", "par", Float)
+    return
+}
 
-//type Lookup struct {
-    //DatFile
-//}
+type Lookup struct {
+    DatFile
+}
 
+func NewDEM(dat, par string) (ret DEM, err error) {
+    ret.DatParFile, err = NewDatParFile(dat, par, "par", Float)
+    return
+}
 
-//func NewDEM(dat, par string) (ret DEM, err error) {
-    //ret.DatParFile, err = NewDatParFile(dat, par, "par", Float)
-    //return
-//}
+func (d DEM) NewLookup(path string) (ret Lookup) {
+    ret.Dat = path
+    ret.URngAzi = d.URngAzi
+    ret.DType =  FloatCpx
+    return
+}
 
-//func (d DEM) NewLookup(path string) Lookup {
-    //return DatFile{Dat: path, RngAzi: d.RngAzi, DType: FloatCpx}
-//}
+func (d DEM) TmpLookup() (ret Lookup, err error) {
+    var path string
+    if path, err = TmpFile(""); err != nil {
+        return
+    }
+    
+    return d.NewLookup(path), nil
+}
 
-//func (d DEM) TmpLookup() (ret Lookup, err error) {
-    //var path string
-    //if path, err = TmpFile(""); err != nil {
-        //return
-    //}
-    
-    //return d.NewLookup(path), nil
-//}
+func (dem DEM) ParseRng() (int, error) {
+    return dem.Int("width", 0)
+}
 
-//func (dem DEM) ParseRng() (int, error) {
-    //return dem.Int("width", 0)
-//}
+func (dem DEM) ParseAzi() (int, error) {
+    return dem.Int("nlines", 0)
+}
 
-//func (dem DEM) ParseAzi() (int, error) {
-    //return dem.Int("nlines", 0)
-//}
+func (d DEM) Raster(opt RasArgs) error {
+    opt.Mode = Power
+    opt.Parse(d)
+    
+    return d.DatFile.Raster(opt)
+}
 
-///*
-//func (d DEM) Raster(opt RasArgs) error {
-    //opt.DisArgs.Datfile = d.Dat
-    //opt.ImgFmt = "FLOAT"
+func (l Lookup) Raster(opt RasArgs) error {
+    opt.Mode = MagPhase
+    opt.Parse(l)
     
-    //err := opt.Parse(d)
-    
-    //if err != nil {
-        //return Handle(err, "failed to parse raster options")
-    //}
-    
-    
-    
-    //return nil
-//}
-//*/
+    return l.DatFile.Raster(opt)
+}
 
-//type (
-    //InterpolationMode int
+type (
+    InterpolationMode int
     
-    //CodeOpt struct {
-        //inWidth int
-        //outWidth int
-        //nlines int
-        //npoints int
-        //dtype string
-        //oversamp float64
-        //maxRad float64
-        //interpolMode InterpolationMode
-        //flipInput bool
-        //flipOutput bool
-        //order int
-    //}
-//)
+    CodeOpt struct {
+        RngAzi
+        Nlines int `name:"nlines" default:"0"`
+        Npoints int `name:"npoint" default:"4"`
+        Oversamp float64 `name:"oversamp" default:"2.0"`
+        MaxRad float64 `name:"maxRadious" default:"0.0"`
+        InterpolMode InterpolationMode
+        FlipInput bool `name:"flipIn"`
+        FlipOutput bool `name:"flipOut"`
+        Order int `name:"order" default:"5"`
+    }
+)
 
-//const (
-    //NearestNeighbour InterpolationMode = iota
-    //BicubicSpline
-    //BicubicSplineLog
-    //BicubicSplineSqrt
-    //BSpline
-    //BSplineSqrt
-    //Lanczos
-    //LanczosSqrt
-    //InvDist
-    //InvSquaredDist
-    //Constant
-    //Gauss
-//)
+const (
+    NearestNeighbour InterpolationMode = iota
+    BicubicSpline
+    BicubicSplineLog
+    BicubicSplineSqrt
+    BSpline
+    BSplineSqrt
+    Lanczos
+    LanczosSqrt
+    InvDist
+    InvSquaredDist
+    Constant
+    Gauss
+)
 
-//func (opt *CodeOpt) Parse() (lrIn int, lrOut int, err error) {
-    //lrIn, lrOut = 1, 1
-    
-    //if opt.flipInput {
-        //lrIn = -1
-    //}
-    
-    //if opt.flipOutput {
-        //lrOut = -1
-    //}
-    
-    //if opt.order == 0 {
-        //opt.order = 5
-    //}
-    
-    //if opt.inWidth == 0 {
-        //err = fmt.Errorf("infile width must be specified")
-        //return
-    //}
-    
-    //if opt.outWidth == 0 {
-        //err = fmt.Errorf("outfile width must be specified")
-        //return
-    //}
-    
-    //if opt.oversamp == 0.0 {
-        //opt.oversamp = 2.0
-    //}
-    
-    //if opt.maxRad == 0.0 {
-        //opt.maxRad = 4 * opt.oversamp
-    //}
-    
-    //if opt.npoints == 0 {
-        //opt.npoints = 4
-    //}
-    
-    //return lrIn, lrOut, nil
-//}
-
-//var g2r = Gamma.Must("geocode")
-
-//func (dem DEM) geo2radar(infile, outfile DatFile, opt CodeOpt) error {
-    //lrIn, lrOut, err := opt.Parse()
-    
-    //if err != nil {
-        //return Handle(err, "failed to parse geo2radar arguments")
-    //}
-    
-    //interp := 0
-
-    //switch opt.interpolMode {
-    //case InvDist:
-        //interp = 0
-    //case NearestNeighbour:
-        //interp = 1
-    //case InvSquaredDist:
-        //interp = 2
-    //case Constant:
-        //interp = 3
-    //case Gauss:
-        //interp = 4
-    //default:
-        //return Handle(nil, "unrecognized interpolation option")
-    //}
-    
-    //dtype := 0
-    
-    //switch opt.dtype {
-        //case "FLOAT":
-            //dtype = 0
-        //case "FCOMPLEX":
-            //dtype = 1
-        //case "SUN", "raster", "BMP", "TIFF":
-            //dtype = 2
-        //case "UNSIGNED CHAR":
-            //dtype = 3
-        //case "SHORT":
-            //dtype = 4
-        //case "SCOMPLEX":
-            //dtype = 5
-        //case "DOUBLE":
-            //dtype = 6
-        //default:
-            //return Handle(nil, "unrecognized data format: %s", opt.dtype)
-    //}
-    
-    //// rng, err := dem.Rng()
-    
-    //// if err != nil {
-    ////     return Handle(err, "failed to retreive DEM width")
-    //// }
-    
-    //_, err = g2r(dem.Lookup, infile, opt.inWidth, outfile, opt.outWidth,
-                 //opt.nlines, interp, dtype, lrIn, lrOut, opt.oversamp,
-                 //opt.maxRad, opt.npoints)
-    
-    //return err
-//}
-
-//var r2g = Gamma.Must("geocode_back")
-
-//func (dem DEM) radar2geo(infile, outfile string, opt CodeOpt) error {
-    //lrIn, lrOut, err := opt.Parse()
-    
-    //if err != nil {
-        //return Handle(err, "failed to parse radar2geo arguments")
-    //}
-    
-    //var interp int
-    
-    //// default interpolation mode
-    //if opt.interpolMode == NearestNeighbour {
-        //interp = 1
-    //} else {
-        //switch opt.interpolMode {
-        //case NearestNeighbour:
-            //interp = 0
-        //case BicubicSpline:
-            //interp = 1
-        //case BicubicSplineLog:
-            //interp = 2
-        //case BicubicSplineSqrt:
-            //interp = 3
-        //case BSpline:
-            //interp = 4
-        //case BSplineSqrt:
-            //interp = 5
-        //case Lanczos:
-            //interp = 6
-        //case LanczosSqrt:
-            //interp = 7
-        //default:
-            //return fmt.Errorf("unrecognized interpolation option")
-        //}
-    //}
-    
-    //dtype := 0
-    
-    //switch opt.dtype {
-        //case "FLOAT":
-            //dtype = 0
-        //case "FCOMPLEX":
-            //dtype = 1
-        //case "SUN", "raster", "BMP", "TIFF":
-            //dtype = 2
-        //case "UNSIGNED CHAR":
-            //dtype = 3
-        //case "SHORT":
-            //dtype = 4
-        //case "DOUBLE":
-            //dtype = 5
-        //default:
-            //return fmt.Errorf("unrecognized data format: %s", opt.dtype)
-    //}
-    
-    //// TODO: use this if opt.inWidth == 0?
-    //// rng, err := dem.Rng()
-    
-    //// if err != nil {
-    ////     return Handle(err, "failed to retreive DEM width")
-    //// }
-    
-    //if opt.order == 0 {
-        //opt.order = 5
-    //}
-    
-    //_, err = r2g(infile, opt.inWidth, dem.Lookup, outfile, opt.outWidth,
-                 //opt.nlines, interp, dtype, lrIn, lrOut, opt.order)
-    
-    //return err
-//}
-
-//var coord2sarpix = Gamma.Must("coord_to_sarpix")
-
-//func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
-    //const par = "corrected SLC/MLI range, azimuth pixel (int)"
-    
-    //out, err := coord2sarpix(mpar, "-", ll.Lat, ll.Lon, hgt, diffPar)
-    
-    //if err != nil {
-        //err = Handle(err, "failed to retreive radar coordinates")
-        //return
-    //}
-    
-    //params := FromString(out, ":")
-    
-    //line, err := params.Param(par)
-    
-    //if err != nil {
-        //err = Handle(err, "failed to retreive range, azimuth")
-        //return
-    //}
-    
-    //split := str.Split(line, " ")
-    
-    //if len(split) < 2 {
-        //err = fmt.Errorf("split to retreive range, azimuth failed")
-        //return
-    //}
-    
-    //if ret.Rng, err = conv.Atoi(split[0]); err != nil {
-        //err = ParseIntErr.Wrap(err, split[0])
-        //return
-    //}
-    
-    //if ret.Azi, err = conv.Atoi(split[1]); err != nil {
-        //err = ParseIntErr.Wrap(err, split[1])
-        //return
-    //}
-
-    //return ret, nil
-//}
+func (i InterpolationMode) String() string {
+    switch i {
+    case NearestNeighbour:
+        return "NearestNeighbour"
+    case BicubicSpline:
+        return "BicubicSpline"
+    case BicubicSplineLog:
+        return "BicubicSplineLog"
+    case BicubicSplineSqrt:
+        return "BicubicSplineLogSqrt"
+    case BSpline:
+        return "BSpline"
+    case BSplineSqrt:
+        return "BSplineSqrt"
+    case Lanczos:
+        return "Lanczos"
+    case LanczosSqrt:
+        return "LanczosSqrt"
+    case InvDist:
+        return "InverseDistance"
+    case InvSquaredDist:
+        return "InverseSquaredDistance"
+    case Constant:
+        return "Constant"
+    case Gauss:
+        return "Gauss"
+    default:
+        return "Unknown"
+    }
+}
 
 
-//func NewGeocode(dat, par string) (ret Geocode, err error) {
-    //ret.MLI, err = NewMLI(dat, par)
-    //return
-//} 
-
-////func (opt *GeoPlotOpt) Parse(d IDatFile) error {
-    ////err := opt.RasArgs.Parse(d)
+func (opt *CodeOpt) Parse() (lrIn int, lrOut int) {
+    lrIn, lrOut = 1, 1
     
-    ////if err != nil {
-        ////return Handle(err, "failed to parse plotting options")
-    ////}
+    if opt.FlipInput {
+        lrIn = -1
+    }
     
-    ////if opt.StartPwr == 0 {
-        ////opt.StartPwr = 1
-    ////}
+    if opt.FlipOutput {
+        lrOut = -1
+    }
     
-    ////if opt.StartHgt == 0 {
-        ////opt.StartHgt = 1
-    ////}
+    if opt.Order == 0 {
+        opt.Order = 5
+    }
+    
+    if opt.Oversamp == 0.0 {
+        opt.Oversamp = 2.0
+    }
+    
+    if opt.MaxRad == 0.0 {
+        opt.MaxRad = 4 * opt.Oversamp
+    }
+    
+    if opt.Npoints == 0 {
+        opt.Npoints = 4
+    }
+        
+    return lrIn, lrOut
+}
+
+var g2r = Gamma.Must("geocode")
+
+func (l Lookup) geo2radar(infile IDatFile, opt CodeOpt) (ret DatFile, err error) {
+    lrIn, lrOut := opt.Parse()
+    
+    if err = opt.RngAzi.Check(); err != nil {
+        return
+    }
+    
+    intm := opt.InterpolMode
+    interp := 0
+
+    switch intm {
+    case InvDist:
+        interp = 0
+    case NearestNeighbour:
+        interp = 1
+    case InvSquaredDist:
+        interp = 2
+    case Constant:
+        interp = 3
+    case Gauss:
+        interp = 4
+    default:
+        err = ModeError{name: "interpolation option", got: intm}
+        return
+    }
+    
+    dt, dtype := 0, infile.Dtype()
+    
+    switch dtype {
+        case Float:
+            dt = 0
+        case FloatCpx:
+            dt = 1
+        case Raster:
+            dt = 2
+        case UChar:
+            dt = 3
+        case Short:
+            dt = 4
+        case ShortCpx:
+            dt = 5
+        case Double:
+            dt = 6
+        default:
+            err = WrongTypeError{DType: dtype, kind: "geo2radar"}
+            return
+    }
     
     
-    ////return nil
-////}
-
-//var rashgt = Gamma.Must("rashgt")
-
-//func (geo Geocode) Raster(opt RasArgs) error {
-    //opt.Raster = fmt.Sprintf("%s.%s", geo.Hgt, Settings.RasExt)
+    if ret, err = TmpDatFile("dat", dtype); err != nil {
+        return
+    }
     
-    //err := opt.Parse(geo)
     
-    //if err != nil {
-        //return Handle(err, "failed to parse plot arguments")
-    //}
+    //log.Fatalf("%#v\n", opt)
     
-    //_, err = rashgt(geo.Hgt, geo.MLI.Dat, opt.Rng, opt.StartHgt, opt.StartPwr,
-                    //opt.Nlines, opt.Avg.Rng, opt.Avg.Azi, opt.Cycle, opt.Scale,
-                    //opt.Exp, opt.LR, opt.Raster)
-    //return err
-//}
+    ret.rng = opt.Rng
+    ret.azi = opt.Azi
+    
+    _, err = g2r(l.Dat, infile.Datfile(), infile.Rng(),
+                 ret.Dat, ret.rng,
+                 opt.Nlines, interp, dt, lrIn, lrOut, opt.Oversamp,
+                 opt.MaxRad, opt.Npoints)
+    
+    return ret, err
+}
 
+var r2g = Gamma.Must("geocode_back")
 
-//type Geocode struct {
-    //MLI
-    //Hgt, SimSar, Zenith, Orient, Inc, Pix, Psi, LsMap, DiffPar,
-    //Offs, Offsets, Ccp, Coffs, Coffsets, Sigma0, Gamma0 string
-//}
+func (l Lookup) radar2geo(infile IDatFile, opt CodeOpt) (ret DatFile, err error) {
+    lrIn, lrOut := opt.Parse()
+    
+    if err = opt.RngAzi.Check(); err != nil {
+        return
+    }
+    
+    intm := opt.InterpolMode
+    var interp int
+    
+    // default interpolation mode
+    if intm == NearestNeighbour {
+        interp = 1
+    } else {
+        switch intm {
+        case NearestNeighbour:
+            interp = 0
+        case BicubicSpline:
+            interp = 1
+        case BicubicSplineLog:
+            interp = 2
+        case BicubicSplineSqrt:
+            interp = 3
+        case BSpline:
+            interp = 4
+        case BSplineSqrt:
+            interp = 5
+        case Lanczos:
+            interp = 6
+        case LanczosSqrt:
+            interp = 7
+        default:
+            err = ModeError{name: "interpolation option", got: intm}
+            return
+        }
+    }
+    
+    
+    dt, dtype := 0, infile.Dtype()
+    
+    switch dtype {
+        case Float:
+            dt = 0
+        case FloatCpx:
+            dt = 1
+        case Raster:
+            dt = 2
+        case UChar:
+            dt = 3
+        case Short:
+            dt = 4
+        case Double:
+            dt = 5
+        default:
+            err = WrongTypeError{DType: dtype, kind: "radar2geo"}
+            return
+    }
+    
+    if ret, err = TmpDatFile("dat", dtype); err != nil {
+        return
+    }
+    
+    ret.rng = opt.Rng
+    ret.azi = opt.Azi
+    
+    _, err = r2g(infile.Datfile(), infile.Rng(), l.Dat,
+                 ret.Dat, ret.rng,
+                 opt.Nlines, interp, dt, lrIn, lrOut, opt.Order)
+    
+    return ret, err
+}
 
-//type (
-    //LayoverScaling int
-    //MaskingMode int
-    //RefenceMode int
-    //ParFileType int
-    //InteractMode int
-//)   
+var coord2sarpix = Gamma.Must("coord_to_sarpix")
 
-//const (
-    //Standard LayoverScaling = iota
-    //VisOpt
-//)
+func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
+    const par = "corrected SLC/MLI range, azimuth pixel (int)"
+    
+    out, err := coord2sarpix(mpar, "-", ll.Lat, ll.Lon, hgt, diffPar)
+    
+    if err != nil {
+        err = Handle(err, "failed to retreive radar coordinates")
+        return
+    }
+    
+    params := FromString(out, ":")
+    
+    line, err := params.Param(par)
+    
+    if err != nil {
+        err = Handle(err, "failed to retreive range, azimuth")
+        return
+    }
+    
+    split := str.Split(line, " ")
+    
+    if len(split) < 2 {
+        err = fmt.Errorf("split to retreive range, azimuth failed")
+        return
+    }
+    
+    if ret.Rng, err = conv.Atoi(split[0]); err != nil {
+        err = ParseIntErr.Wrap(err, split[0])
+        return
+    }
+    
+    if ret.Azi, err = conv.Atoi(split[1]); err != nil {
+        err = ParseIntErr.Wrap(err, split[1])
+        return
+    }
 
-//const (
-    //NoMask MaskingMode = iota
-    //MaskOutside
-    //MaskFull
-//)
+    return ret, nil
+}
 
-//const(
-    //Actual RefenceMode = iota
-    //Simulated
-//)
+type Hgt struct {
+    DatFile
+}
 
-//const (
-    //Offset ParFileType = iota
-    //SLC_MLI
-    //Elevation
-//)
+type Geocode struct {
+    MLI
+    Hgt, SimSar, Zenith, Orient, Inc, Pix, Psi, LsMap, DiffPar,
+    Offs, Offsets, Ccp, Coffs, Coffsets, Sigma0, Gamma0 string
+}
 
-//const (
-    //NonInter InteractMode = iota
-    //Inter
-//)
+type (
+    LayoverScaling int
+    MaskingMode int
+    RefenceMode int
+    ParFileType int
+    InteractMode int
+)   
 
-//var (
-    //createDiffPar = Gamma.Must("create_diff_par")
-    //vrt2dem = Gamma.Must("vrt2dem")
-    ////gcMap = Gamma.Must("gc_map2")
-    //gcMap = Gamma.Must("gc_map")
-    //pixelArea = Gamma.Must("pixel_area")
-    //offsetPwrm = Gamma.Must("offset_pwrm")
-    //offsetFitm = Gamma.Must("offset_fitm")
-    //gcMapFine = Gamma.Must("gc_map_fine")
-//)
+const (
+    Standard LayoverScaling = iota
+    VisOpt
+)
+
+const (
+    NoMask MaskingMode = iota
+    MaskOutside
+    MaskFull
+)
+
+const(
+    Actual RefenceMode = iota
+    Simulated
+)
+
+const (
+    Offset ParFileType = iota
+    SLC_MLI
+    Elevation
+)
+
+const (
+    NonInter InteractMode = iota
+    Inter
+)
+
+var (
+    createDiffPar = Gamma.Must("create_diff_par")
+    vrt2dem = Gamma.Must("vrt2dem")
+    //gcMap = Gamma.Must("gc_map2")
+    gcMap = Gamma.Must("gc_map")
+    pixelArea = Gamma.Must("pixel_area")
+    offsetPwrm = Gamma.Must("offset_pwrm")
+    offsetFitm = Gamma.Must("offset_fitm")
+    gcMapFine = Gamma.Must("gc_map_fine")
+)
 
 //func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
     //geodir := fp.Join(outDir, "geo")
@@ -676,8 +666,8 @@ package gamma
     //return ret, nil
 //}
 
-//type GeoMeta struct {
-    //Dem, DemOrig DEM
-    //Geo Geocode
-//}
+type GeoMeta struct {
+    Dem, DemOrig DEM
+    Geo Geocode
+}
 

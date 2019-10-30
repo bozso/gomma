@@ -35,20 +35,19 @@ type (
         Mode       PlotMode
         zeroFlag   ZeroFlag
         Flip       bool    `name:"flip" default:""`
-        //Dtype    string  `name:"dtype" default:""`
         Datfile    string  `name:"dat" default:""`
         Start      int     `name:"start" default:"0"`
-        Nlines     int     `name:"nlines" default:"1"`
+        Nlines     int     `name:"nlines" default:"0"`
         Sec        string  `name:"sec" default:""`
         StartSec   int     `name:"startSec" default:"1"`
         StartCC    int     `name:"startCC" default:"1"`
         Coh        string  `name:"coh" default:""`
         Cycle      float64 `name:"cycle" default:"160.0"`
         LR         int
-        Elev       float64 `name:"elev" default:""`
-        Orient     float64 `name:"orient" default:""`
-        ColPost    float64 `name:"colpost" default:""`
-        RowPost    float64 `name:"rowpost" default:""`
+        Elev       float64 `name:"elev" default:"45.0"`
+        Orient     float64 `name:"orient" default:"135.0"`
+        ColPost    float64 `name:"colpost" default:"0"`
+        RowPost    float64 `name:"rowpost" default:"0"`
         Offset     float64 `name:"offset" default:"0.0"`
         PhaseScale float64 `name:"scale" default:"0.0"`
         CC         string
@@ -212,6 +211,9 @@ const (
 
 func (d DatFile) Raster(opt RasArgs) (err error) {
     opt.Parse(d)
+    
+    //fmt.Printf("%#v\n", opt)
+    //return nil
                 
     switch opt.Mode {
     case Byte:

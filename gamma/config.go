@@ -26,11 +26,6 @@ type (
         Lon float64 `name:"lot" default:"1.0"`
     }
     
-    RngAzi struct {
-        Rng int `json:"rng" name:"rng" default:"1"`
-        Azi int `json:"azi" name:"azi" default:"1"`
-    }
-    
     GeneralOpt struct {
         DataPath, OutputDir, Pol string
         MasterDate               string

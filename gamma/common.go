@@ -43,7 +43,8 @@ var (
     //}
 
     Pols = [4]string{"vv", "hh", "hv", "vh"}
-
+    
+    // TODO: deprecate this
     DataTypes = map[string]int{
         "FCOMPLEX":  0,
         "SCOMPLEX":  1,

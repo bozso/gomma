@@ -12,26 +12,7 @@ import (
     //ref "reflect"
 )
 
-type (
-    /*
-    DataFile interface {
-        Parfile() string
-        GetRng() int
-        GetAzi() int
-        GetDate() time.Time
-        TimeStr(dateFormat) string
-        TypeStr() string
-        Int(string, int) (int, error)
-        Float(string, int) (float64, error)
-        PlotCmd() string
-        //ImageFormat() (string, error)
-        Move(string) (DataFile, error)
-        //Display(disArgs) error
-        Raster(RasArgs) error
-        Save(string) error
-    }
-    */
-    
+type (    
     Serialize interface {
         jsonMap() JSONMap
         FromJson(JSONMap) error        
@@ -42,7 +23,7 @@ type (
         Rng() int
         Azi() int
         Dtype() DType
-        Move(string) (DatFile, error)
+        //Move(string) (DatFile, error)
         Raster(opt RasArgs) error
     }
     
@@ -99,8 +80,8 @@ func str2dtype(in string) DType {
     }
 }
 
-func (in DType) ToString() string {
-    switch in {
+func (d DType) String() string {
+    switch d {
     case Float:
         return "FLOAT"
     case Double:
@@ -122,6 +103,37 @@ func (in DType) ToString() string {
     }
 }
 
+type ZeroDimError struct {
+    dim string
+    Err error
+}
+
+
+func (e ZeroDimError) Error() string {
+    return fmt.Sprintf("expected %s to be non zero", e.dim)
+}
+
+func (e ZeroDimError) Unwrap() error {
+    return e.Err
+}
+
+type RngAzi struct {
+    Rng int `json:"rng" name:"rng" default:"0"`
+    Azi int `json:"azi" name:"azi" default:"0"`
+}
+
+func (ra RngAzi) Check() (err error) {
+    if ra.Rng == 0 {
+        return ZeroDimError{dim: "range samples / columns"}
+    }
+    
+    if ra.Azi == 0 {
+        return ZeroDimError{dim: "azimuth lines / rows"}
+    }
+    return nil
+}
+
+
 type TypeMismatchError struct {
     ftype, expected string
     DType
@@ -130,12 +142,41 @@ type TypeMismatchError struct {
 
 func (e TypeMismatchError) Error() string {
     return fmt.Sprintf("expected datatype '%s' for %s datafile, got '%s'",
-        e.expected, e.ftype, e.DType.ToString)
+        e.expected, e.ftype, e.DType.String())
 }
 
 func (e TypeMismatchError) Unwrap() error {
     return e.Err
 }
+
+type UnknownTypeError struct {
+    DType
+    Err error
+}
+
+func (e UnknownTypeError) Error() string {
+    return fmt.Sprintf("unrecognised type '%s', expected a valid datatype",
+        e.DType.String())
+}
+
+func (e UnknownTypeError) Unwrap() error {
+    return e.Err
+}
+
+type WrongTypeError struct {
+    DType
+    kind string
+    Err error
+}
+
+func (e WrongTypeError) Error() string {
+    return fmt.Sprintf("wrong datatype '%s' for %s", e.kind, e.DType.String())
+}
+
+func (e WrongTypeError) Unwrap() error {
+    return e.Err
+}
+
 
 func NewGammaParam(path string) Params {
     return Params{Par: path, Sep: ":", contents: nil}
@@ -173,7 +214,7 @@ func TmpDatFile(ext string, dt DType) (ret DatFile, err error) {
         return
     }
     
-    ret.Dat = fmt.Sprintf("%s.%s", dat, ext)
+    ret.Dat = dat
     ret.DType = dt
     
     return ret, nil
@@ -200,7 +241,7 @@ func (d DatFile) jsonMap() JSONMap {
         "datafile": d.Dat,
         "range_samples": d.Rng,
         "azimuth_lines": d.Azi,
-        "dtype": d.DType.ToString(),
+        "dtype": d.DType.String(),
     }
 }
 
@@ -244,6 +285,55 @@ func (d DatFile) Move(dir string) (ret DatFile, err error) {
 func (d DatFile) Exist() (ret bool, err error) {
     ret, err = Exist(d.Dat)
     return
+}
+
+type ShapeMismatchError struct {
+    dat1, dat2, dim string
+    n1, n2 int
+}
+
+func (s ShapeMismatchError) Error() string {
+    return fmt.Sprintf("expected datafile '%s' to have the same %s as " + 
+                       "datafile '%s' (%d != %d)", s.dat1, s.dim, s.dat2, s.n1,
+                       s.n2)
+}
+
+func SameCols(one IDatFile, two IDatFile) error {
+    n1, n2 := one.Rng(), two.Rng()
+    
+    if n1 != n2 {
+        return ShapeMismatchError{
+            dat1: one.Datfile(),
+            dat2: two.Datfile(),
+            n1:n1,
+            n2:n2,
+            dim: "range samples / columns",
+        }
+    }
+    return nil
+}
+
+func SameRows(one IDatFile, two IDatFile) error {
+    n1, n2 := one.Azi(), two.Azi()
+    
+    if n1 != n2 {
+        return ShapeMismatchError{
+            dat1: one.Datfile(),
+            dat2: two.Datfile(),
+            n1:n1,
+            n2:n2,
+            dim: "azimuth lines / rows",
+        }
+    }
+    return nil
+}
+
+func SameShape(one IDatFile, two IDatFile) (err error) {
+    if err = SameCols(one, two); err != nil {
+        return
+    }
+    
+    return SameRows(one, two)
 }
     
 type DatParFile struct {

@@ -290,7 +290,7 @@ func MakeCmd(cmd string) CmdFun {
 
 const (
     FileOpenErr Werror = "failed to open file '%s'"
-    FileReadErr Werror = "failed to open file '%s'"
+    FileReadErr Werror = "failed to read file '%s'"
 )
 
 func NewReader(path string) (ret FileReader, err error) {
@@ -298,7 +298,6 @@ func NewReader(path string) (ret FileReader, err error) {
 
     if err != nil {
         err = FileOpenErr.Wrap(err, path)
-        //err = Handle(err, "Could not open file '%s'!", path)
         return
     }
 
@@ -328,6 +327,21 @@ func ReadFile(path string) (ret []byte, err error) {
 
     return contents, nil
 }
+
+type ParameterError struct {
+    path, par string
+    Err error
+}
+
+func (p ParameterError) Error() string {
+    return fmt.Sprintf("failed to retreive parameter '%s' from file '%s'",
+        p.par, p.path)
+}
+
+func (p ParameterError) Unwrap() error {
+    return p.Err
+}
+
 
 func FromString(params, sep string) Params {
     return Params{Par: "", Sep: sep, contents: str.Split(params, "\n")}
@@ -360,33 +374,9 @@ func (self *Params) Param(name string) (ret string, err error) {
         }
     }
 
-    err = Handle(nil, "failed to find parameter '%s' in '%s'", name, self.Par)
+    err = ParameterError{path: self.Par, par: name}
     return
 }
-
-/*
-func toInt(par string, idx int) (ret int, err error) {
-    ret, err = conv.Atoi(str.Split(par, " ")[idx])
-
-    if err != nil {
-        err = Handle(err, "failed to convert string '%s' to int", par)
-        return
-    }
-
-    return ret, nil
-}
-
-func toFloat(par string, idx int) (ret float64, err error) {
-    ret, err = conv.ParseFloat(str.Split(par, " ")[idx], 64)
-
-    if err != nil {
-        err = Handle(err, "failed to convert string '%s' to float64", par)
-        return
-    }
-
-    return ret, nil
-}
-*/
 
 func (self Params) Int(name string, idx int) (ret int, err error) {
     data, err := self.Param(name)
@@ -405,16 +395,6 @@ func (self Params) Int(name string, idx int) (ret int, err error) {
     }
 
     return ret, nil
-    
-    /*
-    data, err := self.Param(name)
-
-    if err != nil {
-        return 0, err
-    }
-
-    return toInt(data, 0)
-    */
 }
 
 func (self Params) Float(name string, idx int) (ret float64, err error) {
@@ -434,16 +414,6 @@ func (self Params) Float(name string, idx int) (ret float64, err error) {
     }
 
     return ret, nil
-    
-    /*
-    data, err := self.Param(name)
-
-    if err != nil {
-        return 0.0, err
-    }
-
-    return toFloat(data, 0)
-    */
 }
 
 func TmpFile(ext string) (ret string, err error) {
@@ -500,19 +470,6 @@ func (e CWerror) Wrap(err error) error {
 func (e CWerror) Make() error {
     return fmt.Errorf(string(e))
 }
-
-
-/*
-func (e *werror) Wrap(err error, format string, args ...interface{}) {
-    str := fmt.Sprintf(format, args...)
-
-    if err == nil {
-        return fmt.Errorf("%s: %w", str, e)
-    } else {
-        return fmt.Errorf("%s: %w: %w", str, err, e)
-    }
-}
-*/
 
 const (
     DirCreateErr Werror = "failed to create directory '%s'"

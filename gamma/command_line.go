@@ -7,7 +7,7 @@ import (
     "os"
     fp "path/filepath"
     //ref "reflect"
-    //str "strings"
+    str "strings"
 )
 
 type (
@@ -45,7 +45,9 @@ var (
         //"move": move,
         //"make": create,
         //"stat": stat,
-        //"splitIfg": splitIfg,
+        "splitIfg": splitIfg,
+        "geocode": geocode,
+        "raster": raster,
     }
     
     CommandsAvailable = MapKeys(Commands)
@@ -88,9 +90,36 @@ func listSteps() {
 
 
 const (
-    StepErr Werror = "start step '%s' not in list of available steps"
+    StepErr Werror = "step '%s' not in list of available steps"
 )
 
+
+type UnrecognizedMode struct {
+    name, got string
+    Err error
+}
+
+func (e UnrecognizedMode) Error() string {
+    return fmt.Sprintf("unrecognized mode '%s' for %s", e.got, e.name)
+}
+
+func (e UnrecognizedMode) Unwrap() error {
+    return e.Err
+}
+
+type ModeError struct {
+    name string
+    got fmt.Stringer
+    Err error
+}
+
+func (e ModeError) Error() string {
+    return fmt.Sprintf("unrecognized mode '%s' for %s", e.got.String(), e.name)
+}
+
+func (e ModeError) Unwrap() error {
+    return e.Err
+}
 
 func (proc Process) Parse() (istart int, istop int, err error) {
     if proc.Show {
@@ -105,18 +134,12 @@ func (proc Process) Parse() (istart int, istop int, err error) {
         if istart == -1 {
             listSteps()
             err = StepErr.Make(proc.Start)
-            //err = Handle(nil,
-                //"start step '%s' not in list of available steps!",
-                //proc.Start)
             return
         }
 
         if istop == -1 {
             listSteps()
             err = StepErr.Make(proc.Stop)
-            //err = Handle(nil,
-                //"stop step '%s' not in list of available steps!",
-                //proc.Stop)
             return
         }
     } else {
@@ -192,7 +215,6 @@ func batch(args Args) (err error) {
     
     if err = args.ParseStruct(&batch); err != nil {
         err = ParseErr.Wrap(err)
-        //err = Handle(err, parseErr)
         return
     }
 
@@ -201,17 +223,14 @@ func batch(args Args) (err error) {
     switch batch.Mode {
     case "quicklook":
         if err = batch.Quicklook(); err != nil {
-            err = Handle(err, "quicklook failed")
             return
         }
     case "mli", "MLI":
         if err = batch.MLI(); err != nil {
-            err = Handle(err, "MLI failed")
             return
         }
     case "ras", "raster", "plot":
         if err = batch.Raster(); err != nil {
-            err = Handle(err, "raster failed")
             return
         }
     default:
@@ -524,7 +543,7 @@ func coreg(args Args) error {
     //return nil
 //}
 
-/*
+
 type (
     SplitIfg struct {
         SBIOpt
@@ -536,7 +555,7 @@ type (
     }
 )
 
-func splitIfg(args Args) error {
+func splitIfg(args Args) (err error) {
     si := SplitIfg{}
     si.Mode = Ifg
     
@@ -550,77 +569,65 @@ func splitIfg(args Args) error {
         return fmt.Errorf("both master and slave SLC files should be specified")
     }
     
-    var (
-        m_, s_ DataFile
-        m, s SLC
-        err error
-    )
+    var m, s SLC
     
-    if m_, err := LoadDataFile(ms); err != nil {
-        return err
+    if err = Load(ms, &m); err != nil {
+        return
     }
     
-    if m, ok := m_.(SLC); !ok {
-        return TypeErr.Make(m, "master", "SLC")
-    }
-    
-    if s_, err = LoadDataFile(ms); err != nil {
-        return err
-    }
-    
-    if s, ok := s_.(SLC); !ok {
-        return TypeErr.Make(m, "slave", "SLC")
+    if err = Load(ss, &s); err != nil {
+        return
     }
     
     id := ID(m, s, DShort)
-    
     mode := str.ToUpper(si.SpectrumMode)
     
     switch mode {
     case "BEAM", "B":
-        opt := si.SBIOpt
+        if err = SameShape(m, s); err != nil {
+            return
+        }
         
-        out, err := m.SplitBeamIfg(s, opt)
+        out, err := m.SplitBeamIfg(s, si.SBIOpt)
         
         if err != nil {
             return err
         }
         
-        if err = out.Mli.Save(id + "_sbi_mli.json"); err != nil {
+        if err = Save(id + "_sbi_mli.json", &out.Mli); err != nil {
             return err
         }
         
-        if err = out.Ifg.Save(id + "_sbi_ifg.json"); err != nil {
+        if err = Save(id + "_sbi_ifg.json", &out.Ifg); err != nil {
             return err
         }
-    case "SPECTRUM", "S":
-        opt := si.SSIOpt
+    //case "SPECTRUM", "S":
+        //opt := si.SSIOpt
         
-        Mli, err := LoadDataFile(si.Mli)
-        if err != nil {
-            return err
-        }
+        //Mli, err := LoadDataFile(si.Mli)
+        //if err != nil {
+            //return err
+        //}
         
-        mli, ok := Mli.(MLI)
+        //mli, ok := Mli.(MLI)
         
-        if !ok {
-            return TypeErr.Make(Mli, "mli", "MLI")
-        }
+        //if !ok {
+            //return TypeErr.Make(Mli, "mli", "MLI")
+        //}
         
-        out, err := m.SplitSpectrumIfg(s, mli, opt)
+        //out, err := m.SplitSpectrumIfg(s, mli, opt)
         
-        if err != nil {
-            return err
-        }
+        //if err != nil {
+            //return err
+        //}
         
         // still need to figure out the returned files
-        return nil
+        //return nil
     default:
         return fmt.Errorf("unrecognized Split Interferogram mode: '%s'", mode)
     }
     return nil
 }
-*/
 
 type (
     Stat struct {
@@ -653,176 +660,154 @@ func stat(args Args) (err error) {
     return
 }
 
-/*
-
-type(
-    Displayer struct {
-        Mode string `pos:"0"`
-        Dat  string `pos:"1"`
-        Par  string `name:"par" default:""`
-        Sec  string `name:"sec" default:""`
-        RasArgs
-    }
-)
-
-func NewDisplayer(args []string) (ret Displayer, err error) {
-    flag := fl.NewFlagSet("display", fl.ContinueOnError)
-
-    ret.Mode = args[0]
-    
-    flag.StringVar(&ret.Dat, "dat", "",
-        "Datafile containing data to plot.")
-    flag.StringVar(&ret.Par, "par", "", "Parfile describing datafile.")
-    
-    flag.StringVar(&ret.Sec, "sec", "", "Secondary input datafile.")
-    
-    err = flag.Parse(args[1:])
-    
-    if err != nil {
-        err = Handle(err, "failed to parse command line options")
-        return
-    }
-    
-    if len(ret.Dat) == 0 {
-        err = Handle(nil, "dat should be valied path not empty string")
-        return
-    }
-    
-    split := str.Split(ret.Dat, ".")
-    ext := split[len(split)-1]
-    
-    if len(ret.Cmd) == 0 {
-        for key, val := range PlotCmdFiles {
-            if val.Contains(ext) {
-                ret.Cmd = key
-            }
-        }
-        
-        if len(ret.Cmd) == 0 {
-            err = Handle(nil,
-                "could not determine plot command from extension '%s'",
-                ext)
-            return
-        }
-    }
-    
-    return ret, nil
-}
-
-func (dis *Displayer) Plot() error {
-    dat, err := NewDataFile(dis.Dat, dis.Par, "par")
-    
-    if err != nil {
-        return Handle(err, "failed to parse datafile '%s'", dis.Dat)
-    }
-    
-    err = dis.DisArgs.Parse(dat)
-    
-    if err != nil {
-        return Handle(err, "failed to parse plotting options")
-    }
-    
-    switch dis.Mode {
-    case "dis":
-        err := Display(dat, dis.RasArgs.DisArgs)
-        
-        if err != nil {
-            return Handle(err, "failed to execute display")
-        }
-    
-    case "ras":
-        err := Raster(dat,  dis.RasArgs, dis.Sec)
-        
-        if err != nil {
-            return Handle(err, "failed to execute raster")
-        }
-    }
-    return nil
-}
 
 type(
     Coder struct {
-        infile   string `pos:"0"`
-        outfile  string `name:"out" default:""`
-        metafile string `name:"meta" default:"geocode.json"`
-        mode     string `name:"mode" default:""`
-        GeoMeta
+        Lookup   string `pos:"0"`
+        Infile   string `pos:"1"`
+        Outfile  string `name:"out"`
+        Mode     string `name:"mode"`
+        Intpol   string `name:"intpol" default:"nearest"`
+        Shape    string `name:"shape"`
         CodeOpt
     }
 )
 
-func NewCoder(args []string) (ret Coder, err error) {
-    flag := fl.NewFlagSet("coding", fl.ContinueOnError)
+func geocode(args Args) (err error) {
+    c := Coder{}
     
-    flag.StringVar(&ret.infile, "in", "", "Datafile containing to transform.")
-    flag.StringVar(&ret.outfile, "out", "", "Output datafile.")
-    flag.StringVar(&ret.metafile, "meta", "geocode.json",
-        "Metadata of geocoding.")
-    
-    flag.IntVar(&ret.inWidth, "inwidth", 0,
-        "Range samples or Width of infile.")
-    flag.IntVar(&ret.outWidth, "outwidth", 0,
-        "Range samples or Width of outfile.")
-    
-    flag.IntVar(&ret.nlines, "nlines", 0, "Number of lines to code.")
-    flag.StringVar(&ret.mode, "intpol", "nearest", "Interpolation mode.")
-    flag.IntVar(&ret.order, "order", 0,
-        "Lanczos function order or B-spline degree.")
-    flag.BoolVar(&ret.flipInput, "flipIn", false, "Flip input.")
-    flag.BoolVar(&ret.flipOutput, "flipOut", false, "Flip output.")
-    
-    err = flag.Parse(args[1:])
-    
-    if err != nil {
-        err = Handle(err, "failed to parse command line options")
+    if err = args.ParseStruct(&c); err != nil {
+        err = ParseErr.Wrap(err)
         return
     }
     
-    switch ret.mode {
+    shape := c.Shape
+    
+    if len(shape) > 0 {
+        var dat DatFile
+        if err = Load(shape, &dat); err != nil {
+            return
+        }
+        
+        c.Rng = dat.Rng()
+        c.Azi = dat.Azi()
+    }
+    
+    imode := NearestNeighbour
+    
+    switch c.Intpol {
     case "nearest":
-        ret.interpolMode = NearestNeighbour
+        imode = NearestNeighbour
     case "bic":
-        ret.interpolMode = BicubicSpline
+        imode = BicubicSpline
     case "bic_log":
-        ret.interpolMode = BicubicSplineLog
+        imode = BicubicSplineLog
     case "bic_sqrt":
-        ret.interpolMode = BicubicSplineSqrt
+        imode = BicubicSplineSqrt
     case "bsp":
-        ret.interpolMode = BSpline
+        imode = BSpline
     case "bsp_sqrt":
-        ret.interpolMode = BSplineSqrt
+        imode = BSplineSqrt
     case "lanc":
-        ret.interpolMode = Lanczos
+        imode = Lanczos
     case "lanc_sqrt":
-        ret.interpolMode = LanczosSqrt
+        imode = LanczosSqrt
     case "inv_dist":
-        ret.interpolMode = InvDist
+        imode = InvDist
     case "inv_sqrd_dist":
-        ret.interpolMode = InvSquaredDist
+        imode = InvSquaredDist
     case "const":
-        ret.interpolMode = Constant
+        imode = Constant
     case "gauss":
-        ret.interpolMode = Gauss
+        imode = Gauss
     default:
-        err = Handle(nil, "unrecognized interpolation mode '%s'", ret.mode)
+        err = UnrecognizedMode{name: "interpolation option", got: c.Intpol}
         return
     }
     
-    return ret, nil
+    c.InterpolMode = imode
+    
+    var l Lookup
+    if err = Load(c.Lookup, &l); err != nil {
+        return
+    }
+    
+    var dat DatFile
+    if err = Load(c.Infile, &dat); err != nil {
+        return
+    }
+    
+    mode := str.ToUpper(c.Mode)
+    
+    var out DatFile
+    switch mode {
+    case "TORADAR", "RADAR":
+        if out, err = l.geo2radar(dat, c.CodeOpt); err != nil {
+            return
+        }
+    case "TOGEO", "GEO":
+        if out, err = l.radar2geo(dat, c.CodeOpt); err != nil {
+            return
+        }
+    default:
+        err = UnrecognizedMode{name: "geocoding", got: mode}
+        return
+    }
+    
+    
+    return Save(c.Outfile, &out)
 }
 
-// geocode = geo2radar
-
-func (g *Coder) Geo2Radar() error {
-    return g.Dem.geo2radar(g.infile, g.outfile, g.CodeOpt)
+type Plotter struct {
+    RasArgs
+    Infile string `pos:"0"`
+    PlotMode string `name:"mode"`
 }
 
-// geocode_back = radar2geo
-
-func (g *Coder) Radar2Geo() error {
-    return g.Dem.radar2geo(g.infile, g.outfile, g.CodeOpt)
+func raster(args Args) (err error) {
+    p := Plotter{}
+    
+    if err = args.ParseStruct(&p); err != nil {
+        return ParseErr.Wrap(err)
+    }
+        
+    mode, m := Undefined, str.ToUpper(p.PlotMode)
+    
+    switch m {
+    case "PWR", "POWER":
+        mode = Power
+    case "MPH", "MAGPHASE":
+        mode = MagPhase
+    case "MPHPWR", "MAGPHASEPWR":
+        mode = MagPhasePwr
+    case "SLC", "SINGLELOOK":
+        mode = SingleLook
+    case "DB", "DECIBEL":
+        mode = Decibel
+    case "BYTE", "UCHAR":
+        mode = Byte
+    case "CC", "COHERENCE":
+        mode = CC
+    case "DT", "DEFORM":
+        mode = Deform
+    case "LIN", "LINEAR":
+        mode = Linear
+    case "HGT", "HEIGHT":
+        mode = Height
+    case "UNW", "UNWRAPPED":
+        mode = Unwrapped
+    }
+    
+    p.Mode = mode
+    
+    var dat DatFile
+    if err = Load(p.Infile, &dat); err != nil {
+        return
+    }
+    
+    
+    return dat.Raster(p.RasArgs)
 }
-*/
 
 var PlotCmdFiles = map[string]Slice{
     "pwr": Slice{"pix_sigma0", "pix_gamma0", "sbi_pwr", "cc", "rmli", "mli"},
