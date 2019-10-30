@@ -754,6 +754,9 @@ func geocode(args Args) (err error) {
         return
     }
     
+    if out, err = out.Move("."); err != nil {
+        return
+    }
     
     return Save(c.Outfile, &out)
 }
