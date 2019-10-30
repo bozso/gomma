@@ -239,8 +239,8 @@ func (d DatFile) Dtype() DType {
 func (d DatFile) jsonMap() JSONMap {
     return JSONMap{
         "datafile": d.Dat,
-        "range_samples": d.Rng,
-        "azimuth_lines": d.Azi,
+        "range_samples": d.rng,
+        "azimuth_lines": d.azi,
         "dtype": d.DType.String(),
     }
 }
