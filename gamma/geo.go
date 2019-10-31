@@ -1,10 +1,10 @@
 package gamma
 
 import (
-    //"log"
+    "log"
     "fmt"
-    //"os"
-    //fp "path/filepath"
+    "os"
+    fp "path/filepath"
     str "strings"
     conv "strconv"
 )
@@ -347,10 +347,17 @@ type Hgt struct {
     DatFile
 }
 
+
+func (h Hgt) Raster(opt RasArgs) (err error) {
+    opt.Mode = Height
+    opt.Parse(h)
+    
+    return h.DatFile.Raster(opt)
+}
+
 type Geocode struct {
     MLI
-    Hgt, SimSar, Zenith, Orient, Inc, Pix, Psi, LsMap, DiffPar,
-    Offs, Offsets, Ccp, Coffs, Coffsets, Sigma0, Gamma0 string
+    DiffPar, Offs, Offsets, Ccp, Coffs, Coffsets, Sigma0, Gamma0 string
 }
 
 type (
@@ -399,99 +406,104 @@ var (
     gcMapFine = Gamma.Must("gc_map_fine")
 )
 
-//func (g* GeocodeOpt) Run(outDir string) (ret GeoMeta, err error) {
-    //geodir := fp.Join(outDir, "geo")
+func (g* GeocodeOpt) Run(outDir string) (err error) {
+    geodir := fp.Join(outDir, "geo")
     
-    //err = os.MkdirAll(geodir, os.ModePerm)
+    err = os.MkdirAll(geodir, os.ModePerm)
     
-    //if err != nil {
-        //err = DirCreateErr.Wrap(err, geodir)
-        ////err = Handle(err, "failed to create directory '%s'!", geodir)
-        //return
-    //}
+    if err != nil {
+        err = DirCreateErr.Wrap(err, geodir)
+        //err = Handle(err, "failed to create directory '%s'!", geodir)
+        return
+    }
     
-    //demOrig := NewDEM(fp.Join(geodir, "srtm.dem"))
+    var demOrig DEM
+    if demOrig, err = NewDEM(fp.Join(geodir, "srtm.dem"), ""); err != nil {
+        return
+    }
     
     //if err != nil {
         //err = DataCreateErr.Wrap(err, "DEM")
         //return
     //}
     
-    //vrtPath := g.DEMPath
+    vrtPath := g.DEMPath
     
-    //if len(vrtPath) == 0 {
-        //err = fmt.Errorf("path to vrt files not specified")
-        //return
-    //}
+    if len(vrtPath) == 0 {
+        err = fmt.Errorf("path to vrt files not specified")
+        return
+    }
     
-    //overlap := g.DEMOverlap
+    overlap := g.DEMOverlap
     
-    //if overlap.Rng == 0 {
-        //overlap.Rng = 100
-    //}
+    if overlap.Rng == 0 {
+        overlap.Rng = 100
+    }
     
-    //if overlap.Azi == 0 {
-        //overlap.Azi = 100
-    //}
+    if overlap.Azi == 0 {
+        overlap.Azi = 100
+    }
 
-    //npoly, itr := g.NPoly, g.Iter
+    npoly, itr := g.NPoly, g.Iter
     
-    //if npoly == 0 {
-        //npoly = 4
-    //}
+    if npoly == 0 {
+        npoly = 4
+    }
     
     
-    //ex, err := Exist(demOrig.Dat)
+    ex, err := Exist(demOrig.Dat)
     
-    //if err != nil {
-        //err = Handle(err, "failed to check whether original DEM exists")
-        //return
-    //}
+    if err != nil {
+        err = Handle(err, "failed to check whether original DEM exists")
+        return
+    }
     
-    //mli, err := NewMLI(g.Master.Dat, g.Master.Par)
+    mli, err := NewMLI(g.Master.Dat, g.Master.Par)
     
-    //if err != nil {
-        //err = Handle(err, "failed to parse master MLI file")
-        //return
-    //}
+    if err != nil {
+        err = Handle(err, "failed to parse master MLI file")
+        return
+    }
     
-    //if !ex {
-        //log.Printf("Creating DEM from %s\n", vrtPath)
+    if !ex {
+        log.Printf("Creating DEM from %s\n", vrtPath)
         
-        //// magic number 2 = add interpolated geoid offset
-        //_, err = vrt2dem(vrtPath, mli.Par, demOrig.Dat, demOrig.Par, 2, "-")
+        // magic number 2 = add interpolated geoid offset
+        _, err = vrt2dem(vrtPath, mli.Par, demOrig.Dat, demOrig.Par, 2, "-")
         
-        //if err != nil {
-            //err = Handle(err, "failed to create DEM from vrt file")
-            //return
-        //}
-    //} else {
-        //log.Println("DEM already imported.")
-    //}
+        if err != nil {
+            err = Handle(err, "failed to create DEM from vrt file")
+            return
+        }
+    } else {
+        log.Println("DEM already imported.")
+    }
     
-    //mra := mli.RngAzi
-    //offsetWin := g.OffsetWindows
+    mra := mli.URngAzi
+    offsetWin := g.OffsetWindows
     
-    //Patch := RngAzi{
-        //Rng: int(float64(mra.Rng) / float64(offsetWin.Rng) +
-             //float64(overlap.Rng) / 2),
+    Patch := RngAzi{
+        Rng: int(float64(mra.rng) / float64(offsetWin.Rng) +
+             float64(overlap.Rng) / 2),
         
-        //Azi: int(float64(mra.Azi) / float64(offsetWin.Azi) +
-             //float64(overlap.Azi) / 2),
-    //}
+        Azi: int(float64(mra.azi) / float64(offsetWin.Azi) +
+             float64(overlap.Azi) / 2),
+    }
     
-    //// make sure the number of patches are even
+    // make sure the number of patches are even
     
-    //if Patch.Rng % 2 == 1 {
-        //Patch.Rng += 1
-    //}
+    if Patch.Rng % 2 == 1 {
+        Patch.Rng += 1
+    }
     
-    //if Patch.Azi % 2 == 1 {
-        //Patch.Azi += 1
-    //}
+    if Patch.Azi % 2 == 1 {
+        Patch.Azi += 1
+    }
     
-    //dem, err := NewDEM(fp.Join(geodir, "dem_seg.dem"), "",
-        //fp.Join(geodir, "lookup"), fp.Join(geodir, "lookup_old"))
+    var dem DEM
+    if dem, err = NewDEM(fp.Join(geodir, "dem_seg.dem"), ""); err != nil {
+        return
+    }
     
     //if err != nil {
         //err = DataCreateErr.Wrap(err, "DEM")
@@ -500,174 +512,212 @@ var (
     //}
     
     
-    //geo := Geocode{
-        //Hgt     : fp.Join(geodir, "hgt"),
-        //Sigma0  : fp.Join(geodir, "sigma0"),
-        //Gamma0  : fp.Join(geodir, "gamma0"),
-        //LsMap   : fp.Join(geodir, "lsMap"),
-        //SimSar  : fp.Join(geodir, "sim_sar"),
-        //Zenith  : fp.Join(geodir, "zenith"),
-        //Orient  : fp.Join(geodir, "orient"),
-        //Inc     : fp.Join(geodir, "inc"),
-        //Pix     : fp.Join(geodir, "pix"),
-        //Psi     : fp.Join(geodir, "psi"),
-        //DiffPar : fp.Join(geodir, "diff_par"),
-        //Offs    : fp.Join(geodir, "offs"),
-        //Offsets : fp.Join(geodir, "offsets"),
-        //Ccp     : fp.Join(geodir, "ccp"),
-        //Coffs   : fp.Join(geodir, "coffs"),
-        //Coffsets: fp.Join(geodir, "coffsets"),
-    //}
+    geo := Geocode{
+        Offs    : fp.Join(geodir, "offs"),
+        Offsets : fp.Join(geodir, "offsets"),
+        Ccp     : fp.Join(geodir, "ccp"),
+        Coffs   : fp.Join(geodir, "coffs"),
+        Coffsets: fp.Join(geodir, "coffsets"),
+        DiffPar : fp.Join(geodir, "diff_par"),
+        MLI     : mli,
+    }
     
-    //geo.MLI = mli
+    var sigma0, gamma0, lsMap, simSar, zenith, orient, inc, pix, proj DatFile
     
-    //ex1, err := Exist(dem.Lookup)
+    if sigma0, err =  mli.Like(fp.Join(geodir, "sigma0"), Float); err != nil {
+        return
+    }
     
-    //if err != nil {
-        //err = Handle(err, "failed to check whether lookup table exists")
-        //return
-    //}
+    if gamma0, err =  mli.Like(fp.Join(geodir, "gamma0"), Float); err != nil {
+        return
+    }
     
-    //ex2, err := Exist(dem.Par)
+    // datatype of lsmap?
+    if lsMap, err =  mli.Like(fp.Join(geodir, "lsmap"), Float); err != nil {
+        return
+    }
     
-    //if err != nil {
-        //err = Handle(err, "failed to check whether DEM parameter exists")
-        //return
-    //}
+    if simSar, err =  mli.Like(fp.Join(geodir, "sim_sar"), Float); err != nil {
+        return
+    }
     
-    //if !ex1 && !ex2 {
-        //log.Println("Calculating initial lookup table.")
+    if zenith, err =  mli.Like(fp.Join(geodir, "zenith"), Float); err != nil {
+        return
+    }
+    
+    if orient, err =  mli.Like(fp.Join(geodir, "orient"), Float); err != nil {
+        return
+    }
+    
+    if inc, err =  mli.Like(fp.Join(geodir, "inclination"), Float); err != nil {
+        return
+    }
+    
+    if proj, err =  mli.Like(fp.Join(geodir, "projection"), Float); err != nil {
+        return
+    }
+    
+    if pix, err =  mli.Like(fp.Join(geodir, "pixel_area"), Float); err != nil {
+        return
+    }
+    
+    var lookup Lookup
+    if lookup.DatFile, err = dem.Like(fp.Join(geodir, "lookup"), FloatCpx);
+       err != nil {
+        return
+    }
+    
+    var lookupOld string
+    if lookupOld, err = TmpFile(""); err != nil {
+        return
+    }
+    
+    var ex1 bool
+    if ex1, err = Exist(lookup.Dat); err != nil {
+        err = Handle(err, "failed to check whether lookup table exists")
+        return
+    }
+    
+    ex2, err := Exist(dem.Par)
+    
+    if err != nil {
+        err = Handle(err, "failed to check whether DEM parameter exists")
+        return
+    }
+    
+    if !ex1 && !ex2 {
+        log.Println("Calculating initial lookup table.")
         
-        //oversamp := g.DEMOverSampling
+        oversamp := g.DEMOverSampling
         
-        //if oversamp.Lat < 1.0 {
-            //oversamp.Lat = 2.0
-        //}
+        if oversamp.Lat < 1.0 {
+            oversamp.Lat = 2.0
+        }
         
-        //if oversamp.Lon < 1.0 {
-            //oversamp.Lon = 2.0
-        //}
+        if oversamp.Lon < 1.0 {
+            oversamp.Lon = 2.0
+        }
         
-        //if g.RngOversamp < 1.0 {
-            //g.RngOversamp = 2.0
-        //}
+        if g.RngOversamp < 1.0 {
+            g.RngOversamp = 2.0
+        }
         
-        ///*
-        //_, err = gcMap(mli.par, demOrig.par, demOrig.dat, dem.par, dem.dat,
-                       //dem.lookup, oversamp.Lat, oversamp.Lon, demOrig.lsMap,
-                       //geo.lsMap, demOrig.incidence, demOrig.resolution,
-                       //demOrig.offnadir, g.RngOversamp, Standard, NoMask,
-                       //g.nPixel, "-", Actual)
-        //*/
+        /*
+        _, err = gcMap(mli.par, demOrig.par, demOrig.dat, dem.par, dem.dat,
+                       dem.lookup, oversamp.Lat, oversamp.Lon, demOrig.lsMap,
+                       geo.lsMap, demOrig.incidence, demOrig.resolution,
+                       demOrig.offnadir, g.RngOversamp, Standard, NoMask,
+                       g.nPixel, "-", Actual)
+        */
         
-        //_, err = gcMap(mli.Par, nil, demOrig.Par, demOrig.Dat, dem.Par, dem.Dat,
-                       //dem.Lookup, oversamp.Lat, oversamp.Lon, geo.SimSar,
-                       //geo.Zenith, geo.Orient, geo.Inc, geo.Psi, geo.Pix,
-                       //geo.LsMap, g.nPixel, 2, g.RngOversamp)
+        _, err = gcMap(mli.Par, nil, demOrig.Par, demOrig.Dat, dem.Par, dem.Dat,
+                       lookup.Dat, oversamp.Lat, oversamp.Lon, simSar.Dat,
+                       zenith.Dat, orient.Dat, inc.Dat, proj.Dat, pix.Dat,
+                       lsMap.Dat, g.nPixel, 2, g.RngOversamp)
         
-        //if err != nil {
-            //return
-        //}      
-    //} else {
-        //log.Println("Initial lookup table already created.")
-    //}
+        if err != nil {
+            return
+        }      
+    } else {
+        log.Println("Initial lookup table already created.")
+    }
     
-    //dra := dem.RngAzi
+    dra := dem.URngAzi
     
-    //_, err = pixelArea(mli.Par, dem.Par, dem.Dat, dem.Lookup, geo.LsMap,
-                       //geo.Inc, geo.Sigma0, geo.Gamma0, g.AreaFactor)
+    _, err = pixelArea(mli.Par, dem.Par, dem.Dat, lookup.Dat, lsMap.Dat,
+                       inc.Dat, sigma0.Dat, gamma0.Dat, g.AreaFactor)
     
-    //if err != nil {
-        //return
-    //}
+    if err != nil {
+        return
+    }
     
-    //_, err = createDiffPar(mli.Par, nil, geo.DiffPar, SLC_MLI, NonInter)
+    _, err = createDiffPar(mli.Par, nil, geo.DiffPar, SLC_MLI, NonInter)
     
-    //if err != nil {
-        //return
-    //}
+    if err != nil {
+        return
+    }
     
-    //log.Println("Refining lookup table.")
+    log.Println("Refining lookup table.")
     
-    //if itr >= 1 {
-        //log.Println("ITERATING OFFSET REFINEMENT.")
+    if itr >= 1 {
+        log.Println("ITERATING OFFSET REFINEMENT.")
         
-        //for ii := 0; ii < itr; ii++ {
-            //log.Printf("ITERATION %d / %d\n", ii + 1, itr)
+        for ii := 0; ii < itr; ii++ {
+            log.Printf("ITERATION %d / %d\n", ii + 1, itr)
             
-            //err = os.Remove(geo.DiffPar)
+            err = os.Remove(geo.DiffPar)
             
-            //if err != nil {
-                //err = Handle(err, "failed to remove file '%s'", geo.DiffPar)
-                //return
-            //}
+            if err != nil {
+                err = Handle(err, "failed to remove file '%s'", geo.DiffPar)
+                return
+            }
 
-            //// copy previous lookup table
-            //err = os.Rename(dem.Lookup, dem.LookupOld)
+            // copy previous lookup table
+            err = os.Rename(lookup.Dat, lookupOld)
             
-            //if err != nil {
-                //err = Handle(err, "failed to move lookup file '%s'",
-                    //dem.Lookup)
-                //return
-            //}
+            if err != nil {
+                err = Handle(err, "failed to move lookup file '%s'",
+                    lookup.Dat)
+                return
+            }
             
-            //_, err = createDiffPar(mli.Par, nil, geo.DiffPar,
-                                   //SLC_MLI, NonInter)
+            _, err = createDiffPar(mli.Par, nil, geo.DiffPar,
+                                   SLC_MLI, NonInter)
             
-            //if err != nil {
-                //return
-            //}
+            if err != nil {
+                return
+            }
             
-            //_, err = offsetPwrm(geo.Sigma0, mli.Dat, geo.DiffPar, geo.Offs,
-                                //geo.Ccp, Patch.Rng, Patch.Azi, geo.Offsets,
-                                //g.MLIOversamp, offsetWin.Rng, offsetWin.Azi,
-                                //g.CCThresh, g.LanczosOrder, g.BandwithFrac)
+            _, err = offsetPwrm(geo.Sigma0, mli.Dat, geo.DiffPar, geo.Offs,
+                                geo.Ccp, Patch.Rng, Patch.Azi, geo.Offsets,
+                                g.MLIOversamp, offsetWin.Rng, offsetWin.Azi,
+                                g.CCThresh, g.LanczosOrder, g.BandwithFrac)
             
-            //if err != nil {
-                //return
-            //}
+            if err != nil {
+                return
+            }
             
-            //_, err = offsetFitm(geo.Offs, geo.Ccp, geo.DiffPar, geo.Coffs,
-                                //geo.Coffsets, g.CCThresh, npoly, NonInter)
+            _, err = offsetFitm(geo.Offs, geo.Ccp, geo.DiffPar, geo.Coffs,
+                                geo.Coffsets, g.CCThresh, npoly, NonInter)
             
             
-            //if err != nil {
-                //return
-            //}
+            if err != nil {
+                return
+            }
 
-            //// update previous lookup table
-            //// TODO: magic number 1
-            //_, err = gcMapFine(dem.LookupOld, dra.Rng, geo.DiffPar,
-                               //dem.Lookup, 1)
+            // update previous lookup table
+            // TODO: magic number 1
+            _, err = gcMapFine(lookupOld, dra.rng, geo.DiffPar,
+                               lookup.Dat, 1)
             
-            //if err != nil {
-                //return
-            //}
+            if err != nil {
+                return
+            }
 
-            //// create new simulated ampliutides with the new lookup table
-            //_, err = pixelArea(mli.Par, dem.Par, dem.Dat, dem.Lookup, geo.LsMap,
-                               //geo.Inc, geo.Sigma0, geo.Gamma0, g.AreaFactor)
+            // create new simulated ampliutides with the new lookup table
+            _, err = pixelArea(mli.Par, dem.Par, dem.Dat, lookup.Dat, lsMap.Dat,
+                               inc.Dat, sigma0.Dat, gamma0.Dat, g.AreaFactor)
             
-            //if err != nil {
-                //return
-            //}
+            if err != nil {
+                return
+            }
 
-        //}
-        //log.Println("ITERATION DONE.")
-    //}
+        }
+        log.Println("ITERATION DONE.")
+    }
     
     
-    //ret = GeoMeta{
-        //Geo: geo,
-        //DemOrig: demOrig,
-        //Dem: dem,
-    //}
+    toSave := []Serialize{
+        &dem, &demOrig, &lookup, &sigma0, &gamma0, &lsMap, &simSar, &zenith,
+        &orient, &inc, &pix, &proj,
+    }
     
-    //return ret, nil
-//}
-
-type GeoMeta struct {
-    Dem, DemOrig DEM
-    Geo Geocode
+    for _, s := range toSave {
+        if err = Save("", s); err != nil {
+            return
+        }
+    }
+    
+    return nil
 }
 

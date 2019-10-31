@@ -239,19 +239,16 @@ func stepImport(self *Config) error {
             master.Path)
     }
     
-    fburst, err := os.Create(burst_table)
-    
-    if err != nil {
-        return Handle(err, "failed to open temporary file '%s'", burst_table)
+    var fburst *os.File
+    if fburst, err = os.Create(burst_table); err != nil {
+        return FileOpenErr.Wrap(err, burst_table)
     }
     
     defer fburst.Close()
-    // defer os.Remove(burst_table)
     
     _, err = fburst.WriteString(fmt.Sprintf("zipfile: %s\n", master.Path))
-    
     if err != nil {
-        return Handle(err, "failed to write burst_number_table '%s'", burst_table)
+        return FileWriteErr.Wrap(err, burst_table)
     }
     
     nIWs := 0
@@ -277,10 +274,8 @@ func stepImport(self *Config) error {
         
         line := fmt.Sprintf(tpl, ii + 1, nburst, ii + 1, first, ii + 1, last)
         
-        _, err := fburst.WriteString(line)
-        
-        if err != nil {
-            return Handle(err, "failed to write burst_number_table '%s'", burst_table)
+        if _, err := fburst.WriteString(line); err != nil {
+            return FileWriteErr.Wrap(err, burst_table)
         }
         nIWs++
     }
@@ -289,10 +284,8 @@ func stepImport(self *Config) error {
     
     slcDir := fp.Join(self.General.OutputDir, "SLC")
     
-    err = os.MkdirAll(slcDir, os.ModePerm)
-    
-    if err != nil {
-        return Handle(err, "failed to create directory '%s'", slcDir)
+    if err = os.MkdirAll(slcDir, os.ModePerm); err != nil {
+        return DirCreateErr.Wrap(err, slcDir)
     }
     
     for _, s1zip := range zips {
@@ -335,7 +328,7 @@ func stepImport(self *Config) error {
         }
         
         if slc, err = slc.Move(slcDir); err != nil {
-            return Handle(err, "failed to move S1SLC")
+            return err
         }
         
         fmt.Println(slc.Tab)
@@ -351,83 +344,16 @@ func stepImport(self *Config) error {
     return nil
 }
 
-//func stepGeocode (c *Config) error {
-    //outDir := c.General.OutputDir
+func stepGeocode (c *Config) error {
+    outDir := c.General.OutputDir
     
-    //geocode, err := c.Geocoding.Run(outDir)
-    
-    //if err != nil {
-        //return Handle(err, "geocoding failed")
-    //}
-    
-    //// TODO: make geocode.json a setting in configuration file?
-    //err = SaveJson(fp.Join(outDir, "geocode.json"), geocode)
-    
-    //if err != nil {
-        //return Handle(err, "failed to save geocode data")
-    //}
-    
-    //return nil
-//}
-
-/*
-func stepCheckGeo(c *Config) error {
-    meta := GeoMeta{}
-    path := fp.Join(c.General.OutputDir, "geocode.json")
-    err := LoadJson(path, &meta)
-    
-    if err != nil {
-        return Handle(err, "failed to parse meta json file '%s'", path)
+    if err := c.Geocoding.Run(outDir); err != nil {
+        return Handle(err, "geocoding failed")
     }
-    
-    geo, dem := meta.Geo, meta.Dem
-    geo.MLI.Sep = ":"
-    dem.Sep = ":"
-    mra := geo.MLI.RngAzi
-    drng := dem.Rng
-    
-    log.Printf("Geocoding DEM heights into image coordinates.\n")
-    
-    opt := CodeOpt{
-        inWidth: drng,
-        outWidth: mra.Rng,
-        nlines: mra.Azi,
-        dtype: "FLOAT",
-        interpolMode: InvSquaredDist,
-    }
-    
-    err = dem.geo2radar(dem.Dat, geo.Hgt, opt)
-    
-    if err != nil {
-        return Handle(err,
-            "failed to geocode from geographic to radar coordinates")
-    }
-    
-    err = dem.Raster(RasArgs{})
-    
-    if err != nil {
-        return Handle(err, "raster generation for DEM failed")
-    }
-    
-    // TODO: make gm.raster2
-    log.Printf("Creating quicklook hgt file.\n")
-    
-    popt2 := GeoPlotOpt{Cycle: 500.0}
-    
-    err = geo.Raster(popt2)
-    
-    if err != nil {
-        return Handle(err, "raster generation for HGT file failed")
-    }
-    
-    // geo.raster("gamma0")
-
-    // gp.dis2pwr(hgt.mli.dat, geo.gamma0, mrng, mrng)
-    
-    
+        
     return nil
 }
-*/
+
 
 //func stepCoreg(self *Config) error {
     //outDir := self.General.OutputDir
@@ -564,7 +490,7 @@ func stepCheckGeo(c *Config) error {
         //prev = &out.Rslc
     //}
     
-    ///*
+    //
     
     //for ii, S1 := range s1zips {
         //if ii == midx {
@@ -586,7 +512,7 @@ func stepCheckGeo(c *Config) error {
         
         //// S1Coreg(mslc, )
     //}
-    //*/
+    //
     //return nil
 //}
 

@@ -91,8 +91,7 @@ var (
     steps = map[string]stepFun{
         "select": stepSelect,
         "import": stepImport,
-        //"geo": stepGeocode,
-        //"check_geo": stepCheckGeo,
+        "geo": stepGeocode,
         //"coreg":  stepCoreg,
     }
 

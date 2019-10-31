@@ -16,6 +16,7 @@ type (
     Serialize interface {
         jsonMap() JSONMap
         FromJson(JSONMap) error        
+        Datfile() string
     }
     
     IDatFile interface {
@@ -217,6 +218,23 @@ func TmpDatFile(ext string, dt DType) (ret DatFile, err error) {
     ret.Dat = dat
     ret.DType = dt
     
+    return ret, nil
+}
+
+func (d DatFile) Like(name string, dtype DType) (ret DatFile, err error) {
+    if dtype == Unknown {
+        dtype = d.DType
+    }
+    
+    if name, err = fp.Abs(name); err != nil {
+        return
+    }
+    
+    if ret, err = NewDatFile(name, dtype); err != nil {
+        return
+    }
+    
+    ret.URngAzi = d.URngAzi
     return ret, nil
 }
 
@@ -671,6 +689,12 @@ func Move(path string, dir string) (ret string, err error) {
 }
 
 func Save(path string, d Serialize) (err error) {
+    if len(path) == 0 {
+        if path, err = fp.Abs(d.Datfile() + ".json"); err != nil {
+            return
+        }
+    }
+    
     return SaveJson(path, d.jsonMap())
 }
 

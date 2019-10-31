@@ -127,6 +127,7 @@ func (arg *DisArgs) Parse(dat IDatFile) {
         arg.Orient = 135.0
     }
     
+    // TODO: implement proper deduction of plot mode
     //if arg.Mode == Undefined {
         //switch opt.DType {
             
