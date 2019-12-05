@@ -6,12 +6,11 @@ import (
     "log"
     "os"
     "os/exec"
-    bio "bufio"
-    io "io/ioutil"
-    fp "path/filepath"
-    conv "strconv"
-    str "strings"
-    ref "reflect"
+    "bufio"
+    "io/ioutil"
+    "strconv"
+    "strings"
+    "reflect"
 )
 
 type (
@@ -19,7 +18,7 @@ type (
     Joiner     func(args ...string) string
 
     FileReader struct {
-        *bio.Scanner
+        *bufio.Scanner
         *os.File
     }
 
@@ -31,11 +30,6 @@ type (
 
     Tmp struct {
         files []string
-    }
-
-    path struct {
-        path  string
-        parts []string
     }
 )
 
@@ -49,8 +43,8 @@ func NewArgs(args []string) (ret Args) {
     ret.opt = make(map[string]string)
     
     for _, arg := range args {
-        if str.Contains(arg, "=") {
-            split := str.Split(arg, "=")
+        if strings.Contains(arg, "=") {
+            split := strings.Split(arg, "=")
             
             ret.opt[split[0]] = split[1]
         } else {
@@ -68,34 +62,34 @@ const (
     ParseFloatErr Werror = "failed to parse '%s' into an float"
 )
 
-func StringToVal(v ref.Value, kind ref.Kind, in string) error {
+func StringToVal(v reflect.Value, kind reflect.Kind, in string) error {
     switch kind {
-    case ref.Int:
-        set, err := conv.Atoi(in)
+    case reflect.Int:
+        set, err := strconv.Atoi(in)
         if err != nil {
             return ParseIntErr.Wrap(err, in)
         }
         
         v.SetInt(int64(set))
-    case ref.Float32:
-        set, err := conv.ParseFloat(in, 32)
+    case reflect.Float32:
+        set, err := strconv.ParseFloat(in, 32)
         
         if err != nil {
             return ParseFloatErr.Wrap(err, in)
         }
         
         v.SetFloat(set)
-    case ref.Float64:
-        set, err := conv.ParseFloat(in, 64)
+    case reflect.Float64:
+        set, err := strconv.ParseFloat(in, 64)
         
         if err != nil {
             return ParseFloatErr.Wrap(err, in)
         }
         
         v.SetFloat(set)
-    case ref.Bool:
+    case reflect.Bool:
         v.SetBool(true)
-    case ref.String:
+    case reflect.String:
         v.SetString(in)
     }
     return nil
@@ -108,10 +102,10 @@ const (
 )
 
 func (h Args) ParseStruct(s interface{}) error {
-    vptr := ref.ValueOf(s)
+    vptr := reflect.ValueOf(s)
     kind := vptr.Kind()
     
-    if kind != ref.Ptr {
+    if kind != reflect.Ptr {
         return fmt.Errorf("expected a pointer to struct not '%v'", kind)
     }
     
@@ -123,7 +117,7 @@ func (h Args) ParseStruct(s interface{}) error {
     return nil
 }
 
-func (h Args) parseStruct(v ref.Value) error {
+func (h Args) parseStruct(v reflect.Value) error {
     t := v.Type()
 
     for ii := 0; ii < v.NumField(); ii++ {
@@ -133,7 +127,7 @@ func (h Args) parseStruct(v ref.Value) error {
         
         //fmt.Printf("Parsing field[%d]: %s\n", ii, sField.Name)
         
-        if kind == ref.Struct {
+        if kind == reflect.Struct {
             if err := h.parseStruct(sValue); err != nil {
                 return ParseFieldErr.Wrap(err, sField.Name)
             }
@@ -150,7 +144,7 @@ func (h Args) parseStruct(v ref.Value) error {
         npos := len(pos)
         
         if npos > 0 {
-            idx, err := conv.Atoi(pos)
+            idx, err := strconv.Atoi(pos)
             
             if err != nil {
                 return ParseIntErr.Wrap(err, pos)
@@ -174,7 +168,7 @@ func (h Args) parseStruct(v ref.Value) error {
             name = sField.Name
         }
         
-        if kind == ref.Bool {
+        if kind == reflect.Bool {
             val := false
             for _, pos := range h.pos {
                 if pos == name {
@@ -200,10 +194,10 @@ func (h Args) parseStruct(v ref.Value) error {
 }
 
 func MapKeys(dict interface{}) (ret []string) {
-    val := ref.ValueOf(dict)
+    val := reflect.ValueOf(dict)
     kind := val.Kind()
     
-    if kind != ref.Map {
+    if kind != reflect.Map {
         log.Fatalf("expected a map not an '%s'", kind)
     }
     
@@ -300,13 +294,9 @@ func NewReader(path string) (ret FileReader, err error) {
         return
     }
 
-    ret.Scanner = bio.NewScanner(ret.File)
+    ret.Scanner = bufio.NewScanner(ret.File)
 
     return ret, nil
-}
-
-func NewPath(args ...string) path {
-    return path{fp.Join(args...), args}
 }
 
 func ReadFile(path string) (ret []byte, err error) {
@@ -318,7 +308,7 @@ func ReadFile(path string) (ret []byte, err error) {
 
     defer f.Close()
 
-    contents, err := io.ReadAll(f)
+    contents, err := ioutil.ReadAll(f)
     if err != nil {
         err = FileReadErr.Wrap(err, path)
         return
@@ -343,7 +333,7 @@ func (p ParameterError) Unwrap() error {
 
 
 func FromString(params, sep string) Params {
-    return Params{Par: "", Sep: sep, contents: str.Split(params, "\n")}
+    return Params{Par: "", Sep: sep, contents: strings.Split(params, "\n")}
 }
 
 func (self *Params) Param(name string) (ret string, err error) {
@@ -357,18 +347,18 @@ func (self *Params) Param(name string) (ret string, err error) {
         }
 
         defer file.Close()
-        scanner := bio.NewScanner(file)
+        scanner := bufio.NewScanner(file)
 
         for scanner.Scan() {
             line := scanner.Text()
-            if str.Contains(line, name) {
-                return str.Trim(str.Split(line, self.Sep)[1], " "), nil
+            if strings.Contains(line, name) {
+                return strings.Trim(strings.Split(line, self.Sep)[1], " "), nil
             }
         }
     } else {
         for _, line := range self.contents {
-            if str.Contains(line, name) {
-                return str.Trim(str.Split(line, self.Sep)[1], " "), nil
+            if strings.Contains(line, name) {
+                return strings.Trim(strings.Split(line, self.Sep)[1], " "), nil
             }
         }
     }
@@ -384,9 +374,9 @@ func (self Params) Int(name string, idx int) (ret int, err error) {
         return ret, err
     }
     
-    data = str.Split(data, " ")[idx]
+    data = strings.Split(data, " ")[idx]
     
-    ret, err = conv.Atoi(data)
+    ret, err = strconv.Atoi(data)
 
     if err != nil {
         err = ParseIntErr.Wrap(err, data)
@@ -403,9 +393,9 @@ func (self Params) Float(name string, idx int) (ret float64, err error) {
         return 0.0, err
     }
     
-    data = str.Split(data, " ")[idx]
+    data = strings.Split(data, " ")[idx]
     
-    ret, err = conv.ParseFloat(data, 64)
+    ret, err = strconv.ParseFloat(data, 64)
 
     if err != nil {
         err = ParseFloatErr.Wrap(err, data)
@@ -418,9 +408,9 @@ func (self Params) Float(name string, idx int) (ret float64, err error) {
 func TmpFile(ext string) (ret string, err error) {
     var file *os.File
     if len(ext) > 0 {
-        file, err = io.TempFile("", "*." + ext)
+        file, err = ioutil.TempFile("", "*." + ext)
     } else {
-        file, err = io.TempFile("", "*")
+        file, err = ioutil.TempFile("", "*")
     }
 
     if err != nil {

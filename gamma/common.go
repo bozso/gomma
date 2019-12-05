@@ -5,9 +5,9 @@ import (
     "math"
     //"fmt"
     //"os"
-    fp "path/filepath"
-    pt "path"
-    str "strings"
+    "path/filepath"
+    "path"
+    "strings"
 )
 
 type (
@@ -75,15 +75,15 @@ func makeGamma() GammaFun {
     for _, module := range Settings.Modules {
         for _, dir := range [2]string{"bin", "scripts"} {
 
-            _path := fp.Join(Path, module, dir, "*")
-            glob, err := fp.Glob(_path)
+            _path := filepath.Join(Path, module, dir, "*")
+            glob, err := filepath.Glob(_path)
 
             if err != nil {
                 Fatal(err, "Glob '%s' failed! %s", _path, err)
             }
 
             for _, path := range glob {
-                result[fp.Base(path)] = MakeCmd(path)
+                result[filepath.Base(path)] = MakeCmd(path)
             }
         }
     }
@@ -119,18 +119,14 @@ func (self GammaFun) Must(name string) (ret CmdFun) {
 }
 
 
-func NoExt(path string) string {
-    return str.TrimSuffix(path, pt.Ext(path))
+func NoExt(p string) string {
+    return strings.TrimSuffix(p, path.Ext(p))
 }
 
 
 func (self *Point) InRect(r *Rect) bool {
     return (self.X < r.Max.X && self.X > r.Min.X &&
             self.Y < r.Max.Y && self.Y > r.Min.Y)
-}
-
-func First() string {
-    return "First"
 }
 
 func isclose(num1, num2 float64) bool {

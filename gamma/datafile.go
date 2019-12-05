@@ -6,9 +6,9 @@ import (
     "os"
     //"log"
     "encoding/json"
-    fp "path/filepath"
-    str "strings"
-    conv "strconv"
+    "path/filepath"
+    "strings"
+    "strconv"
     //ref "reflect"
 )
 
@@ -57,7 +57,7 @@ const (
 )
 
 func str2dtype(in string) DType {
-    in = str.ToUpper(in)
+    in = strings.ToUpper(in)
     
     switch in {
     case "FLOAT":
@@ -226,7 +226,7 @@ func (d DatFile) Like(name string, dtype DType) (ret DatFile, err error) {
         dtype = d.DType
     }
     
-    if name, err = fp.Abs(name); err != nil {
+    if name, err = filepath.Abs(name); err != nil {
         return
     }
     
@@ -269,7 +269,7 @@ func (d *DatFile) FromJson(m JSONMap) (err error) {
         return
     }
     
-    dt := ""
+    var dt string
     if dt, err = m.String("dtype"); err != nil {
         err = Handle(err, "failed to retreive dtype")
         return
@@ -492,13 +492,12 @@ func (d DatParFile) ParseDate() (ret time.Time, err error) {
         return
     }
     
-    split := str.Fields(dateStr)
+    split := strings.Fields(dateStr)
     
-    year, err := conv.Atoi(split[0])
+    year, err := strconv.Atoi(split[0])
     
     if err != nil {
         err = TimeParseErr.Wrap(err, "year", dateStr)
-        //err = Handle(err, "failed retreive year from date string '%s'", dateStr)
         return
     }
     
@@ -532,7 +531,7 @@ func (d DatParFile) ParseDate() (ret time.Time, err error) {
     }
     
     
-    day, err := conv.Atoi(split[2])
+    day, err := strconv.Atoi(split[2])
         
     if err != nil {
         err = TimeParseErr.Wrap(err, "day", dateStr)
@@ -546,21 +545,21 @@ func (d DatParFile) ParseDate() (ret time.Time, err error) {
     
     if len(split) == 6 {
         
-        hour, err = conv.Atoi(split[3])
+        hour, err = strconv.Atoi(split[3])
             
         if err != nil {
             err = TimeParseErr.Wrap(err, "hour", dateStr)
             return
         }
         
-        min, err = conv.Atoi(split[4])
+        min, err = strconv.Atoi(split[4])
             
         if err != nil {
             err = TimeParseErr.Wrap(err, "minute", dateStr)
             return
         }
         
-        sec, err = conv.ParseFloat(split[5], 64)
+        sec, err = strconv.ParseFloat(split[5], 64)
             
         if err != nil {
             err = TimeParseErr.Wrap(err, "seconds", dateStr)
@@ -673,7 +672,7 @@ type(
 //}
 
 func Move(path string, dir string) (ret string, err error) {
-    dst, err := fp.Abs(fp.Join(dir, fp.Base(path)));
+    dst, err := filepath.Abs(filepath.Join(dir, filepath.Base(path)));
     if err != nil {
         err = Handle(err, "failed to create absolute path")
         return
@@ -690,7 +689,7 @@ func Move(path string, dir string) (ret string, err error) {
 
 func Save(path string, d Serialize) (err error) {
     if len(path) == 0 {
-        if path, err = fp.Abs(d.Datfile() + ".json"); err != nil {
+        if path, err = filepath.Abs(d.Datfile() + ".json"); err != nil {
             return
         }
     }

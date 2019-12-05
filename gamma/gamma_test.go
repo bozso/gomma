@@ -2,14 +2,14 @@ package gamma;
 
 import (
     "fmt";
-    test "testing";
+    "testing";
 );
 
 const NUM = 10000000;
 const buf = 1000;
 
 
-func BenchmarkAppend(b *test.B) {
+func BenchmarkAppend(b *testing.B) {
     b.ReportAllocs();
     
     ints := make([]int, NUM);
@@ -22,7 +22,7 @@ func BenchmarkAppend(b *test.B) {
     }
 }
 
-func BenchmarkPrealloc(b *test.B) {
+func BenchmarkPrealloc(b *testing.B) {
     b.ReportAllocs();
     
     ints := make([]int, NUM);
@@ -55,7 +55,7 @@ const (
 );
 
 
-func TestGetParameter(t *test.T) {
+func TestGetParameter(t *testing.T) {
     params := fmt.Sprintf(
         "range_samples: %d\nazimuth_lines: %d\nimage_format: %v",
         rng, azi, img_fmt);
@@ -94,7 +94,7 @@ func TestGetParameter(t *test.T) {
 }
 
 
-func TestPoints(t *test.T) {
+func TestPoints(t *testing.T) {
     rect := Rect{Max: Point{X:1.0, Y:2.0},
                  Min: Point{X:0.0, Y:-1.0}}
     

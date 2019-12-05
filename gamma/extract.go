@@ -5,9 +5,9 @@ import (
     "os"
     "log"
     "fmt"
-    zip "archive/zip"
-    fp "path/filepath"
-    rex "regexp"
+    "archive/zip"
+    "path/filepath"
+    "regexp"
 )
 
 type (
@@ -31,7 +31,7 @@ func extractFile(src *zip.File, dst string) error {
     }
     defer in.Close()
     
-    dir := fp.Dir(dst)
+    dir := filepath.Dir(dst)
     err = os.MkdirAll(dir, os.ModePerm)
     
     if err != nil {
@@ -55,7 +55,7 @@ func extractFile(src *zip.File, dst string) error {
 }
 
 func matches(candidate string, template string) (bool, error) {
-    matched, err := rex.MatchString(template, candidate)
+    matched, err := regexp.MatchString(template, candidate)
     
     if err != nil {
         return false, Handle(err, "MatchString failed")
@@ -81,7 +81,7 @@ func extract(file *zip.ReadCloser, template, root string) (ret string, err error
             return
         }
         
-        ret = fp.Join(root, name)
+        ret = filepath.Join(root, name)
         
         if !matched {
             continue
