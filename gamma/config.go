@@ -56,6 +56,8 @@ type (
         FractionThresh   float64 `name:"frac"   default:"0.01"`
         PhaseStdevThresh float64 `name:"phase"  default:"0.8"`
         MasterIdx        int     `name:"master" default:"0"`
+        Mli              string  `name:"mli"`
+        Hgt              string  `name:"hgt"`
     }
 
     IfgSelectOpt struct {

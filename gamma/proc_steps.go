@@ -6,11 +6,10 @@ import (
     "log"
     "sort"
     "os"
-    // "math"
-    // "time"
+    //"time"
     fp "path/filepath"
     //conv "strconv"
-    //str "strings"
+    str "strings"
 )
 
 type(
@@ -111,7 +110,6 @@ func stepSelect(self *Config) error {
     var checker, startCheck, stopCheck checkerFun
     check := false
     
-    
     if len(dateStart) != 0 {
         _dateStart, err := ParseDate(DShort, dateStart)
         
@@ -163,10 +161,14 @@ func stepSelect(self *Config) error {
     // nzip := len(zipfiles)
     
     
+    var (
+        s1zip *S1Zip
+        IWs IWInfos
+    )
     
     if check {
         for _, zip := range zipfiles {
-            s1zip, IWs, err := parseS1(zip, root, extInfo)
+            s1zip, IWs, err = parseS1(zip, root, extInfo)
             
             if err != nil {
                 return Handle(err,
@@ -179,7 +181,8 @@ func stepSelect(self *Config) error {
         }
     } else {
         for _, zip := range zipfiles {
-            s1zip, IWs, err := parseS1(zip, root, extInfo)
+            s1zip, IWs, err = parseS1(zip, root, extInfo)
+
             if err != nil {
                 return Handle(err,
                     "failed to import S1Zip data from '%s'", zip)
@@ -355,166 +358,142 @@ func stepGeocode (c *Config) error {
 }
 
 
-//func stepCoreg(self *Config) error {
-    //outDir := self.General.OutputDir
+func stepCoreg(self *Config) error {
+    outDir := self.General.OutputDir
+    coreg := self.Coreg
     
-    //path := self.infile
-    //file, err := NewReader(path)
+    path := self.infile
+    file, err := NewReader(path)
     
-    //if err != nil {
-        //return Handle(err, "failed to open file '%s'", path)
-    //}
+    if err != nil {
+        return Handle(err, "failed to open file '%s'", path)
+    }
     
-    //defer file.Close()
+    defer file.Close()
     
-    //S1SLCs := []S1SLC{}
+    S1SLCs := []S1SLC{}
     
-    //for file.Scan() {
-        //line := str.TrimSpace(file.Text())
+    for file.Scan() {
+        line := str.TrimSpace(file.Text())
         
-        //s1, err := FromTabfile(line)
+        var s1 S1SLC
+        if s1, err = FromTabfile(line); err != nil {
+            return Handle(err, "failed to parse S1SLC file from '%s'",
+                line)
+        }
         
-        //if err != nil {
-            //return Handle(err, "failed to parse S1SLC file from '%s'",
-                //line)
-        //}
+        S1SLCs = append(S1SLCs, s1)
+    }
+    
+    midx := self.Coreg.MasterIdx - 1
+    
+    mslc := S1SLCs[midx]
+    mdate := mslc.Format(DateShort)
+    
+    fmt.Printf("Master date: %s\n", mdate)
+    
+    
+    if len(coreg.Mli) == 0 || len(coreg.Hgt) == 0 {
+        return fmt.Errorf("Path to master MLI file and path to " + 
+                          "elevation model in radar coordinates " +
+                          "has to be given!")
+    }
+    
+    var mli MLI
+    if err = Load(coreg.Mli, &mli); err != nil {
+        return Handle(err, "failed to make master MLI struct")
+    }
+
+    var hgt Hgt
+    if err = Load(coreg.Hgt, &hgt); err != nil {
+        return Handle(err, "failed to make master MLI struct")
+    }
+    
+    rslc, ifg := fp.Join(outDir, "RSLC"), fp.Join(outDir, "IFG")
+    
+    if err = os.MkdirAll(rslc, os.ModePerm); err != nil {
+        return Handle(err, "failed to create directory '%s'", rslc)
+    }
+    
+    if err = os.MkdirAll(ifg, os.ModePerm); err != nil {
+        return Handle(err, "failed to create directory '%s'", ifg)
+    }
+    
+    master := S1Coreg{
+        Tab: mslc.Tab,
+        ID: mdate,
+        CoregOpt: self.Coreg,
+        Hgt: hgt.Dat,
+        Poly1: "-",
+        Poly2: "-",
+        Looks: self.General.Looks,
+        Clean: false,
+        UseInter: true,
+        OutDir: outDir,
+        RslcPath: rslc,
+        IfgPath: ifg,
+    }
+    
+    var prev *S1SLC = nil
+    nzip := len(S1SLCs)
+    
+    opt := RasArgs{DisArgs:DisArgs{Sec: mli.Dat}}
+    
+    for ii := midx + 1; ii < nzip; ii++ {
+        curr := &S1SLCs[ii]
         
-        //S1SLCs = append(S1SLCs, s1)
-    //}
-    
-    //midx := self.Coreg.MasterIdx - 1
-    
-    //mslc := S1SLCs[midx]
-    //mdate := mslc.Format(DateShort)
-    
-    //fmt.Printf("Master date: %s\n", mdate)
-    
-    //meta := GeoMeta{}
-    //path = fp.Join(self.General.OutputDir, "geocode.json")
-    //err = LoadJson(path, &meta)
-    
-    //if err != nil {
-        //return Handle(err, "failed to parse meta json file '%s'", path)
-    //}
-    
-    //mli, err := NewMLI(meta.Geo.Dat, meta.Geo.Par)
-    
-    //if err != nil {
-        //return Handle(err, "failed to make master MLI struct")
-    //}
-    
-    //rslc, ifg := fp.Join(outDir, "RSLC"), fp.Join(outDir, "IFG")
-    
-    //err = os.MkdirAll(rslc, os.ModePerm)
-    
-    //if err != nil {
-        //return Handle(err, "failed to create directory '%s'", rslc)
-    //}
-    
-    //err = os.MkdirAll(ifg, os.ModePerm)
-    
-    //if err != nil {
-        //return Handle(err, "failed to create directory '%s'", ifg)
-    //}
-    
-    //master := S1Coreg{
-        //Tab: mslc.Tab,
-        //ID: mdate,
-        //CoregOpt: self.Coreg,
-        //Hgt: meta.Geo.Hgt,
-        //Poly1: "-",
-        //Poly2: "-",
-        //Looks: self.General.Looks,
-        //Clean: false,
-        //UseInter: true,
-        //OutDir: outDir,
-        //RslcPath: rslc,
-        //IfgPath: ifg,
-    //}
-    
-    //var prev *S1SLC = nil
-    //nzip := len(S1SLCs)
-    
-    //opt := RasArgs{DisArgs:DisArgs{Sec: mli.Dat}}
-    
-    //for ii := midx + 1; ii < nzip; ii++ {
-        //curr := &S1SLCs[ii]
+        out, err := master.Coreg(curr, prev)
         
-        //out, err := master.Coreg(curr, prev)
+        if err != nil {
+            return Handle(err, "coregistration failed")
+        }
         
-        //if err != nil {
-            //return Handle(err, "coregistration failed")
-        //}
+        if !out.Ok {
+            log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
+                curr.Format(DateShort))
+            continue
+        }
         
-        //if !out.Ok {
-            //log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
-                //curr.Format(DateShort))
-            //continue
-        //}
+        err = out.Ifg.Raster(opt)
         
-        //err = out.Ifg.Raster(opt)
+        if err != nil {
+            return Handle(err, "failed to create raster image for interferogram '%s",
+                out.Ifg.Dat)
+        }
         
-        //if err != nil {
-            //return Handle(err, "failed to create raster image for interferogram '%s",
-                //out.Ifg.Dat)
-        //}
-        
-        //prev = &out.Rslc
-    //}
+        prev = &out.Rslc
+    }
     
     
-    //prev = nil
+    prev = nil
     
-    //for ii := midx - 1; ii > -1; ii-- {
-        //curr := &S1SLCs[ii]
+    for ii := midx - 1; ii > -1; ii-- {
+        curr := &S1SLCs[ii]
         
-        //out, err := master.Coreg(curr, prev)
+        out, err := master.Coreg(curr, prev)
         
-        //if err != nil {
-            //return Handle(err, "coregistration failed")
-        //}
+        if err != nil {
+            return Handle(err, "coregistration failed")
+        }
         
-        //if !out.Ok {
-            //log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
-                //curr.Format(DateShort))
-            //continue
-        //}
+        if !out.Ok {
+            log.Printf("Coregistration of '%s' failed! Moving to the next scene\n",
+                curr.Format(DateShort))
+            continue
+        }
         
-        //err = out.Ifg.Raster(opt)
+        err = out.Ifg.Raster(opt)
         
-        //if err != nil {
-            //return Handle(err, "failed to create raster image for interferogram '%s",
-                //out.Ifg.Datfile())
-        //}
+        if err != nil {
+            return Handle(err, "failed to create raster image for interferogram '%s",
+                out.Ifg.Datfile())
+        }
         
-        //prev = &out.Rslc
-    //}
+        prev = &out.Rslc
+    }
     
-    //
-    
-    //for ii, S1 := range s1zips {
-        //if ii == midx {
-            //continue
-        //}
-        
-        //date1 := S1.Center()
-        //date2 := s1zips[0].Center()
-        
-        //idx, diff1 := 0, math.Abs(float64(date1.Sub(date2)))
-        
-        //for jj := 1; jj < nzip; jj++ {
-            //diff2 := math.Abs(float64(date1.Sub(s1zips[jj].Center())))
-            
-            //if diff2 < diff1 {
-                //idx = jj
-            //}
-        //}
-        
-        //// S1Coreg(mslc, )
-    //}
-    //
-    //return nil
-//}
+    return nil
+}
 
 
 func Search(s1 *S1Zip, zips []*S1Zip) *S1Zip {
@@ -540,36 +519,26 @@ func toZiplist(name string, one, two *S1Zip) error {
     defer file.Close()
     
     if two == nil {
-        _, err = file.WriteString(one.Path)
-        
-        if err != nil {
+        if _, err = file.WriteString(one.Path); err != nil {
             return Handle(err, "failed to write to ziplist file '%s'", name)
         }
     } else {
         after := two.date.center.After(one.date.center)
         
         if after {
-            _, err = file.WriteString(one.Path + "\n")
-            
-            if err != nil {
+            if _, err = file.WriteString(one.Path + "\n"); err != nil {
                 return Handle(err, "failed to write to ziplist file '%s'", name)
             }
             
-            _, err = file.WriteString(two.Path + "\n")
-            
-            if err != nil {
+            if _, err = file.WriteString(two.Path + "\n"); err != nil {
                 return Handle(err, "failed to write to ziplist file '%s'", name)
             }
         } else {
-            _, err = file.WriteString(two.Path + "\n")
-            
-            if err != nil {
+            if _, err = file.WriteString(two.Path + "\n"); err != nil {
                 return Handle(err, "failed to write to ziplist file '%s'", name)
             }
             
-            _, err = file.WriteString(one.Path + "\n")
-            
-            if err != nil {
+            if _, err = file.WriteString(one.Path + "\n"); err != nil {
                 return Handle(err, "failed to write to ziplist file '%s'", name)
             }
         }
