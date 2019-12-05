@@ -4,9 +4,9 @@ import (
     "log"
     "fmt"
     "os"
-    fp "path/filepath"
-    str "strings"
-    conv "strconv"
+    "path/filepath"
+    "strings"
+    "strconv"
 )
 
 
@@ -323,19 +323,19 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
         return
     }
     
-    split := str.Split(line, " ")
+    split := strings.Split(line, " ")
     
     if len(split) < 2 {
         err = fmt.Errorf("split to retreive range, azimuth failed")
         return
     }
     
-    if ret.Rng, err = conv.Atoi(split[0]); err != nil {
+    if ret.Rng, err = strconv.Atoi(split[0]); err != nil {
         err = ParseIntErr.Wrap(err, split[0])
         return
     }
     
-    if ret.Azi, err = conv.Atoi(split[1]); err != nil {
+    if ret.Azi, err = strconv.Atoi(split[1]); err != nil {
         err = ParseIntErr.Wrap(err, split[1])
         return
     }
@@ -407,7 +407,7 @@ var (
 )
 
 func (g* GeocodeOpt) Run(outDir string) (err error) {
-    geodir := fp.Join(outDir, "geo")
+    geodir := filepath.Join(outDir, "geo")
     
     err = os.MkdirAll(geodir, os.ModePerm)
     
@@ -418,7 +418,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     }
     
     var demOrig DEM
-    if demOrig, err = NewDEM(fp.Join(geodir, "srtm.dem"), ""); err != nil {
+    if demOrig, err = NewDEM(filepath.Join(geodir, "srtm.dem"), ""); err != nil {
         return
     }
     
@@ -501,7 +501,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     }
     
     var dem DEM
-    if dem, err = NewDEM(fp.Join(geodir, "dem_seg.dem"), ""); err != nil {
+    if dem, err = NewDEM(filepath.Join(geodir, "dem_seg.dem"), ""); err != nil {
         return
     }
     
@@ -513,56 +513,56 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     
     
     geo := Geocode{
-        Offs    : fp.Join(geodir, "offs"),
-        Offsets : fp.Join(geodir, "offsets"),
-        Ccp     : fp.Join(geodir, "ccp"),
-        Coffs   : fp.Join(geodir, "coffs"),
-        Coffsets: fp.Join(geodir, "coffsets"),
-        DiffPar : fp.Join(geodir, "diff_par"),
+        Offs    : filepath.Join(geodir, "offs"),
+        Offsets : filepath.Join(geodir, "offsets"),
+        Ccp     : filepath.Join(geodir, "ccp"),
+        Coffs   : filepath.Join(geodir, "coffs"),
+        Coffsets: filepath.Join(geodir, "coffsets"),
+        DiffPar : filepath.Join(geodir, "diff_par"),
         MLI     : mli,
     }
     
     var sigma0, gamma0, lsMap, simSar, zenith, orient, inc, pix, proj DatFile
     
-    if sigma0, err =  mli.Like(fp.Join(geodir, "sigma0"), Float); err != nil {
+    if sigma0, err =  mli.Like(filepath.Join(geodir, "sigma0"), Float); err != nil {
         return
     }
     
-    if gamma0, err =  mli.Like(fp.Join(geodir, "gamma0"), Float); err != nil {
+    if gamma0, err =  mli.Like(filepath.Join(geodir, "gamma0"), Float); err != nil {
         return
     }
     
     // datatype of lsmap?
-    if lsMap, err =  mli.Like(fp.Join(geodir, "lsmap"), Float); err != nil {
+    if lsMap, err =  mli.Like(filepath.Join(geodir, "lsmap"), Float); err != nil {
         return
     }
     
-    if simSar, err =  mli.Like(fp.Join(geodir, "sim_sar"), Float); err != nil {
+    if simSar, err =  mli.Like(filepath.Join(geodir, "sim_sar"), Float); err != nil {
         return
     }
     
-    if zenith, err =  mli.Like(fp.Join(geodir, "zenith"), Float); err != nil {
+    if zenith, err =  mli.Like(filepath.Join(geodir, "zenith"), Float); err != nil {
         return
     }
     
-    if orient, err =  mli.Like(fp.Join(geodir, "orient"), Float); err != nil {
+    if orient, err =  mli.Like(filepath.Join(geodir, "orient"), Float); err != nil {
         return
     }
     
-    if inc, err =  mli.Like(fp.Join(geodir, "inclination"), Float); err != nil {
+    if inc, err =  mli.Like(filepath.Join(geodir, "inclination"), Float); err != nil {
         return
     }
     
-    if proj, err =  mli.Like(fp.Join(geodir, "projection"), Float); err != nil {
+    if proj, err =  mli.Like(filepath.Join(geodir, "projection"), Float); err != nil {
         return
     }
     
-    if pix, err =  mli.Like(fp.Join(geodir, "pixel_area"), Float); err != nil {
+    if pix, err =  mli.Like(filepath.Join(geodir, "pixel_area"), Float); err != nil {
         return
     }
     
     var lookup Lookup
-    if lookup.DatFile, err = dem.Like(fp.Join(geodir, "lookup"), FloatCpx);
+    if lookup.DatFile, err = dem.Like(filepath.Join(geodir, "lookup"), FloatCpx);
        err != nil {
         return
     }

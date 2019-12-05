@@ -7,7 +7,7 @@ import (
     "log"
     //ref "reflect"
     //conv "strconv"
-    str "strings"
+    "strings"
 )
 
 type (
@@ -170,7 +170,7 @@ func (ra *RngAzi) Default() {
 
 func delim(msg, sym string) {
     msg = fmt.Sprintf("%s %s %s", sym, msg, sym)
-    syms := str.Repeat(sym, len(msg))
+    syms := strings.Repeat(sym, len(msg))
 
     log.Printf("\n%s\n%s\n%s\n", syms, msg, syms)
 }
@@ -178,6 +178,7 @@ func delim(msg, sym string) {
 
 func MakeDefaultConfig(path string) (err error) {
     out, err := json.MarshalIndent(defaultConfig, "", "    ")
+    
     if err != nil {
         return Handle(err, "failed to json encode default configuration")
     }
@@ -198,6 +199,7 @@ func MakeDefaultConfig(path string) (err error) {
 
 func SaveJson(path string, val interface{}) error {
     out, err := json.MarshalIndent(val, "", "    ")
+    
     if err != nil {
         return Handle(err, "failed to json encode struct: %v", val)
     }

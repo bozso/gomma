@@ -5,9 +5,9 @@ import (
     "encoding/json"
     "fmt"
     "os"
-    fp "path/filepath"
-    //ref "reflect"
-    str "strings"
+    "path/filepath"
+    //"reflect"
+    "strings"
 )
 
 type (
@@ -243,7 +243,7 @@ func batch(args Args) (err error) {
 }
 
 func (b Batcher) Quicklook() error {
-    cache := fp.Join(b.General.CachePath, "sentinel1")
+    cache := filepath.Join(b.General.CachePath, "sentinel1")
 
     info := &ExtractOpt{root: cache, pol: b.General.Pol}
 
@@ -309,7 +309,7 @@ func (b Batcher) MLI() (err error) {
         }
         
         var name string
-        if name, err = fp.Abs(fp.Join(mliDir, s1.Format(DateShort))); err != nil {
+        if name, err = filepath.Abs(filepath.Join(mliDir, s1.Format(DateShort))); err != nil {
             return
         }
         
@@ -415,7 +415,7 @@ func like(args Args) (err error) {
     }
     
     
-    if out, err = fp.Abs(out); err != nil {
+    if out, err = filepath.Abs(out); err != nil {
         return
     }
     
@@ -640,7 +640,7 @@ func splitIfg(args Args) (err error) {
     }
     
     id := ID(m, s, DShort)
-    mode := str.ToUpper(si.SpectrumMode)
+    mode := strings.ToUpper(si.SpectrumMode)
     
     switch mode {
     case "BEAM", "B":
@@ -797,7 +797,7 @@ func geocode(args Args) (err error) {
         return
     }
     
-    mode := str.ToUpper(c.Mode)
+    mode := strings.ToUpper(c.Mode)
     
     var out DatFile
     switch mode {
@@ -834,7 +834,7 @@ func raster(args Args) (err error) {
         return ParseErr.Wrap(err)
     }
         
-    mode, m := Undefined, str.ToUpper(p.PlotMode)
+    mode, m := Undefined, strings.ToUpper(p.PlotMode)
     
     switch m {
     case "PWR", "POWER":

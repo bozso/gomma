@@ -6,11 +6,11 @@ import (
     "log"
     "sort"
     "os"
+    "path/filepath"
     // "math"
     // "time"
-    fp "path/filepath"
-    //conv "strconv"
-    //str "strings"
+    //"strconv"
+    //"strings"
 )
 
 type(
@@ -79,7 +79,7 @@ func loadS1(path, root string) (ret S1Zips, err error) {
 
 func (self *Config) extOpt(satellite string) *ExtractOpt {
     return &ExtractOpt{pol: self.General.Pol, 
-        root: fp.Join(self.General.CachePath, satellite)}
+        root: filepath.Join(self.General.CachePath, satellite)}
 }
 
 func stepSelect(self *Config) error {
@@ -102,15 +102,16 @@ func stepSelect(self *Config) error {
     
     dateStart, dateStop := Select.DateStart, Select.DateStop
 
-    zipfiles, err := fp.Glob(fp.Join(dataPath, "S1*_IW_SLC*.zip"))
+    zipfiles, err := filepath.Glob(filepath.Join(dataPath, "S1*_IW_SLC*.zip"))
     if err != nil {
         return Handle(err, "failed to Glob zipfiles")
     }
     
-    
     var checker, startCheck, stopCheck checkerFun
-    check := false
     
+    checker = func(s1zip *S1Zip) bool {
+        return true
+    }
     
     if len(dateStart) != 0 {
         _dateStart, err := ParseDate(DShort, dateStart)
@@ -123,7 +124,6 @@ func stepSelect(self *Config) error {
         startCheck = func(s1zip *S1Zip) bool {
             return s1zip.Start().After(_dateStart)
         }
-        check = true
     }
     
     if len(dateStop) != 0 {
@@ -137,7 +137,6 @@ func stepSelect(self *Config) error {
         stopCheck = func(s1zip *S1Zip) bool {
             return s1zip.Stop().Before(_dateStop)
         }
-        check = true
     }
     
     if startCheck != nil && stopCheck != nil {
@@ -164,30 +163,16 @@ func stepSelect(self *Config) error {
     
     
     
-    if check {
-        for _, zip := range zipfiles {
-            s1zip, IWs, err := parseS1(zip, root, extInfo)
-            
-            if err != nil {
-                return Handle(err,
-                    "failed to import S1Zip data from '%s'", zip)
-            }
-            
-            if IWs.contains(aoi) && checker(s1zip) {
-                fmt.Printf("%s\n", s1zip.Path)
-            }
+    for _, zip := range zipfiles {
+        s1zip, IWs, err := parseS1(zip, root, extInfo)
+        
+        if err != nil {
+            return Handle(err,
+                "failed to import S1Zip data from '%s'", zip)
         }
-    } else {
-        for _, zip := range zipfiles {
-            s1zip, IWs, err := parseS1(zip, root, extInfo)
-            if err != nil {
-                return Handle(err,
-                    "failed to import S1Zip data from '%s'", zip)
-            }
-            
-            if IWs.contains(aoi) {
-                fmt.Printf("%s\n", s1zip.Path)
-            }
+        
+        if IWs.contains(aoi) && checker(s1zip) {
+            fmt.Printf("%s\n", s1zip.Path)
         }
     }
     
@@ -282,7 +267,7 @@ func stepImport(self *Config) error {
     
     // defer os.Remove(ziplist)
     
-    slcDir := fp.Join(self.General.OutputDir, "SLC")
+    slcDir := filepath.Join(self.General.OutputDir, "SLC")
     
     if err = os.MkdirAll(slcDir, os.ModePerm); err != nil {
         return DirCreateErr.Wrap(err, slcDir)

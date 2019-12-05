@@ -4,9 +4,9 @@ import (
     "os"
     "time"
     "log"
-    bio "bufio"
-    str "strings"
-    conv "strconv"
+    "bufio"
+    "strings"
+    "strconv"
 )
 
 type (
@@ -270,7 +270,7 @@ func (self IFG) CheckQuality() (ret bool, err error) {
     
     defer file.Close()
     
-    scanner := bio.NewScanner(file)
+    scanner := bufio.NewScanner(file)
     
     offs := 0.0
     
@@ -283,10 +283,10 @@ func (self IFG) CheckQuality() (ret bool, err error) {
             continue
         }
         
-        split := str.Fields(line)
+        split := strings.Fields(line)
         
         if split[0] == "azimuth_pixel_offset" {
-            diff, err = conv.ParseFloat(split[1], 64)
+            diff, err = strconv.ParseFloat(split[1], 64)
             
             if err != nil {
                 err = Handle(err, "failed to parse: '%s' into float64",

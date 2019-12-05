@@ -6,8 +6,8 @@ import (
     "math"
     "os"
     "time"
-    fp "path/filepath"
-    str "strings"
+    "path/filepath"
+    "strings"
 )
 
 const (
@@ -60,7 +60,7 @@ var (
 
     burstCorners = Gamma.selectFun("ScanSAR_burst_corners",
         "SLC_burst_corners")
-    calibPath = fp.Join("annotation", "calibration")
+    calibPath = filepath.Join("annotation", "calibration")
 
     fmtNeeded = [nTemplate]bool{
         tiff:      true,
@@ -78,10 +78,10 @@ var (
 func NewS1Zip(zipPath, root string) (ret *S1Zip, err error) {
     const rexTemplate = "%s-iw%%d-slc-%%s-.*"
 
-    zipBase := fp.Base(zipPath)
+    zipBase := filepath.Base(zipPath)
     ret = &S1Zip{Path: zipPath, zipBase: zipBase}
 
-    ret.mission = str.ToLower(zipBase[:3])
+    ret.mission = strings.ToLower(zipBase[:3])
     ret.dateStr = zipBase[17:48]
 
     start, stop := zipBase[17:32], zipBase[33:48]
@@ -93,23 +93,23 @@ func NewS1Zip(zipPath, root string) (ret *S1Zip, err error) {
     }
 
     ret.mode = zipBase[4:6]
-    safe := str.ReplaceAll(zipBase, ".zip", ".SAFE")
+    safe := strings.ReplaceAll(zipBase, ".zip", ".SAFE")
     tpl := fmt.Sprintf(rexTemplate, ret.mission)
 
     ret.Templates = [6]string{
-        tiff:      fp.Join(safe, "measurement", tpl+".tiff"),
-        annot:     fp.Join(safe, "annotation", tpl+".xml"),
-        calib:     fp.Join(safe, calibPath, fmt.Sprintf("calibration-%s.xml", tpl)),
-        noise:     fp.Join(safe, calibPath, fmt.Sprintf("noise-%s.xml", tpl)),
-        preview:   fp.Join(safe, "preview", "product-preview.html"),
-        quicklook: fp.Join(safe, "preview", "quick-look.png"),
+        tiff:      filepath.Join(safe, "measurement", tpl+".tiff"),
+        annot:     filepath.Join(safe, "annotation", tpl+".xml"),
+        calib:     filepath.Join(safe, calibPath, fmt.Sprintf("calibration-%s.xml", tpl)),
+        noise:     filepath.Join(safe, calibPath, fmt.Sprintf("noise-%s.xml", tpl)),
+        preview:   filepath.Join(safe, "preview", "product-preview.html"),
+        quicklook: filepath.Join(safe, "preview", "quick-look.png"),
     }
 
     ret.Safe = safe
-    ret.Root = fp.Join(root, ret.Safe)
+    ret.Root = filepath.Join(root, ret.Safe)
     
     for _, s1path := range S1DirPaths {
-        path := fp.Join(ret.Root, s1path)
+        path := filepath.Join(ret.Root, s1path)
         err = os.MkdirAll(path, os.ModePerm)
         
         if err != nil {
@@ -125,7 +125,7 @@ func NewS1Zip(zipPath, root string) (ret *S1Zip, err error) {
     ret.productClass = string(zipBase[13])
     ret.pol = zipBase[14:16]
     ret.absoluteOrbit = zipBase[49:55]
-    ret.DTID = str.ToLower(zipBase[56:62])
+    ret.DTID = strings.ToLower(zipBase[56:62])
     ret.UID = zipBase[63:67]
 
     return ret, nil
@@ -231,7 +231,7 @@ func FromTabfile(tab string) (ret S1SLC, err error) {
     
     for file.Scan() {
         line := file.Text()
-        split := str.Split(line, " ")
+        split := strings.Split(line, " ")
         
         log.Printf("Parsing IW%d\n", ret.nIW + 1)
         
@@ -258,7 +258,7 @@ func FromTabfile(tab string) (ret S1SLC, err error) {
 }
 
 func (s1 S1SLC) Move(dir string) (ret S1SLC, err error) {
-    newtab := fp.Join(dir, fp.Base(s1.Tab))
+    newtab := filepath.Join(dir, filepath.Base(s1.Tab))
     
     file, err := os.Create(newtab)
     
@@ -395,7 +395,7 @@ func (s1 S1SLC) DerampSlave(ref *S1SLC, looks RngAzi, keep bool) (ret S1SLC, err
 }
 
 func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
-    tab := fp.Join(outDir, str.ReplaceAll(fp.Base(s1.Tab), "SLC_tab", "RSLC_tab"))
+    tab := filepath.Join(outDir, strings.ReplaceAll(filepath.Base(s1.Tab), "SLC_tab", "RSLC_tab"))
 
     file, err := os.Create(tab)
 
@@ -409,7 +409,7 @@ func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
     for ii := 0; ii < s1.nIW; ii++ {
         IW := s1.IWs[ii]
         
-        dat := fp.Join(outDir, str.ReplaceAll(fp.Base(IW.Dat), "slc", "rslc"))
+        dat := filepath.Join(outDir, strings.ReplaceAll(filepath.Base(IW.Dat), "slc", "rslc"))
         par, TOPS_par := dat + ".par", dat + ".TOPS_par"
         
         ret.IWs[ii] = NewIW(dat, par, TOPS_par)
@@ -451,7 +451,6 @@ func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
     
     if err != nil {
         return StructCreateError.Wrap(err, "MLI")
-        //return Handle(err, "failed to create MLI file '%s'", mli.Dat)
     }
     
     return nil
@@ -623,18 +622,18 @@ func IWAbsDiff(one, two IWInfos) (float64, error) {
 }
 
 func (s1 *S1Zip) Names(mode, pol string) (dat, par string) {
-    path := fp.Join(s1.Root, mode)
+    path := filepath.Join(s1.Root, mode)
     
-    dat = fp.Join(path, fmt.Sprintf("%s.%s", pol, mode))
+    dat = filepath.Join(path, fmt.Sprintf("%s.%s", pol, mode))
     par = dat + ".par"
     
     return
 }
 
 func (s1 *S1Zip) SLCNames(mode, pol string, ii int) (dat, par, TOPS string) {
-    slcPath := fp.Join(s1.Root, mode)
+    slcPath := filepath.Join(s1.Root, mode)
 
-    dat = fp.Join(slcPath, fmt.Sprintf("iw%d_%s.%s", ii, pol, mode))
+    dat = filepath.Join(slcPath, fmt.Sprintf("iw%d_%s.%s", ii, pol, mode))
     par = dat + ".par"
     TOPS = dat + ".TOPS_par"
 
@@ -668,7 +667,7 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
 }
 
 func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
-    //path := fp.Join(s1.Root, mode)
+    //path := filepath.Join(s1.Root, mode)
     
     if ret, err = TmpMLI(); err != nil {
         return
@@ -706,7 +705,6 @@ func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
     err = slc.MLI(&ret, opt)
     
     if err != nil {
-        //err = Handle(err, "failed to check create MLI file")
         return ret, err
     }
     
@@ -714,7 +712,7 @@ func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
 }
 
 func (s1 *S1Zip) tabName(mode, pol string) string {
-    return fp.Join(s1.Root, mode, fmt.Sprintf("%s.tab", pol))
+    return filepath.Join(s1.Root, mode, fmt.Sprintf("%s.tab", pol))
 }
 
 const (

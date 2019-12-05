@@ -4,7 +4,7 @@ import (
     "os"
     "fmt"
     "log"
-    fp "path/filepath"
+    "path/filepath"
     //str "strings"
 )
 
@@ -147,9 +147,9 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
 
     if self.Clean {
         var glob []string
-        pattern := fp.Join(self.OutDir, slc1ID + "*")
+        pattern := filepath.Join(self.OutDir, slc1ID + "*")
         
-        if glob, err = fp.Glob(pattern); err != nil {
+        if glob, err = filepath.Glob(pattern); err != nil {
             err = Handle(err, "globbing for leftover files from coregistration failed")
             return
         }
@@ -161,9 +161,9 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
             }
         }
         
-        pattern = fp.Join(self.OutDir, slc2ID + "*")
+        pattern = filepath.Join(self.OutDir, slc2ID + "*")
         
-        if glob, err = fp.Glob(pattern); err != nil {
+        if glob, err = filepath.Glob(pattern); err != nil {
             err = Handle(err, "globbing for leftover files from coregistration failed")
             return
         }
