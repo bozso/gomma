@@ -5,6 +5,7 @@ import (
     "fmt"
     "log"
     "os"
+    "io"
     "os/exec"
     "bufio"
     "io/ioutil"
@@ -413,10 +414,18 @@ func NewSplitParser(s, sep string) (sp SplitParser) {
     sp.split = strings.Split(s, sep)
     
     if len(sp.split) == 0 {
-        sp.err = fmt.Errorf("string '%s' could no be split into " +
+        sp.err = fmt.Errorf("could no be split into " +
             "multiple parts with separator '%s'", s, sep)
     }
     return
+}
+
+func (sp SplitParser) Wrap() error {
+    if sp.err != nil {
+        sp.err = fmt.Errorf("failed to parse string '%s': %w",
+            sp.s, sp.err) 
+    }
+    return sp.err
 }
 
 func (sp *SplitParser) Int(idx int) (i int) {
@@ -469,30 +478,29 @@ func RemoveTmp() {
 }
 
 type Writer struct {
+    *bufio.Writer
     *os.File
     err error
 }
 
-func NewWriter(name string) (w Writer) {
-    w.File, w.err = os.Create(name)
+func NewWriter(wr io.Writer) (w Writer) {
+    w.Writer = bufio.NewWriter(wr)
+    return
+}
+
+func NewWriterFile(name string) (w Writer, file *os.File) {
+    file, w.err = os.Create(name)
+    w.Writer = bufio.NewWriter(file)
+    w.path = name
     return
 }
 
 func (w *Writer) Write(b []byte) (n int) {
     if w.err != nil {
-        return 0
+        return
     }
     
-    n, w.err = w.File.Write(b)
-    return
-}
-
-func (w *Writer) WriteAt(b []byte, off int64) (n int) {
-    if w.err != nil {
-        return 0
-    }
-    
-    n, w.err = w.File.WriteAt(b, off)
+    n, w.err = w.Writer.Write(b)
     return
 }
 
@@ -501,7 +509,7 @@ func (w *Writer) WriteString(s string) (n int) {
         return 0
     }
     
-    n, w.err = w.File.WriteString(s)
+    n, w.err = w.Writer.WriteString(s)
     return
 }
 
@@ -510,8 +518,15 @@ func (w *Writer) WriteFmt(tpl string, args ...interface{}) int {
 }
 
 func (w *Writer) Wrap() error {
-    return fmt.Errorf("error while writing to file '%s': %w",
-        w.File.Name(), w.err)
+    if w.err != nil {
+        if len(w.path) != 0 { 
+            return fmt.Errorf("error while writing to file '%s': %w",
+                w.path, w.err)
+        } else {
+            return fmt.Errorf("error while writing: %w", w.err)
+        }
+    }
+    return w.err
 }
 
 func Wrap(err1 error, err2 error) error {

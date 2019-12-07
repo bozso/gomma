@@ -96,7 +96,7 @@ func NewS1Zip(zipPath, pol string) (s1 *S1Zip, err error) {
     safe := strings.ReplaceAll(zipBase, ".zip", ".SAFE")
     tpl := fmt.Sprintf(rexTemplate, s1.mission)
 
-    s1.Templates = [6]string{
+    s1.Templates = templates{
         tiff:      filepath.Join(safe, "measurement", tpl+".tiff"),
         annot:     filepath.Join(safe, "annotation", tpl+".xml"),
         calib:     filepath.Join(safe, calibPath, fmt.Sprintf("calibration-%s.xml", tpl)),
@@ -106,18 +106,6 @@ func NewS1Zip(zipPath, pol string) (s1 *S1Zip, err error) {
     }
 
     s1.Safe = safe
-    //s1.Root = filepath.Join(dst, s1.Safe)
-    
-    for _, s1path := range S1DirPaths {
-        path := filepath.Join(s1.Root, s1path)
-        
-        if err = os.MkdirAll(path, os.ModePerm); err != nil {
-            err = DirCreateErr.Wrap(err, path)
-            return
-        }
-    }
-    
-    
     s1.productType = zipBase[7:10]
     s1.resolution = string(zipBase[10])
     s1.level = string(zipBase[12])
@@ -168,34 +156,31 @@ type(
     IWs [maxIW]S1IW
 )
 
-func NewIW(dat, par, TOPS_par string) (ret S1IW) {
-    ret.Dat = dat
+func NewIW(dat, par, TOPS_par string) (iw S1IW) {
+    iw.Dat = dat
     
     if len(par) == 0 {
         par = dat + ".par"
     }
     
-    ret.Params = Params{Par: par, Sep: ":"}
+    iw.Params = Params{Par: par, Sep: ":"}
     
     if len(TOPS_par) == 0 {
         TOPS_par = dat + ".TOPS_par"
     }
 
-    ret.TOPS_par = Params{Par: TOPS_par, Sep: ":"}
+    iw.TOPS_par = Params{Par: TOPS_par, Sep: ":"}
 
-    return ret
+    return
 }
 
-func (iw S1IW) Move(dir string) (ret S1IW, err error) {
-    if ret.DatParFile, err = iw.DatParFile.Move(dir); err != nil {
+func (iw S1IW) Move(dir string) (miw S1IW, err error) {
+    if miw.DatParFile, err = iw.DatParFile.Move(dir); err != nil {
         return
     }
     
-    if ret.TOPS_par.Par, err = Move(iw.TOPS_par.Par, dir); err != nil {
-        return
-    }
-    
-    return ret, nil
+    miw.TOPS_par.Par, err = Move(iw.TOPS_par.Par, dir)
+    return
 }
 
 
@@ -210,96 +195,81 @@ type S1SLC struct {
     IWs
 }
 
-func FromTabfile(tab string) (ret S1SLC, err error) {
-    fmt.Printf("Parsing tabfile: '%s'.\n", tab)
+func FromTabfile(tab string) (s1 S1SLC, err error) {
+    log.Printf("Parsing tabfile: '%s'.\n", tab)
     
-    file, err := NewReader(tab)
-    
-    if err != nil {
+    var file FileReader
+    if file, err = NewReader(tab); err != nil {
         err = FileOpenErr.Wrap(err, tab)
         return
     }
-    
     defer file.Close()
 
-    ret.nIW = 0
+    s1.nIW = 0
     
     for file.Scan() {
         line := file.Text()
         split := strings.Split(line, " ")
         
-        log.Printf("Parsing IW%d\n", ret.nIW + 1)
+        log.Printf("Parsing IW%d\n", s1.nIW + 1)
         
-        ret.IWs[ret.nIW] = NewIW(split[0], split[1], split[2])
-        
-        if err != nil {
-            err = Handle(err, "failed to parse IW files from line '%s'", line)
-            return
-        }
-        
-        ret.nIW++
+        s1.IWs[s1.nIW] = NewIW(split[0], split[1], split[2])
+        s1.nIW++
     }
     
-    ret.Tab = tab
-        
-    ret.Time, err = ret.IWs[0].ParseDate()
+    s1.Tab = tab
     
-    if err != nil {
+    if s1.Time, err = s1.IWs[0].ParseDate(); err != nil {
         err = Handle(err, "failed to retreive date for '%s'", tab)
-        return
     }
     
-    return ret, nil
+    return
 }
 
-func (s1 S1SLC) Move(dir string) (ret S1SLC, err error) {
+func (s1 S1SLC) Move(dir string) (ms1 S1SLC, err error) {
     newtab := filepath.Join(dir, filepath.Base(s1.Tab))
     
-    file, err := os.Create(newtab)
-    
-    if err != nil {
+    var file *os.File
+    if file, err = os.Create(newtab); err != nil {
         err = FileOpenErr.Wrap(err, newtab)
         return
     }
-    
     defer file.Close()
     
     for ii := 0; ii < s1.nIW; ii++ {
-        if ret.IWs[ii], err = s1.IWs[ii].Move(dir); err != nil {
+        if ms1.IWs[ii], err = s1.IWs[ii].Move(dir); err != nil {
             return
         }
         
-        IW := ret.IWs[ii]
+        IW := ms1.IWs[ii]
         
         line := fmt.Sprintf("%s %s %s\n", IW.Dat, IW.Par, IW.TOPS_par.Par)
         
-        _, err = file.WriteString(line)
-        
-        if err != nil {
+        if _, err = file.WriteString(line); err != nil {
             err = FileWriteErr.Wrap(err, newtab)
             return 
         }
     }
     
-    ret.Tab, ret.nIW, ret.Time = newtab, s1.nIW, s1.Time
-    return ret, nil
+    ms1.Tab, ms1.nIW, ms1.Time = newtab, s1.nIW, s1.Time
+    
+    return ms1, nil
 }
 
-func (s1 S1SLC) Exist() (ret bool, err error) {
-    var exist bool
+func (s1 S1SLC) Exist() (b bool, err error) {
     for _, iw := range s1.IWs {
-        exist, err = iw.Exist()
-
-        if err != nil {
-            err = fmt.Errorf("Could not determine whether IW datafile exists!")
+        if b, err = iw.Exist(); err != nil {
+            err = fmt.Errorf("failed to determine whether IW " +
+                "datafile exists: %w", err)
             return
         }
 
-        if !exist {
-            return false, nil
+        if !b {
+            return
         }
     }
-    return true, nil
+    b = true
+    return
 }
 
 type MosaicOpts struct {
@@ -310,7 +280,7 @@ type MosaicOpts struct {
 
 var mosaic = Gamma.Must("SLC_mosaic_S1_TOPS")
 
-func (s1 S1SLC) Mosaic(opts MosaicOpts) (ret SLC, err error) {
+func (s1 S1SLC) Mosaic(opts MosaicOpts) (slc SLC, err error) {
     opts.Looks.Default()
     
     bflg := 0
@@ -325,24 +295,23 @@ func (s1 S1SLC) Mosaic(opts MosaicOpts) (ret SLC, err error) {
         ref = opts.RefTab
     }
     
-    if ret, err = TmpSLC(); err != nil {
+    if slc, err = TmpSLC(); err != nil {
         return
     }
 
-    _, err = mosaic(s1.Tab, ret.Dat, ret.Par, opts.Looks.Rng, opts.Looks.Azi,
-                    bflg, ref)
+    _, err = mosaic(s1.Tab, slc.Dat, slc.Par, opts.Looks.Rng,
+        opts.Looks.Azi, bflg, ref)
     
     if err != nil {
         err = Handle(err, "failed to mosaic '%s'", s1.Tab)
-        return
     }
     
-    return ret, nil
+    return
 }
 
 var derampRef = Gamma.Must("S1_deramp_TOPS_reference")
 
-func (s1 S1SLC) DerampRef() (ret S1SLC, err error) {
+func (s1 S1SLC) DerampRef() (ds1 S1SLC, err error) {
     tab := s1.Tab
     
     if _, err = derampRef(tab); err != nil {
@@ -352,11 +321,11 @@ func (s1 S1SLC) DerampRef() (ret S1SLC, err error) {
     
     tab += ".deramp"
     
-    if ret, err = FromTabfile(tab); err != nil {
+    if ds1, err = FromTabfile(tab); err != nil {
         err = Handle(err, "failed to import S1SLC from tab '%s'", tab)
         return
     }
-    return ret, nil
+    return ds1, nil
 }
 
 var derampSlave = Gamma.Must("S1_deramp_TOPS_slave")
@@ -719,7 +688,7 @@ func (s1 *S1Zip) ImportSLC(dst string) (err error) {
     
     var ext Extractor
     if ext, err = s1.newExtractor(dst); err != nil {
-        err = StructCreateErr.Wrap(err, "Extractor")
+        err = StructCreateError.Wrap(err, "Extractor")
         return
     }
 
@@ -780,10 +749,10 @@ func (s1 *S1Zip) ImportSLC(dst string) (err error) {
     return nil
 }
 
-func (s1 *S1Zip) Quicklook(dst string) (ret string, err error) {
+func (s1 *S1Zip) Quicklook(dst string) (s string, err error) {
     var ext Extractor
     if ext, err = s1.newExtractor(dst); err != nil {
-        err = StructCreateErr.Wrap(err, "Extractor")
+        err = StructCreateError.Wrap(err, "Extractor")
         return
     }
     defer ext.Close()

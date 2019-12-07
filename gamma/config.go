@@ -155,6 +155,19 @@ func (ra *RngAzi) Default() {
     }
 }
 
+func (mm *IMinmax) Decode(s string) (err error) {
+    if len(s) == 0 {
+        return EmptyStringError
+    }
+    
+    split := NewSplitParser(s, ",")
+    
+    mm.Min = split.Int(0)
+    mm.Max = split.Int(1)
+    
+    return split.Wrap()
+}
+
 func delim(msg, sym string) {
     msg = fmt.Sprintf("%s %s %s", sym, msg, sym)
     syms := strings.Repeat(sym, len(msg))

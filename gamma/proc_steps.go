@@ -6,8 +6,11 @@ import (
     "log"
     "path/filepath"
     "os"
+    "io"
+    "bufio"
     
     "github.com/mkideal/cli"
+    clix "github.com/mkideal/cli/ext"
     //"sort"
     //"strings"
     // "math"
@@ -33,29 +36,22 @@ func parseS1(zip, pol, dst string) (s1 *S1Zip, IWs IWInfos, err error) {
     return s1, IWs, nil
 }
 
-func loadS1(path, root string) (ret S1Zips, err error) {
-    var file FileReader
-    if file, err = NewReader(path); err != nil {
-        err = FileOpenErr.Make(path)
-        return
-    }
-    
-    defer file.Close()
-    
-    var s1zip *S1Zip
+func loadS1(reader io.Reader, pol string) (s1 S1Zips, err error) {
+    file := bufio.NewScanner(reader)
     
     for file.Scan() {
         line := file.Text()
-
-        if s1zip, err = NewS1Zip(line, root); err != nil {
+        
+        var s1zip *S1Zip
+        if s1zip, err = NewS1Zip(line, pol); err != nil {
             err = Handle(err, "failed to parse zipfile '%s'", line)
             return
         }
         
-        ret = append(ret, s1zip)
+        s1 = append(s1, s1zip)
     }
     
-    return ret, nil
+    return s1, nil
 }
 
 
@@ -66,12 +62,13 @@ func loadS1(path, root string) (ret S1Zips, err error) {
 
 type GeneralOpt struct {
     //DataPath   string     `cli:"" usage:""`
-    OutputDir  string `cli:"o,out" usage:"Output directory"`
-    Pol        string `cli:"p,pol" usage:"Polarisation used" dft:"vv"`
-    MasterDate string `cli:"m,master" usage:"Master date"`
-    CachePath  string `cli:"cache" usage:"Cache path" json:"CACHE_PATH"`
-    Looks      RngAzi `cli:"l,looks" usage:""`
-    InFile     string `cli:"i,infile" usage:"Input file"`   
+    OutputDir  string      `cli:"out" usage:"Output directory"`
+    Pol        string      `cli:"p,pol" usage:"Polarisation used" dft:"vv"`
+    MasterDate string      `cli:"m,master" usage:"Master date"`
+    CachePath  string      `cli:"cache" usage:"Cache path" json:"CACHE_PATH"`
+    Looks      RngAzi      `cli:"l,looks" usage:""`
+    InFile     clix.Reader `cli:"i,infile" usage:"Input file"`   
+    OutFile    clix.Writer `cli:"o,outfile" usage:"Output file"`   
 }
 
 type dataSelector struct {
@@ -94,30 +91,18 @@ var DataSelect = &cli.Command{
 func dataSelect(ctx *cli.Context) (err error) {
     sel := ctx.Argv().(*dataSelector)
     
-    ll, ur := sel.LowerLeft, sel.UpperRight
-
-    aoi := AOI{
-        Point{X: ll.Lon, Y: ll.Lat}, Point{X: ll.Lon, Y: ur.Lat},
-        Point{X: ur.Lon, Y: ur.Lat}, Point{X: ur.Lon, Y: ll.Lat},
-    }
-    
-    extInfo := sel.extOpt("sentinel1")
-    root := extInfo.root
-    
-    dateStart, dateStop := sel.DateStart, sel.DateStop
-
     dataFiles := sel.DataFiles
-    
     if len(dataFiles) == 0 {
         return fmt.Errorf("At least one datafile must be specified!")
     }
     
     var startCheck, stopCheck checkerFun
-    
     checker := func(s1zip *S1Zip) bool {
         return true
     }
     
+    dateStart, dateStop := sel.DateStart, sel.DateStop
+
     if len(dateStart) != 0 {
         _dateStart, err := ParseDate(DShort, dateStart)
         
@@ -170,16 +155,29 @@ func dataSelect(ctx *cli.Context) (err error) {
     var (
         s1zip *S1Zip
         IWs IWInfos
+        
+        ll, ur = sel.LowerLeft, sel.UpperRight
+        
+        aoi = AOI{
+            Point{X: ll.Lon, Y: ll.Lat}, Point{X: ll.Lon, Y: ur.Lat},
+            Point{X: ur.Lon, Y: ur.Lat}, Point{X: ur.Lon, Y: ll.Lat},
+        }
     )
     
+    writer := bufio.NewWriter(&sel.OutFile)
+    defer sel.OutFile.Close()
+    
     for _, zip := range dataFiles {
-        if s1zip, IWs, err = parseS1(zip, root, extInfo); err != nil {
+        if s1zip, IWs, err = parseS1(zip, sel.Pol, sel.CachePath);
+           err != nil {
             return Handle(err,
                 "failed to import S1Zip data from '%s'", zip)
         }
         
         if IWs.contains(aoi) && checker(s1zip) {
-            fmt.Printf("%s\n", s1zip.Path)
+            if _, err = writer.WriteString(s1zip.Path); err != nil {
+                return
+            }
         }
     }
     
@@ -189,7 +187,7 @@ func dataSelect(ctx *cli.Context) (err error) {
 
 type dataImporter struct {
     GeneralOpt
-    IWs        [3]IMinmax `cli:"iws" usage:""`
+    IWs        [3]IMinmax `cli:"iws" usage:"IW burst indices"`
     
 }
 
@@ -210,22 +208,14 @@ func dataImport(ctx *cli.Context) (err error) {
     )
     
     imp := ctx.Argv().(*dataImporter)
-    
-    pol, path := imp.Pol, imp.InFile
-    
-    if len(path) == 0 {
-        return fmt.Errorf("inputfile must by specified")
-    }
-    
-    extInfo := sel.extOpt("sentinel1")
-    root := extInfo.root
-    
+        
+    defer imp.InFile.Close()
     var zips S1Zips
-    if zips, err = loadS1(path, root); err != nil {
-        return Handle(err, "failed to load zipfiles from '%s'", path)
+    if zips, err = loadS1(imp.InFile, imp.Pol); err != nil {
+        return Handle(err, "failed to load zipfiles")
     }
     
-    var master *S1Zip = nil
+    var master *S1Zip
     
     //sort.Sort(ByDate(zips))
     
@@ -239,26 +229,22 @@ func dataImport(ctx *cli.Context) (err error) {
     
     
     var masterIW IWInfos
-    if masterIW, err = master.Info(extInfo); err != nil {
+    if masterIW, err = master.Info(imp.CachePath); err != nil {
         return Handle(err, "failed to parse S1Zip data from master '%s'",
             master.Path)
     }
     
-    var fburst *os.File
-    if fburst, err = os.Create(burst_table); err != nil {
-        return FileOpenErr.Wrap(err, burst_table)
+    fburst, file := NewWriterFile(burst_table);
+    if fburst.Wrap() != nil {
+        return
     }
-    defer fburst.Close()
+    defer file.Close()
     
-    
-    _, err = fburst.WriteString(fmt.Sprintf("zipfile: %s\n", master.Path))
-    if err != nil {
-        return FileWriteErr.Wrap(err, burst_table)
-    }
+    fburst.WriteFmt("zipfile: %s\n", master.Path)
     
     nIWs := 0
     
-    for ii, iw := range self.General.IWs {
+    for ii, iw := range imp.IWs {
         min, max := iw.Min, iw.Max
         
         if min == 0 && max == 0 {
@@ -278,19 +264,24 @@ func dataImport(ctx *cli.Context) (err error) {
         
         line := fmt.Sprintf(tpl, ii + 1, nburst, ii + 1, first, ii + 1, last)
         
-        if _, err := fburst.WriteString(line); err != nil {
-            return FileWriteErr.Wrap(err, burst_table)
-        }
+        fburst.WriteString(line)
         nIWs++
+    }
+    
+    if err = fburst.Wrap(); err != nil {
+        return
     }
     
     // defer os.Remove(ziplist)
     
-    slcDir := filepath.Join(self.General.OutputDir, "SLC")
+    slcDir := filepath.Join(imp.OutputDir, "SLC")
 
     if err = os.MkdirAll(slcDir, os.ModePerm); err != nil {
         return DirCreateErr.Wrap(err, slcDir)
     }
+    
+    pol, writer := imp.Pol, bufio.NewWriter(&imp.OutFile)
+    defer imp.OutFile.Close()
     
     for _, s1zip := range zips {
         // iw, err := s1zip.Info(extInfo)
@@ -322,7 +313,6 @@ func dataImport(ctx *cli.Context) (err error) {
             nIW: nIWs,
         }
         
-        
         for ii := 0; ii < nIWs; ii++ {
             dat := fmt.Sprintf("%s.slc.iw%d", base, ii + 1)
             
@@ -335,7 +325,9 @@ func dataImport(ctx *cli.Context) (err error) {
             return err
         }
         
-        fmt.Println(slc.Tab)
+        if _, err = writer.WriteString(slc.Tab); err != nil {
+            return
+        }
     }
     
     // TODO: save master idx?
@@ -494,12 +486,12 @@ func stepCoreg(self *Config) (err error) {
 }
 */
 
-func toZiplist(name string, one, two *S1Zip) error {
-    var file Writer
-    if file = NewWriter(name); file.err != nil {
-        return FileOpenErr.Make(name)
+func toZiplist(name string, one, two *S1Zip) (err error) {
+    file, file_ := NewWriterFile(name)
+    if err = file.Wrap(); err != nil {
+        return
     }
-    defer file.Close()
+    defer file_.Close()
     
     if two == nil {
         file.WriteString(one.Path)
@@ -514,11 +506,8 @@ func toZiplist(name string, one, two *S1Zip) error {
             file.WriteString(one.Path + "\n")
         }
     }
-    
-    if file.err != nil {
-        return file.Wrap()
-    }
-    return nil
+
+    return file.Wrap()
 }
 
 func Search(s1 *S1Zip, zips []*S1Zip) *S1Zip {
