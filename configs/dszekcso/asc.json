@@ -1,0 +1,88 @@
+{
+    "General": {
+        "DataPath": "/mnt/Dszekcso/ASC",
+        "OutputDir": "/mnt/bozso_i/dszekcso/asc",
+        "Pol": "vv",
+        "MasterDate": "20161205",
+        "Looks": {
+            "rng": 1,
+            "azi": 1
+        },
+        "IWs": [
+            {
+                "Min": 0,
+                "Max": 0
+            },
+            {
+                "Min": 0,
+                "Max": 0
+            },
+            {
+                "Min": 0,
+                "Max": 0
+            }
+        ]
+    },
+    "PreSelect": {
+        "DateStart": "20161201",
+        "DateStop": "20170131",
+        "LowerLeft": {
+            "Lat": 0,
+            "Lon": 0
+        },
+        "UpperRight": {
+            "Lat": 0,
+            "Lon": 0
+        },
+        "CheckZips": false
+    },
+    "Geocoding": {
+        "DEMPath": "/home/istvan/DEM/srtm.vrt",
+        "Iter": 1,
+        "NPoly": 1,
+        "LanczosOrder": 5,
+        "MLIOversamp": 2,
+        "DEMOverlap": {
+            "rng": 100,
+            "azi": 100
+        },
+        "OffsetWindows": {
+            "rng": 500,
+            "azi": 500
+        },
+        "DEMOverSampling": {
+            "Lat": 2,
+            "Lon": 2
+        },
+        "AreaFactor": 20,
+        "CCThresh": 0.1,
+        "BandwithFrac": 0.8,
+        "RngOversamp": 2,
+        "Master": ""
+    },
+    "Coreg": {
+        "CoherenceThresh": 0.8,
+        "FractionThresh": 0.01,
+        "PhaseStdevThresh": 0.8,
+        "MasterIdx": 0
+    },
+    "IFGSelect": {
+        "Bperp": {
+            "Min": 0,
+            "Max": 150
+        },
+        "DeltaT": {
+            "Min": 0,
+            "Max": 15
+        }
+    },
+    "CalcCoherence": {
+        "WeightType": "gaussian",
+        "Box": {
+            "Min": 3,
+            "Max": 9
+        },
+        "SlopeCorrelationThresh": 0.4,
+        "SlopeWindow": 5
+    }
+}
