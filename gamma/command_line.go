@@ -2,32 +2,20 @@ package gamma
 
 import (
     //"log"
-    "encoding/json"
+    //"reflect"
     "fmt"
     "os"
-    "path/filepath"
-    //"reflect"
     "strings"
+    "path/filepath"
+    "github.com/mkideal/cli"
 )
 
 type (
     Cmd func(Args) error
     JSONMap map[string]interface{}
     
-    Process struct {
-        Conf        string `name:"conf" default:"gamma.conf"`
-        Step        string `name:"step" default:""`
-        Start       string `name:"start" default:""`
-        Stop        string `name:"stop" default:""` 
-        Log         string `name:"log" default:"gamma.log"`
-        CachePath   string `name:"cache" default:""`
-        Skip        bool   `name:"skip"`
-        Show        bool   `name:"show"`
-        Config
-    }
-    
     MetaFile struct {
-        Meta string `pos:"0"`
+        Meta string `cli:"*meta" usage:"Metadata json file"`
     }
 )
 
@@ -37,31 +25,41 @@ const (
 
 var (
     BatchModes = []string{"quicklook", "mli / MLI", "ras"}
-    
-    Commands = map[string]Cmd{
-        "proc": process,
-        "init": initGamma,
-        "batch": batch,
-        //"move": move,
-        //"make": create,
-        //"stat": stat,
-        "splitIfg": splitIfg,
-        "geocode": geocode,
-        "raster": raster,
-        "like": like,
-    }
-    
-    CommandsAvailable = MapKeys(Commands)
 )
 
-func process(args Args) (err error) {
-    proc := Process{}
-    
-    if err = args.ParseStruct(&proc); err != nil {
-        err = ParseErr.Wrap(err)
-        //err = Handle(err, parseErr)
-        return
+type (
+    root struct {
+        cli.Helper
     }
+)
+
+var Root = &cli.Command{
+    Desc: "Gamma Golang wrapper command line program.",
+    Argv: func() interface{} { return &root{} },
+    Fn: func(ctx *cli.Context) error { return nil },
+}
+
+type process struct {
+    cli.Helper
+    Conf        string `cli:"conf" dft:"gamma.json"`
+    Step        string `cli:"step"`
+    Start       string `cli:"start"`
+    Stop        string `cli:"stop"` 
+    Log         string `cli:"log" dft:"gamma.log"`
+    CachePath   string `cli:"cache"`
+    Skip        bool   `cli:"skip"`
+    Show        bool   `cli:"show"`
+}
+
+var Process = &cli.Command{
+    Name: "proc",
+    Desc: "Execute processing steps",
+    Argv: func() interface{} { return &process{} },
+    Fn: proc,
+}
+
+func proc(ctx *cli.Context) (err error) {
+    proc := ctx.Argv().(*process) 
     
     start, stop, err := proc.Parse()
     if err != nil {
@@ -122,7 +120,7 @@ func (e ModeError) Unwrap() error {
     return e.Err
 }
 
-func (proc Process) Parse() (istart int, istop int, err error) {
+func (proc process) Parse() (istart int, istop int, err error) {
     if proc.Show {
         listSteps()
         os.Exit(0)
@@ -148,30 +146,23 @@ func (proc Process) Parse() (istart int, istop int, err error) {
         istop = istep + 1
     }
 
-    path := proc.Conf
-    data, err := ReadFile(path)
-
-    if err != nil {
-        err = Handle(err, "failed to read file '%s'", path)
-        return
-    }
-
-    if err = json.Unmarshal(data, &proc.Config); err != nil {
-        err = Handle(err, "failed to parse json data '%s'", data)
-        return
-    }
-
     return istart, istop, nil
 }
 
-func (proc Process) RunSteps(start, stop int) error {
+func (proc process) RunSteps(start, stop int) (err error) {
+    config := Config{}
+    
+    if err = LoadJson(proc.Conf, &config); err != nil {
+        return
+    }
+    
     for ii := start; ii < stop; ii++ {
         name := stepList[ii]
         step := steps[name]
 
         delim(fmt.Sprintf("START: %s", name), "*")
 
-        if err := step(&proc.Config); err != nil {
+        if err = step(&config); err != nil {
             return Handle(err, "error while running step '%s'",
                 name)
         }
@@ -182,18 +173,22 @@ func (proc Process) RunSteps(start, stop int) error {
 }
 
 
-func initGamma(args Args) (err error) {
-    if len(args.pos) < 1 {
-        err = Handle(nil,
-            "at least one positional argument required (path of configuration file")
-        return
-    }
-    
-    conf := args.pos[0]
+type initGamma struct {
+    Outfile string `cli:"*out" usage:"Outfile"`
+}
+
+var Init = &cli.Command{
+    Name: "init",
+    Desc: "Initialize Gamma (pre)processing",
+    Argv: func() interface{} { return &initGamma{} },
+    Fn: InitGamma,
+}
+
+func InitGamma(ctx *cli.Context) (err error) {
+    conf := ctx.Argv().(*initGamma).Outfile
     
     if err = MakeDefaultConfig(conf); err != nil {
         err = Handle(err, "failed to create config file")
-        return
     }
     return
 }
@@ -347,12 +342,12 @@ func (b Batcher) MLI() (err error) {
     return nil
 }
 
-func (b Batcher) Raster() error {
+func (b Batcher) Raster() (err error) {
     path := b.Infile
     opt := b.RasArgs
     
-    file, err := NewReader(path)
-    if err != nil {
+    var file FileReader
+    if file, err = NewReader(path); err != nil {
         return err
     }
     defer file.Close()
@@ -366,11 +361,14 @@ func (b Batcher) Raster() error {
         
         var data DatFile
         if err = Load(line, &data); err != nil {
-            return Handle(err, "failed to load datafile from '%s'", line)
+            err = Handle(err, "failed to load datafile from '%s'", line)
+            return
         }
         
         if err = data.Raster(opt); err != nil {
-            return Handle(err, "failed to create raster file for '%s'", line)
+            err = Handle(err, "failed to create raster file for '%s'",
+                line)
+            return
         }
     }
     
@@ -414,7 +412,6 @@ func like(args Args) (err error) {
         dtype = indat.Dtype()
     }
     
-    
     if out, err = filepath.Abs(out); err != nil {
         return
     }
@@ -431,7 +428,7 @@ func like(args Args) (err error) {
 
 type(
     Mover struct {
-        OutDir   string `name:"out" default:"."`
+        OutDir   string `cli:"out" usage:"Output directory" dft:"."`
         MetaFile
     }
 )
@@ -455,12 +452,10 @@ func move(args Args) (err error) {
     out := m.OutDir
     
     if dat, err = dat.Move(out); err != nil {
-        //err = Handle(err, "failed to move datafile to '%s", out)
         return err
     }
     
     if path, err = Move(path, out); err != nil {
-        //err = Handle(err, "failed to move json metafile to '%s'", out)
         return err
     }
     
@@ -648,18 +643,17 @@ func splitIfg(args Args) (err error) {
             return
         }
         
-        out, err := m.SplitBeamIfg(s, si.SBIOpt)
-        
-        if err != nil {
+        var out SBIOut
+        if out, err = m.SplitBeamIfg(s, si.SBIOpt); err != nil {
             return err
         }
         
         if err = Save(id + "_sbi_mli.json", &out.Mli); err != nil {
-            return err
+            return
         }
         
         if err = Save(id + "_sbi_ifg.json", &out.Ifg); err != nil {
-            return err
+            return
         }
     //case "SPECTRUM", "S":
         //opt := si.SSIOpt
@@ -889,7 +883,6 @@ func (m JSONMap) String(name string) (ret string, err error) {
     
     if !ok {
         err = KeyErr.Make(name, m)
-        //err = Handle(nil, "key '%s' is not present in map '%s'", name, m)
         return
     }
     
@@ -897,8 +890,6 @@ func (m JSONMap) String(name string) (ret string, err error) {
     
     if !ok {
         err = TypeErr.Make(tmp, name, "string")
-        //err = Handle(nil, "unexpected type %T for '%s', expected string",
-            //tmp, name)
         return
     }
     

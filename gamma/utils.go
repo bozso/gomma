@@ -17,11 +17,6 @@ type (
     CmdFun     func(args ...interface{}) (string, error)
     Joiner     func(args ...string) string
 
-    FileReader struct {
-        *bufio.Scanner
-        *os.File
-    }
-
     Params struct {
         Par string `json:"paramfile" name:"par"`
         Sep string `json:"separator" name:"sep" default:":"`
@@ -135,6 +130,7 @@ func (h Args) parseStruct(v reflect.Value) error {
         }
         
         tag := sField.Tag
+        fmt.Println(tag)
         
         if tag == "" {
             continue
@@ -286,35 +282,35 @@ const (
     FileReadErr Werror = "failed to read file '%s'"
 )
 
-func NewReader(path string) (ret FileReader, err error) {
-    ret.File, err = os.Open(path)
-
-    if err != nil {
-        err = FileOpenErr.Wrap(err, path)
-        return
-    }
-
-    ret.Scanner = bufio.NewScanner(ret.File)
-
-    return ret, nil
+type FileReader struct {
+    *bufio.Scanner
+    *os.File
 }
 
-func ReadFile(path string) (ret []byte, err error) {
-    f, err := os.Open(path)
-    if err != nil {
+func NewReader(path string) (r FileReader, err error) {
+    if r.File, err = os.Open(path); err != nil {
         err = FileOpenErr.Wrap(err, path)
         return
     }
 
-    defer f.Close()
+    r.Scanner = bufio.NewScanner(r.File)
 
-    contents, err := ioutil.ReadAll(f)
-    if err != nil {
-        err = FileReadErr.Wrap(err, path)
+    return r, nil
+}
+
+func ReadFile(path string) (b []byte, err error) {
+    var f *os.File
+    if f, err = os.Open(path); err != nil {
+        err = FileOpenErr.Wrap(err, path)
         return
     }
-
-    return contents, nil
+    defer f.Close()
+    
+    if b, err = ioutil.ReadAll(f); err != nil {
+        err = FileReadErr.Wrap(err, path)
+    }
+    
+    return
 }
 
 type ParameterError struct {
@@ -331,26 +327,21 @@ func (p ParameterError) Unwrap() error {
     return p.Err
 }
 
-
 func FromString(params, sep string) Params {
     return Params{Par: "", Sep: sep, contents: strings.Split(params, "\n")}
 }
 
 func (self *Params) Param(name string) (ret string, err error) {
     if self.contents == nil {
-        var file *os.File
-        file, err = os.Open(self.Par)
-
-        if err != nil {
-            err = FileOpenErr.Wrap(err, self.Par)
+        var reader FileReader
+        if reader, err = NewReader(self.Par); err != nil {
             return
         }
+        defer reader.Close()
 
-        defer file.Close()
-        scanner := bufio.NewScanner(file)
-
-        for scanner.Scan() {
-            line := scanner.Text()
+        for reader.Scan() {
+            line := reader.Text()
+            
             if strings.Contains(line, name) {
                 return strings.Trim(strings.Split(line, self.Sep)[1], " "), nil
             }
@@ -367,42 +358,34 @@ func (self *Params) Param(name string) (ret string, err error) {
     return
 }
 
-func (self Params) Int(name string, idx int) (ret int, err error) {
-    data, err := self.Param(name)
-    
-    if err != nil {
-        return ret, err
+func (self Params) Int(name string, idx int) (i int, err error) {
+    var data string
+    if data, err = self.Param(name); err != nil {
+        return
     }
     
     data = strings.Split(data, " ")[idx]
     
-    ret, err = strconv.Atoi(data)
-
-    if err != nil {
+    if i, err = strconv.Atoi(data); err != nil {
         err = ParseIntErr.Wrap(err, data)
-        return
     }
 
-    return ret, nil
+    return
 }
 
-func (self Params) Float(name string, idx int) (ret float64, err error) {
-    data, err := self.Param(name)
-    
-    if err != nil {
-        return 0.0, err
+func (self Params) Float(name string, idx int) (f float64, err error) {
+    var data string
+    if data, err = self.Param(name); err != nil {
+        return
     }
     
     data = strings.Split(data, " ")[idx]
-    
-    ret, err = strconv.ParseFloat(data, 64)
 
-    if err != nil {
+    if f, err = strconv.ParseFloat(data, 64); err != nil {
         err = ParseFloatErr.Wrap(err, data)
-        return
     }
 
-    return ret, nil
+    return
 }
 
 func TmpFile(ext string) (ret string, err error) {
@@ -434,6 +417,48 @@ func RemoveTmp() {
             log.Printf("Failed to remove temporary file '%s': %s\n", file, err)
         }
     }
+}
+
+type Writer struct {
+    *os.File
+    err error
+}
+
+func NewWriter(name string) (w Writer) {
+    w.File, w.err = os.Create(name)
+    return
+}
+
+func (w *Writer) Write(b []byte) (n int) {
+    if w.err != nil {
+        return 0
+    }
+    
+    n, w.err = w.File.Write(b)
+    return
+}
+
+func (w *Writer) WriteAt(b []byte, off int64) (n int) {
+    if w.err != nil {
+        return 0
+    }
+    
+    n, w.err = w.File.WriteAt(b, off)
+    return
+}
+
+func (w *Writer) WriteString(s string) (n int) {
+    if w.err != nil {
+        return 0
+    }
+    
+    n, w.err = w.File.WriteString(s)
+    return
+}
+
+func (w *Writer) Wrap() error {
+    return fmt.Errorf("error while writing to file '%s': %w",
+        w.File.Name(), w.err)
 }
 
 func Wrap(err1 error, err2 error) error {

@@ -9,8 +9,8 @@ import (
     "path/filepath"
     // "math"
     // "time"
-    //"strconv"
-    //"strings"
+    // "strconv"
+    "strings"
 )
 
 type(
@@ -29,18 +29,13 @@ type(
 
 
 func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err error) {
-    s1, err = NewS1Zip(zip, root)
-    
-    if err != nil {
+    if s1, err = NewS1Zip(zip, root); err != nil {
         err = Handle(err, "failed to parse S1Zip data from '%s'", zip)
         return
     }
-
     log.Printf("Parsing IW Information for S1 zipfile '%s'", s1.Path)
     
-    IWs, err = s1.Info(ext)
-    
-    if err != nil {
+    if IWs, err = s1.Info(ext); err != nil {
         err = Handle(err, "failed to parse IW information for zip '%s'",
             s1.Path)
         return
@@ -50,10 +45,9 @@ func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err err
 }
 
 func loadS1(path, root string) (ret S1Zips, err error) {
-    file, err := NewReader(path)
-    
-    if err != nil {
-        err = Handle(err, "failed to open file '%s'", path)
+    var file FileReader
+    if file, err = NewReader(path); err != nil {
+        err = FileOpenErr.Make(path)
         return
     }
     
@@ -63,9 +57,8 @@ func loadS1(path, root string) (ret S1Zips, err error) {
     
     for file.Scan() {
         line := file.Text()
-        s1zip, err = NewS1Zip(line, root)
-        
-        if err != nil {
+
+        if s1zip, err = NewS1Zip(line, root); err != nil {
             err = Handle(err, "failed to parse zipfile '%s'", line)
             return
         }
@@ -102,7 +95,9 @@ func stepSelect(self *Config) error {
     
     dateStart, dateStop := Select.DateStart, Select.DateStop
 
-    zipfiles, err := filepath.Glob(filepath.Join(dataPath, "S1*_IW_SLC*.zip"))
+    zipfiles, err := filepath.Glob(filepath.Join(dataPath,
+        "S1*_IW_SLC*.zip"))
+    
     if err != nil {
         return Handle(err, "failed to Glob zipfiles")
     }
@@ -183,7 +178,7 @@ func stepSelect(self *Config) error {
 
 var s1Import = Gamma.Must("S1_import_SLC_from_zipfiles")
 
-func stepImport(self *Config) error {
+func stepImport(self *Config) (err error) {
     const (
         tpl = "iw%d_number_of_bursts: %d\niw%d_first_burst: %f\niw%d_last_burst: %f\n"
         burst_table = "burst_number_table"
@@ -198,12 +193,11 @@ func stepImport(self *Config) error {
     
     extInfo := self.extOpt("sentinel1")
     
-    root := extInfo.root
-    path := self.infile
+    root, path := extInfo.root, self.infile
     
-    zips, err := loadS1(path, root)
     
-    if err != nil {
+    var zips S1Zips
+    if zips, err = loadS1(path, root); err != nil {
         return Handle(err, "failed to load zipfiles from '%s'", path)
     }
     
@@ -220,7 +214,6 @@ func stepImport(self *Config) error {
     }
     
     masterIW, err := master.Info(extInfo)
-    
     if err != nil {
         return Handle(err, "failed to parse S1Zip data from master '%s'",
             master.Path)
@@ -230,7 +223,6 @@ func stepImport(self *Config) error {
     if fburst, err = os.Create(burst_table); err != nil {
         return FileOpenErr.Wrap(err, burst_table)
     }
-    
     defer fburst.Close()
     
     _, err = fburst.WriteString(fmt.Sprintf("zipfile: %s\n", master.Path))
@@ -255,7 +247,6 @@ func stepImport(self *Config) error {
         }
         
         IW := masterIW[ii]
-        
         first := IW.bursts[min - 1]
         last := IW.bursts[max - 1]
         
@@ -270,7 +261,7 @@ func stepImport(self *Config) error {
     // defer os.Remove(ziplist)
     
     slcDir := filepath.Join(self.General.OutputDir, "SLC")
-    
+
     if err = os.MkdirAll(slcDir, os.ModePerm); err != nil {
         return DirCreateErr.Wrap(err, slcDir)
     }
@@ -341,24 +332,23 @@ func stepGeocode (c *Config) error {
     return nil
 }
 
-
-func stepCoreg(self *Config) error {
+func stepCoreg(self *Config) (err error) {
     outDir := self.General.OutputDir
     coreg := self.Coreg
     
     path := self.infile
-    file, err := NewReader(path)
     
-    if err != nil {
-        return Handle(err, "failed to open file '%s'", path)
+    var file FileReader
+    if file, err = NewReader(path); err != nil {
+        err = FileOpenErr.Make(path)
+        return
     }
-    
     defer file.Close()
     
     S1SLCs := []S1SLC{}
     
     for file.Scan() {
-        line := str.TrimSpace(file.Text())
+        line := strings.TrimSpace(file.Text())
         
         var s1 S1SLC
         if s1, err = FromTabfile(line); err != nil {
@@ -385,22 +375,22 @@ func stepCoreg(self *Config) error {
     
     var mli MLI
     if err = Load(coreg.Mli, &mli); err != nil {
-        return Handle(err, "failed to make master MLI struct")
+        return StructCreateError.Make("MLI")
     }
 
     var hgt Hgt
     if err = Load(coreg.Hgt, &hgt); err != nil {
-        return Handle(err, "failed to make master MLI struct")
+        return StructCreateError.Make("HGT")
     }
     
-    rslc, ifg := fp.Join(outDir, "RSLC"), fp.Join(outDir, "IFG")
+    rslc, ifg := filepath.Join(outDir, "RSLC"), filepath.Join(outDir, "IFG")
     
     if err = os.MkdirAll(rslc, os.ModePerm); err != nil {
-        return Handle(err, "failed to create directory '%s'", rslc)
+        return DirCreateErr.Make(rslc)
     }
     
     if err = os.MkdirAll(ifg, os.ModePerm); err != nil {
-        return Handle(err, "failed to create directory '%s'", ifg)
+        return DirCreateErr.Make(ifg)
     }
     
     master := S1Coreg{
@@ -438,9 +428,7 @@ func stepCoreg(self *Config) error {
             continue
         }
         
-        err = out.Ifg.Raster(opt)
-        
-        if err != nil {
+        if err = out.Ifg.Raster(opt); err != nil {
             return Handle(err, "failed to create raster image for interferogram '%s",
                 out.Ifg.Dat)
         }
@@ -466,9 +454,7 @@ func stepCoreg(self *Config) error {
             continue
         }
         
-        err = out.Ifg.Raster(opt)
-        
-        if err != nil {
+        if err = out.Ifg.Raster(opt); err != nil {
             return Handle(err, "failed to create raster image for interferogram '%s",
                 out.Ifg.Datfile())
         }
@@ -494,38 +480,28 @@ func Search(s1 *S1Zip, zips []*S1Zip) *S1Zip {
 }
 
 func toZiplist(name string, one, two *S1Zip) error {
-    file, err := os.Create(name)
-    
-    if err != nil {
-        return Handle(err, "failed to open file '%s'", name)
+    var file Writer
+    if file = NewWriter(name); file.err != nil {
+        return FileOpenErr.Make(name)
     }
-    
     defer file.Close()
     
     if two == nil {
-        if _, err = file.WriteString(one.Path); err != nil {
-            return Handle(err, "failed to write to ziplist file '%s'", name)
-        }
+        file.WriteString(one.Path)
     } else {
         after := two.date.center.After(one.date.center)
         
         if after {
-            if _, err = file.WriteString(one.Path + "\n"); err != nil {
-                return Handle(err, "failed to write to ziplist file '%s'", name)
-            }
-            
-            if _, err = file.WriteString(two.Path + "\n"); err != nil {
-                return Handle(err, "failed to write to ziplist file '%s'", name)
-            }
+            file.WriteString(one.Path + "\n")
+            file.WriteString(two.Path + "\n")
         } else {
-            if _, err = file.WriteString(two.Path + "\n"); err != nil {
-                return Handle(err, "failed to write to ziplist file '%s'", name)
-            }
-            
-            if _, err = file.WriteString(one.Path + "\n"); err != nil {
-                return Handle(err, "failed to write to ziplist file '%s'", name)
-            }
+            file.WriteString(two.Path + "\n")
+            file.WriteString(one.Path + "\n")
         }
+    }
+    
+    if file.err != nil {
+        return file.Wrap()
     }
     return nil
 }

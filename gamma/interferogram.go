@@ -61,7 +61,7 @@ var (
 
 type IFG struct {
     DatParFile
-    DiffPar Params          `json:"diffparfile"`
+    DiffPar   Params        `json:"diffparfile"`
     Quality   string        `json:"quality"`
     SimUnwrap string        `json:"simulated_unwrapped"`
     DeltaT    time.Duration `json:"-"`
@@ -133,7 +133,8 @@ func (i *IFG) FromJson(m JSONMap) (err error) {
     }
     
     if i.DType != FloatCpx {
-        err = TypeMismatchError{ftype:"IFG", expected:"complex", DType:i.DType}
+        err = TypeMismatchError{ftype:"IFG", expected:"complex",
+            DType:i.DType}
         return
     }
     
