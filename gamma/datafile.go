@@ -4,12 +4,12 @@ import (
     "fmt"
     "time"
     "os"
-    //"log"
     "encoding/json"
     "path/filepath"
     "strings"
     "strconv"
-    //ref "reflect"
+    //"log"
+    //"reflect"
 )
 
 type (    
@@ -121,6 +121,19 @@ func (e ZeroDimError) Unwrap() error {
 type RngAzi struct {
     Rng int `json:"rng" name:"rng" default:"0"`
     Azi int `json:"azi" name:"azi" default:"0"`
+}
+
+func (ra *RngAzi) Decode(s string) (err error) {
+    if len(s) == 0 {
+        return EmptyStringError
+    }
+    
+    split := NewSplitParser(s, ",")
+    
+    ra.Rng = split.Int(0)
+    ra.Azi = split.Int(1)
+    
+    return split.err
 }
 
 func (ra RngAzi) Check() (err error) {

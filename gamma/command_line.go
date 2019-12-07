@@ -4,9 +4,9 @@ import (
     //"log"
     //"reflect"
     "fmt"
-    "os"
+    //"os"
     "strings"
-    "path/filepath"
+    //"path/filepath"
     "github.com/mkideal/cli"
 )
 
@@ -41,51 +41,52 @@ var Root = &cli.Command{
 
 type process struct {
     cli.Helper
-    Conf        string `cli:"conf" dft:"gamma.json"`
-    Step        string `cli:"step"`
-    Start       string `cli:"start"`
-    Stop        string `cli:"stop"` 
-    Log         string `cli:"log" dft:"gamma.log"`
+    Conf        string `cli:"conf" usage:"Processing configuration file" dft:"gamma.json"`
+    Step        string `cli:"step" usage:"Execute single step"`
+    Start       string `cli:"start" usage:"Starting step"`
+    Stop        string `cli:"stop" usage:"Stoppong step"` 
+    Log         string `cli:"log" usage:"Logfile" dft:"gamma.log"`
     CachePath   string `cli:"cache"`
-    Skip        bool   `cli:"skip"`
-    Show        bool   `cli:"show"`
+    Skip        bool   `cli:"skip" usage: "Skip optional steps"`
+    Show        bool   `cli:"show" usage:"Show available steps"`
+    InputFile   string `cli:"in" usage:"Input file list"`
 }
 
-var Process = &cli.Command{
-    Name: "proc",
-    Desc: "Execute processing steps",
-    Argv: func() interface{} { return &process{} },
-    Fn: proc,
-}
+//var Process = &cli.Command{
+    //Name: "proc",
+    //Desc: "Execute processing steps",
+    //Argv: func() interface{} { return &process{} },
+    //Fn: proc,
+//}
 
-func proc(ctx *cli.Context) (err error) {
-    proc := ctx.Argv().(*process) 
+//func proc(ctx *cli.Context) (err error) {
+    //proc := ctx.Argv().(*process) 
     
-    start, stop, err := proc.Parse()
-    if err != nil {
-        err = Handle(err, "failed to  parse processing steps")
-        return
-    }
+    //start, stop, err := proc.Parse()
+    //if err != nil {
+        //err = Handle(err, "failed to  parse processing steps")
+        //return
+    //}
     
-    if err = proc.RunSteps(start, stop); err != nil {
-        err = Handle(err, "error occurred while running processing steps")
-        return
-    }
-    return nil
-}
+    //if err = proc.RunSteps(start, stop); err != nil {
+        //err = Handle(err, "error occurred while running processing steps")
+        //return
+    //}
+    //return nil
+//}
 
-func stepIndex(step string) int {
-    for ii, _step := range stepList {
-        if step == _step {
-            return ii
-        }
-    }
-    return -1
-}
+//func stepIndex(step string) int {
+    //for ii, _step := range stepList {
+        //if step == _step {
+            //return ii
+        //}
+    //}
+    //return -1
+//}
 
-func listSteps() {
-    fmt.Println("Available processing steps: ", stepList)
-}
+//func listSteps() {
+    //fmt.Println("Available processing steps: ", stepList)
+//}
 
 
 const (
@@ -120,57 +121,57 @@ func (e ModeError) Unwrap() error {
     return e.Err
 }
 
-func (proc process) Parse() (istart int, istop int, err error) {
-    if proc.Show {
-        listSteps()
-        os.Exit(0)
-    }
+//func (proc process) Parse() (istart int, istop int, err error) {
+    //if proc.Show {
+        //listSteps()
+        //os.Exit(0)
+    //}
 
-    istep, istart, istop := stepIndex(proc.Step), stepIndex(proc.Start),
-        stepIndex(proc.Stop)
+    //istep, istart, istop := stepIndex(proc.Step), stepIndex(proc.Start),
+        //stepIndex(proc.Stop)
 
-    if istep == -1 {
-        if istart == -1 {
-            listSteps()
-            err = StepErr.Make(proc.Start)
-            return
-        }
+    //if istep == -1 {
+        //if istart == -1 {
+            //listSteps()
+            //err = StepErr.Make(proc.Start)
+            //return
+        //}
 
-        if istop == -1 {
-            listSteps()
-            err = StepErr.Make(proc.Stop)
-            return
-        }
-    } else {
-        istart = istep
-        istop = istep + 1
-    }
+        //if istop == -1 {
+            //listSteps()
+            //err = StepErr.Make(proc.Stop)
+            //return
+        //}
+    //} else {
+        //istart = istep
+        //istop = istep + 1
+    //}
 
-    return istart, istop, nil
-}
+    //return istart, istop, nil
+//}
 
-func (proc process) RunSteps(start, stop int) (err error) {
-    config := Config{}
+//func (proc process) RunSteps(start, stop int) (err error) {
+    //config := Config{InFile: proc.InputFile}
     
-    if err = LoadJson(proc.Conf, &config); err != nil {
-        return
-    }
+    //if err = LoadJson(proc.Conf, &config); err != nil {
+        //return
+    //}
     
-    for ii := start; ii < stop; ii++ {
-        name := stepList[ii]
-        step := steps[name]
+    //for ii := start; ii < stop; ii++ {
+        //name := stepList[ii]
+        //step := steps[name]
 
-        delim(fmt.Sprintf("START: %s", name), "*")
+        //delim(fmt.Sprintf("START: %s", name), "*")
 
-        if err = step(&config); err != nil {
-            return Handle(err, "error while running step '%s'",
-                name)
-        }
+        //if err = step(&config); err != nil {
+            //return Handle(err, "error while running step '%s'",
+                //name)
+        //}
 
-        delim(fmt.Sprintf("END: %s", name), "*")
-    }
-    return nil
-}
+        //delim(fmt.Sprintf("END: %s", name), "*")
+    //}
+    //return nil
+//}
 
 
 type initGamma struct {
@@ -193,279 +194,279 @@ func InitGamma(ctx *cli.Context) (err error) {
     return
 }
 
-type(
-    Batcher struct {
-        Mode     string `pos:"0"`
-        Infile   string `pos:"1"`
-        Conf     string `name:"conf" default:"gamma.conf"`
-        OutDir   string `name:"out" default:"."`
-        Filetype string `name:"ftype" default:""`
-        Mli      string `name:"mli" default:""`
-        RasArgs
-        Config
-    }
-)
+//type(
+    //Batcher struct {
+        //Mode     string `cli:"*m,mode"`
+        //Infile   string `cli:"*i,in"`
+        //Conf     string `cli:"conf" dft:"gamma.conf"`
+        //OutDir   string `cli:"out" dft:"."`
+        //Filetype string `cli:"f,ftype"`
+        //Mli      string `cli:"mli"`
+        //RasArgs
+        //Config
+    //}
+//)
 
-func batch(args Args) (err error) {
-    batch := Batcher{}
+//func batch(args Args) (err error) {
+    //batch := Batcher{}
     
-    if err = args.ParseStruct(&batch); err != nil {
-        err = ParseErr.Wrap(err)
-        return
-    }
+    //if err = args.ParseStruct(&batch); err != nil {
+        //err = ParseErr.Wrap(err)
+        //return
+    //}
 
-    //fmt.Printf("%#v\n", batch)
+    ////fmt.Printf("%#v\n", batch)
     
-    switch batch.Mode {
-    case "quicklook":
-        if err = batch.Quicklook(); err != nil {
-            return
-        }
-    case "mli", "MLI":
-        if err = batch.MLI(); err != nil {
-            return
-        }
-    case "ras", "raster", "plot":
-        if err = batch.Raster(); err != nil {
-            return
-        }
-    default:
-        err = Handle(nil, "unrecognized mode: '%s'! Choose from: %v",
-            batch.Mode, BatchModes)
-        return
-    }
-    return nil
-}
+    //switch batch.Mode {
+    //case "quicklook":
+        //if err = batch.Quicklook(); err != nil {
+            //return
+        //}
+    //case "mli", "MLI":
+        //if err = batch.MLI(); err != nil {
+            //return
+        //}
+    //case "ras", "raster", "plot":
+        //if err = batch.Raster(); err != nil {
+            //return
+        //}
+    //default:
+        //err = Handle(nil, "unrecognized mode: '%s'! Choose from: %v",
+            //batch.Mode, BatchModes)
+        //return
+    //}
+    //return nil
+//}
 
-func (b Batcher) Quicklook() error {
-    cache := filepath.Join(b.General.CachePath, "sentinel1")
+//func (b Batcher) Quicklook() error {
+    //cache := filepath.Join(b.General.CachePath, "sentinel1")
 
-    info := &ExtractOpt{root: cache, pol: b.General.Pol}
+    //info := &ExtractOpt{root: cache, pol: b.General.Pol}
 
-    path := b.infile
-    file, err := NewReader(path)
+    //path := b.Infile
+    //file, err := NewReader(path)
 
-    if err != nil {
-        return err
-    }
+    //if err != nil {
+        //return err
+    //}
 
-    defer file.Close()
+    //defer file.Close()
 
-    for file.Scan() {
-        line := file.Text()
+    //for file.Scan() {
+        //line := file.Text()
 
-        s1, err := NewS1Zip(line, cache)
+        //s1, err := NewS1Zip(line, cache)
 
-        if err != nil {
-            return Handle(err, "failed to parse Sentinel-1 '%s'", s1.Path)
-        }
+        //if err != nil {
+            //return Handle(err, "failed to parse Sentinel-1 '%s'", s1.Path)
+        //}
 
-        image, err := s1.Quicklook(info)
+        //image, err := s1.Quicklook(info)
 
-        if err != nil {
-            return Handle(err, "failed to retreive quicklook file '%s'",
-                s1.Path)
-        }
+        //if err != nil {
+            //return Handle(err, "failed to retreive quicklook file '%s'",
+                //s1.Path)
+        //}
 
-        fmt.Println(image)
-    }
+        //fmt.Println(image)
+    //}
 
-    return nil
-}
+    //return nil
+//}
 
-func (b Batcher) MLI() (err error) {
-    path := b.infile
+//func (b Batcher) MLI() (err error) {
+    //path := b.InFile
     
-    var file FileReader
-    if file, err = NewReader(path); err != nil {
-        return
-    }
+    //var file FileReader
+    //if file, err = NewReader(path); err != nil {
+        //return
+    //}
 
-    defer file.Close()
+    //defer file.Close()
     
-    opt := &MLIOpt {
-        Looks: b.General.Looks,
-    }
+    //opt := &MLIOpt {
+        //Looks: b.General.Looks,
+    //}
     
-    mliDir := b.OutDir
+    //mliDir := b.OutDir
     
-    if err = os.MkdirAll(mliDir, os.ModePerm); err != nil {
-        return Handle(err, "failed to create directory '%s'", mliDir)
-    }
+    //if err = os.MkdirAll(mliDir, os.ModePerm); err != nil {
+        //return Handle(err, "failed to create directory '%s'", mliDir)
+    //}
     
-    for file.Scan() {
-        line := file.Text()
+    //for file.Scan() {
+        //line := file.Text()
         
         
-        var s1 S1SLC
-        if s1, err = FromTabfile(line); err != nil {
-            err = Handle(err, "failed to parse S1SLC tabfile '%s'", line)
-            return
-        }
+        //var s1 S1SLC
+        //if s1, err = FromTabfile(line); err != nil {
+            //err = Handle(err, "failed to parse S1SLC tabfile '%s'", line)
+            //return
+        //}
         
-        var name string
-        if name, err = filepath.Abs(filepath.Join(mliDir, s1.Format(DateShort))); err != nil {
-            return
-        }
+        //var name string
+        //if name, err = filepath.Abs(filepath.Join(mliDir, s1.Format(DateShort))); err != nil {
+            //return
+        //}
         
-        var mli MLI
-        if mli, err = NewMLI(name + ".mli", ""); err != nil {
-            err = Handle(err, "could not create MLI struct")
-            return
-        }
+        //var mli MLI
+        //if mli, err = NewMLI(name + ".mli", ""); err != nil {
+            //err = Handle(err, "could not create MLI struct")
+            //return
+        //}
         
-        var exist bool
-        if exist, err = mli.Exist(); err != nil {
-            return
-        }
+        //var exist bool
+        //if exist, err = mli.Exist(); err != nil {
+            //return
+        //}
         
-        json := name + ".json"
+        //json := name + ".json"
         
-        if exist {
-            if err = Save(json, &mli); err != nil {
-                return
-            }
-            continue
-        }
+        //if exist {
+            //if err = Save(json, &mli); err != nil {
+                //return
+            //}
+            //continue
+        //}
         
-        if err = s1.MLI(&mli, opt); err != nil {
-            return Handle(err, "failed to retreive MLI file for '%s'",
-                line)
-        }
+        //if err = s1.MLI(&mli, opt); err != nil {
+            //return Handle(err, "failed to retreive MLI file for '%s'",
+                //line)
+        //}
         
-        if err = Save(json, &mli); err != nil {
-            return
-        }
-        fmt.Println(json) 
-    }
+        //if err = Save(json, &mli); err != nil {
+            //return
+        //}
+        //fmt.Println(json) 
+    //}
 
-    return nil
-}
+    //return nil
+//}
 
-func (b Batcher) Raster() (err error) {
-    path := b.Infile
-    opt := b.RasArgs
+//func (b Batcher) Raster() (err error) {
+    //path := b.Infile
+    //opt := b.RasArgs
     
-    var file FileReader
-    if file, err = NewReader(path); err != nil {
-        return err
-    }
-    defer file.Close()
+    //var file FileReader
+    //if file, err = NewReader(path); err != nil {
+        //return err
+    //}
+    //defer file.Close()
     
-    for file.Scan() {
-        line := file.Text()
+    //for file.Scan() {
+        //line := file.Text()
         
-        if len(line) == 0 {
-            continue
-        }
+        //if len(line) == 0 {
+            //continue
+        //}
         
-        var data DatFile
-        if err = Load(line, &data); err != nil {
-            err = Handle(err, "failed to load datafile from '%s'", line)
-            return
-        }
+        //var data DatFile
+        //if err = Load(line, &data); err != nil {
+            //err = Handle(err, "failed to load datafile from '%s'", line)
+            //return
+        //}
         
-        if err = data.Raster(opt); err != nil {
-            err = Handle(err, "failed to create raster file for '%s'",
-                line)
-            return
-        }
-    }
+        //if err = data.Raster(opt); err != nil {
+            //err = Handle(err, "failed to create raster file for '%s'",
+                //line)
+            //return
+        //}
+    //}
     
-    return nil
-}
+    //return nil
+//}
 
-type Like struct {
-    In    string `name:"in"`
-    Out   string `name:"out"`
-    Dtype string `name:"dtype"`
-    Ext   string `name:"ext" default:"dat"`
-}
+//type Like struct {
+    //In    string `name:"in"`
+    //Out   string `name:"out"`
+    //Dtype string `name:"dtype"`
+    //Ext   string `name:"ext" default:"dat"`
+//}
 
-func like(args Args) (err error) {
-    l := Like{}
+//func like(args Args) (err error) {
+    //l := Like{}
     
-    if err = args.ParseStruct(&l); err != nil {
-        err = ParseErr.Wrap(err)
-        return
-    }
+    //if err = args.ParseStruct(&l); err != nil {
+        //err = ParseErr.Wrap(err)
+        //return
+    //}
     
-    in, out := l.In, l.Out
+    //in, out := l.In, l.Out
     
-    if len(in) == 0 && len(out) == 0 {
-        err = fmt.Errorf("expected parameter 'in' and 'out' to be set")
-        return
-    }
+    //if len(in) == 0 && len(out) == 0 {
+        //err = fmt.Errorf("expected parameter 'in' and 'out' to be set")
+        //return
+    //}
     
-    dt, dtype := l.Dtype, Unknown
+    //dt, dtype := l.Dtype, Unknown
     
-    if len(dt) > 0 {
-        dtype = str2dtype(dt)
-    }
+    //if len(dt) > 0 {
+        //dtype = str2dtype(dt)
+    //}
     
-    var indat DatFile
-    if err = Load(in, &indat); err != nil {
-        return
-    }
+    //var indat DatFile
+    //if err = Load(in, &indat); err != nil {
+        //return
+    //}
     
-    if dtype == Unknown {
-        dtype = indat.Dtype()
-    }
+    //if dtype == Unknown {
+        //dtype = indat.Dtype()
+    //}
     
-    if out, err = filepath.Abs(out); err != nil {
-        return
-    }
+    //if out, err = filepath.Abs(out); err != nil {
+        //return
+    //}
     
-    outdat := DatFile{
-        Dat: fmt.Sprintf("%s.%s", out, l.Ext),
-        URngAzi: indat.URngAzi,
-        DType: dtype,
-    }
+    //outdat := DatFile{
+        //Dat: fmt.Sprintf("%s.%s", out, l.Ext),
+        //URngAzi: indat.URngAzi,
+        //DType: dtype,
+    //}
     
-    return Save(out + ".json", &outdat)
-}
+    //return Save(out + ".json", &outdat)
+//}
 
 
-type(
-    Mover struct {
-        OutDir   string `cli:"out" usage:"Output directory" dft:"."`
-        MetaFile
-    }
-)
+//type(
+    //Mover struct {
+        //OutDir   string `cli:"out" usage:"Output directory" dft:"."`
+        //MetaFile
+    //}
+//)
 
-func move(args Args) (err error) {
-    m := Mover{}
+//func move(args Args) (err error) {
+    //m := Mover{}
     
-    if err = args.ParseStruct(&m); err != nil {
-        err = ParseErr.Wrap(err)
-        return
-    }
+    //if err = args.ParseStruct(&m); err != nil {
+        //err = ParseErr.Wrap(err)
+        //return
+    //}
     
-    path := m.Meta
+    //path := m.Meta
     
-    var dat DatParFile
-    if err = Load(path, &dat); err != nil {
-        err = Handle(err, "failed to parse json metadatafile '%s'", path)
-        return
-    }
+    //var dat DatParFile
+    //if err = Load(path, &dat); err != nil {
+        //err = Handle(err, "failed to parse json metadatafile '%s'", path)
+        //return
+    //}
     
-    out := m.OutDir
+    //out := m.OutDir
     
-    if dat, err = dat.Move(out); err != nil {
-        return err
-    }
+    //if dat, err = dat.Move(out); err != nil {
+        //return err
+    //}
     
-    if path, err = Move(path, out); err != nil {
-        return err
-    }
+    //if path, err = Move(path, out); err != nil {
+        //return err
+    //}
     
-    if err = SaveJson(path, dat); err != nil {
-        err = Handle(err, "failed to refresh json metafile")
-        return err
-    }
+    //if err = SaveJson(path, dat); err != nil {
+        //err = Handle(err, "failed to refresh json metafile")
+        //return err
+    //}
     
-    return nil
-}
+    //return nil
+//}
 
 //type (
     //Coregister struct {

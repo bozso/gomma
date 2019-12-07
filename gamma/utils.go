@@ -90,6 +90,20 @@ func StringToVal(v reflect.Value, kind reflect.Kind, in string) error {
     return nil
 }
 
+type emptyStringError struct {
+    err error
+}
+
+func (e emptyStringError) Error() string {
+    return fmt.Sprintf("expected non empty string")
+}
+
+func (e emptyStringError) Unwrap() error {
+    return e.err
+}
+
+var EmptyStringError emptyStringError
+
 const (
     ParseFieldErr Werror = "parsing of struct field '%s' failed"
     SetFieldErr Werror = "failed to set struct field '%s'"
@@ -388,6 +402,41 @@ func (self Params) Float(name string, idx int) (f float64, err error) {
     return
 }
 
+type SplitParser struct {
+    s string
+    split []string
+    err error
+}
+
+func NewSplitParser(s, sep string) (sp SplitParser) {
+    sp.s, sp.err = s, nil
+    sp.split = strings.Split(s, sep)
+    
+    if len(sp.split) == 0 {
+        sp.err = fmt.Errorf("string '%s' could no be split into " +
+            "multiple parts with separator '%s'", s, sep)
+    }
+    return
+}
+
+func (sp *SplitParser) Int(idx int) (i int) {
+    if sp.err != nil {
+        return
+    }
+    
+    i, sp.err = strconv.Atoi(sp.split[idx])
+    return
+}
+
+func (sp *SplitParser) Float(idx, prec int) (f float64) {
+    if sp.err != nil {
+        return
+    }
+    
+    f, sp.err = strconv.ParseFloat(sp.split[idx], prec)
+    return
+}
+
 func TmpFile(ext string) (ret string, err error) {
     var file *os.File
     if len(ext) > 0 {
@@ -454,6 +503,10 @@ func (w *Writer) WriteString(s string) (n int) {
     
     n, w.err = w.File.WriteString(s)
     return
+}
+
+func (w *Writer) WriteFmt(tpl string, args ...interface{}) int {
+    return w.WriteString(fmt.Sprintf(tpl, args...))
 }
 
 func (w *Writer) Wrap() error {

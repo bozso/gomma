@@ -10,17 +10,45 @@ import (
     "regexp"
 )
 
-type (
-    ExtractOpt struct {
-        pol, root string
+type Extractor struct {
+    pol, dst string
+    templates templates
+    *zip.ReadCloser
+}
+
+func (s1 *S1Zip) newExtractor(dst string) (ex Extractor, err error) {
+    path := s1.Path
+    
+    ex.templates       = s1.Templates
+    ex.pol             = s1.pol
+    ex.dst             = dst
+    
+    if ex.ReadCloser, err = zip.OpenReader(path); err != nil {
+        err = Handle(err, "failed to open zipfile '%s'", path)
+        return
     }
     
-    S1Extractor struct {
-        ExtractOpt
-        templates templates
-        zip       *zip.ReadCloser
+    return ex, nil
+}
+
+//func (ex Extractor) Wrap() error {
+    //return fmt.Errorf("failure during extraction: %w", ex.err)
+//}
+
+func (ex *Extractor) extract(mode tplType, iw int) (s string, err error) {
+    var tpl string
+    
+    if fmtNeeded[mode] {
+        tpl = fmt.Sprintf(ex.templates[mode], iw, ex.pol)
+    } else {
+        tpl = ex.templates[mode]
     }
-)
+    
+    s, err = extract(ex.ReadCloser, tpl, ex.dst)
+    
+    return
+}
+
 
 func extractFile(src *zip.File, dst string) error {
     srcName := src.Name
@@ -32,21 +60,19 @@ func extractFile(src *zip.File, dst string) error {
     defer in.Close()
     
     dir := filepath.Dir(dst)
-    err = os.MkdirAll(dir, os.ModePerm)
-    
-    if err != nil {
-        return Handle(err, "failed to create directory '%s'", dir)
+    if err = os.MkdirAll(dir, os.ModePerm); err != nil {
+        return DirCreateErr.Wrap(err, dir)
     }
     
-    out, err := os.Create(dst)
-    if err != nil {
-        return Handle(err, "failed to create file '%s'", dst)
+    var out *os.File
+    if out, err = os.Create(dst); err != nil {
+        return FileCreateErr.Wrap(err, dst)
     }
     defer out.Close()
     
     log.Printf("Extracting '%s' into '%s'", srcName, dst)
-    _, err = io.Copy(out, in)
-    if err != nil {
+    
+    if _, err = io.Copy(out, in); err != nil {
         return Handle(err, "failed to copy contents of '%s' into '%s'",
             srcName, dst)
     }
@@ -54,98 +80,58 @@ func extractFile(src *zip.File, dst string) error {
     return nil
 }
 
-func matches(candidate string, template string) (bool, error) {
-    matched, err := regexp.MatchString(template, candidate)
-    
-    if err != nil {
-        return false, Handle(err, "MatchString failed")
-    }
-
-    return matched, nil
-}
-
-func extract(file *zip.ReadCloser, template, root string) (ret string, err error) {
+func extract(file *zip.ReadCloser, template, dst string) (s string, err error) {
     //log.Fatalf("%s %s", root, template)
     
     var matched, exist bool
+    
     // go through files in the zipfile
     for _, zipfile := range file.File {
         name := zipfile.Name
         
-        matched, err = matches(name, template)
-        
-        if err != nil {
+        if matched, err = regexp.MatchString(name, template); err != nil {
             err = Handle(err,
                 "failed to check whether zipped file '%s' matches templates",
                 name)
             return
         }
         
-        ret = filepath.Join(root, name)
-        
         if !matched {
             continue
         }
+        
+        s = filepath.Join(dst, name)
         
         //fmt.Printf("Matched: %s\n", dst)
         //fmt.Printf("\n\nCurrent: %s\nTemplate: %s\nMatched: %v\n",
         //    name, template, matched)
         
-        exist, err = Exist(ret)
-        
-        if err != nil {
+        if exist, err = Exist(s); err != nil {
             err = Handle(err, "stat failed on file '%s'", name)
             return
         }
         
         if !exist {
-            err = extractFile(zipfile, ret)
-
-            if err != nil {
+            if err = extractFile(zipfile, s); err != nil {
                 err = Handle(err, "failed to extract file '%s'", name)
                 return
             }
         }
-        return ret, nil
+        return s, nil
     }
-    return "", nil
+    return s, nil
 }
 
-func (self *S1Zip) newExtractor(ext *ExtractOpt) (ret S1Extractor, err error) {
-    path := self.Path
-    
-    ret.templates = self.Templates
-    ret.pol       = ext.pol
-    ret.root      = ext.root
-    ret.zip, err  = zip.OpenReader(path)
-
-    if err != nil {
-        err = Handle(err, "failed to open zipfile '%s'", path)
-        return
-    }
-    
-    return ret, nil
+type ExtractError struct {
+    file, path string
+    err error
 }
 
-func (self *S1Extractor) extract(mode tplType, iw int) (string, error) {
-    var tpl string
-    
-    if fmtNeeded[mode] {
-        tpl = fmt.Sprintf(self.templates[mode], iw, self.pol)
-    } else {
-        tpl = self.templates[mode]
-    }
-    
-    
-    ret, err := extract(self.zip, tpl, self.root)
-    
-    if err != nil {
-        return "", Handle(err, "error occurred while extracting!")
-    }
-    
-    return ret, nil
+func (e ExtractError) Error() string {
+    return fmt.Sprintf("failed to extract %s file from '%s'",
+        e.file, e.path)
 }
 
-func (self *S1Extractor) Close() {
-    self.zip.Close()
+func (e ExtractError) Unwrap() error {
+    return e.err
 }

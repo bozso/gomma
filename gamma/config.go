@@ -5,9 +5,9 @@ import (
     "fmt"
     "os"
     "log"
+    "strings"
     //ref "reflect"
     //conv "strconv"
-    "strings"
 )
 
 type (
@@ -26,14 +26,6 @@ type (
         Lon float64 `name:"lot" default:"1.0"`
     }
     
-    GeneralOpt struct {
-        DataPath, OutputDir, Pol string
-        MasterDate               string
-        CachePath                string `json:"CACHE_PATH"`
-        Looks                    RngAzi
-        IWs                      [3]IMinmax
-    }
-
     PreSelectOpt struct {
         DateStart, DateStop   string
         LowerLeft, UpperRight LatLon
@@ -73,7 +65,7 @@ type (
     }
 
     Config struct {
-        infile        string
+        InFile        string
         General       GeneralOpt
         PreSelect     PreSelectOpt
         Geocoding     GeocodeOpt
@@ -90,14 +82,7 @@ const (
 )
 
 var (
-    steps = map[string]stepFun{
-        "select": stepSelect,
-        "import": stepImport,
-        "geo": stepGeocode,
-        //"coreg":  stepCoreg,
-    }
-
-    stepList = MapKeys(steps)
+    //stepList = MapKeys(steps)
 
     defaultConfig = Config{
         General: GeneralOpt{

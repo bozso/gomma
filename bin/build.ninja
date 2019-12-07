@@ -1,5 +1,5 @@
 rule go
-  command = go build ${in}
+  command = go build -ldflags="-s -w" ${in}
   description = Build executable
 
 build gamma: go gamma.go | ../gamma/gamma_test.go ../gamma/utils.go $

@@ -75,28 +75,28 @@ var (
     S1SLCType = "S1SLC"
 )
 
-func NewS1Zip(zipPath, root string) (ret *S1Zip, err error) {
+func NewS1Zip(zipPath, pol string) (s1 *S1Zip, err error) {
     const rexTemplate = "%s-iw%%d-slc-%%s-.*"
 
     zipBase := filepath.Base(zipPath)
-    ret = &S1Zip{Path: zipPath, zipBase: zipBase}
+    s1 = &S1Zip{Path: zipPath, zipBase: zipBase, pol: pol}
 
-    ret.mission = strings.ToLower(zipBase[:3])
-    ret.dateStr = zipBase[17:48]
+    s1.mission = strings.ToLower(zipBase[:3])
+    s1.dateStr = zipBase[17:48]
 
     start, stop := zipBase[17:32], zipBase[33:48]
 
-    if ret.date, err = NewDate(DLong, start, stop); err != nil {
+    if s1.date, err = NewDate(DLong, start, stop); err != nil {
         err = Handle(err, "Could not create new date from strings: '%s' '%s'",
             start, stop)
         return
     }
 
-    ret.mode = zipBase[4:6]
+    s1.mode = zipBase[4:6]
     safe := strings.ReplaceAll(zipBase, ".zip", ".SAFE")
-    tpl := fmt.Sprintf(rexTemplate, ret.mission)
+    tpl := fmt.Sprintf(rexTemplate, s1.mission)
 
-    ret.Templates = [6]string{
+    s1.Templates = [6]string{
         tiff:      filepath.Join(safe, "measurement", tpl+".tiff"),
         annot:     filepath.Join(safe, "annotation", tpl+".xml"),
         calib:     filepath.Join(safe, calibPath, fmt.Sprintf("calibration-%s.xml", tpl)),
@@ -105,53 +105,48 @@ func NewS1Zip(zipPath, root string) (ret *S1Zip, err error) {
         quicklook: filepath.Join(safe, "preview", "quick-look.png"),
     }
 
-    ret.Safe = safe
-    ret.Root = filepath.Join(root, ret.Safe)
+    s1.Safe = safe
+    //s1.Root = filepath.Join(dst, s1.Safe)
     
     for _, s1path := range S1DirPaths {
-        path := filepath.Join(ret.Root, s1path)
-        err = os.MkdirAll(path, os.ModePerm)
+        path := filepath.Join(s1.Root, s1path)
         
-        if err != nil {
+        if err = os.MkdirAll(path, os.ModePerm); err != nil {
             err = DirCreateErr.Wrap(err, path)
             return
         }
     }
     
     
-    ret.productType = zipBase[7:10]
-    ret.resolution = string(zipBase[10])
-    ret.level = string(zipBase[12])
-    ret.productClass = string(zipBase[13])
-    ret.pol = zipBase[14:16]
-    ret.absoluteOrbit = zipBase[49:55]
-    ret.DTID = strings.ToLower(zipBase[56:62])
-    ret.UID = zipBase[63:67]
+    s1.productType = zipBase[7:10]
+    s1.resolution = string(zipBase[10])
+    s1.level = string(zipBase[12])
+    s1.productClass = string(zipBase[13])
+    s1.pol = zipBase[14:16]
+    s1.absoluteOrbit = zipBase[49:55]
+    s1.DTID = strings.ToLower(zipBase[56:62])
+    s1.UID = zipBase[63:67]
 
-    return ret, nil
+    return s1, nil
 }
 
-func (s1 *S1Zip) Info(exto *ExtractOpt) (ret IWInfos, err error) {
-    ext, err := s1.newExtractor(exto)
-    var _annot string
-
-    if err != nil {
-        err = Handle(err, "Failed to create new S1Extractor!")
+func (s1 *S1Zip) Info(dst string) (iws IWInfos, err error) {
+    
+    var ext Extractor
+    if ext, err = s1.newExtractor(dst); err != nil {
+        err = StructCreateError.Wrap(err, "Extractor")
         return
     }
-
     defer ext.Close()
 
+    var _annot string
     for ii := 1; ii < 4; ii++ {
-        _annot, err = ext.extract(annot, ii)
-
-        if err != nil {
-            err = Handle(err, "Failed to extract annotation file from '%s'!",
-                s1.Path)
+        if _annot, err = ext.extract(annot, ii); err != nil {
+            err = ExtractError{file: "annotation", path: s1.Path}
             return
         }
 
-        if ret[ii-1], err = iwInfo(_annot); err != nil {
+        if iws[ii-1], err = iwInfo(_annot); err != nil {
             err = Handle(err,
                 "Parsing of IW information of annotation file '%s' failed!",
                 _annot)
@@ -159,7 +154,7 @@ func (s1 *S1Zip) Info(exto *ExtractOpt) (ret IWInfos, err error) {
         }
 
     }
-    return ret, nil
+    return iws, nil
 }
 
 const maxIW = 3
@@ -719,18 +714,18 @@ const (
     ExtractErr Werror = "failed to extract %s file from '%s'"
 )
 
-func (s1 *S1Zip) ImportSLC(exto *ExtractOpt) (err error) {
+func (s1 *S1Zip) ImportSLC(dst string) (err error) {
     var _annot, _calib, _tiff, _noise string
-    ext, err := s1.newExtractor(exto)
-
-    if err != nil {
-        err = Handle(err, "failed to create S1Extractor")
+    
+    var ext Extractor
+    if ext, err = s1.newExtractor(dst); err != nil {
+        err = StructCreateErr.Wrap(err, "Extractor")
         return
     }
 
     defer ext.Close()
 
-    path, pol := s1.Path, exto.pol
+    path, pol := s1.Path, s1.pol
     tab := s1.tabName("slc", pol)
 
     file, err := os.Create(tab)
@@ -785,26 +780,21 @@ func (s1 *S1Zip) ImportSLC(exto *ExtractOpt) (err error) {
     return nil
 }
 
-func (s1 *S1Zip) Quicklook(exto *ExtractOpt) (ret string, err error) {
-    ext, err := s1.newExtractor(exto)
-
-    if err != nil {
-        err = Handle(err, "failed to create new S1Extractor")
+func (s1 *S1Zip) Quicklook(dst string) (ret string, err error) {
+    var ext Extractor
+    if ext, err = s1.newExtractor(dst); err != nil {
+        err = StructCreateErr.Wrap(err, "Extractor")
         return
     }
-
     defer ext.Close()
 
     path := s1.Path
 
-    ret, err = ext.extract(quicklook, 0)
-
-    if err != nil {
+    if s, err = ext.extract(quicklook, 0); err != nil {
         err = ExtractErr.Wrap(err, "annotation", path)
-        return
     }
 
-    return ret, nil
+    return
 }
 
 func (d ByDate) Len() int      { return len(d) }

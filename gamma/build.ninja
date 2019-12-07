@@ -1,5 +1,5 @@
 rule go
-  command = go build -o ${out} ${in}
+  command = go build -ldflags="-s -w" -o ${out} ${in}
   description = Build executable
 
 build ../bin/gamma: go ../bin/gamma.go | utils.go common.go date.go $

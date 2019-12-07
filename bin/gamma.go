@@ -16,10 +16,10 @@ func main() {
     
     if err := cli.Root(gamma.Root,
         cli.Tree(help),
-        cli.Tree(gamma.Process),
         cli.Tree(gamma.Init),
+        cli.Tree(gamma.DataSelect),
     ).Run(os.Args[1:]); err != nil {
-        fmt.Fprintf(os.Stderr, "Error occurred: %v\n", err)
+        fmt.Fprintln(os.Stderr, err)
         os.Exit(1)
     }
 }

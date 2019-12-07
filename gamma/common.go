@@ -3,11 +3,11 @@ package gamma
 import (
     "log"
     "math"
-    //"fmt"
-    //"os"
-    "path/filepath"
     "path"
     "strings"
+    "path/filepath"
+    //"fmt"
+    //"os"
 )
 
 type (

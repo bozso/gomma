@@ -4,38 +4,27 @@ package gamma
 import (
     "fmt"
     "log"
-    "sort"
-    "os"
     "path/filepath"
+    "os"
+    
+    "github.com/mkideal/cli"
+    //"sort"
+    //"strings"
     // "math"
     // "time"
     // "strconv"
-    "strings"
 )
 
-type(
-    SARInfo interface {
-        contains(*AOI) bool
-    }
-    
-    
-    SARImage interface {
-        Info(*ExtractOpt) (SARInfo, error)
-        SLC(*ExtractOpt) (SLC, error)
-    }
-    
-    checkerFun func(*S1Zip) bool
-)
+type checkerFun func(*S1Zip) bool
 
-
-func parseS1(zip, root string, ext *ExtractOpt) (s1 *S1Zip, IWs IWInfos, err error) {
-    if s1, err = NewS1Zip(zip, root); err != nil {
+func parseS1(zip, pol, dst string) (s1 *S1Zip, IWs IWInfos, err error) {
+    if s1, err = NewS1Zip(zip, pol); err != nil {
         err = Handle(err, "failed to parse S1Zip data from '%s'", zip)
         return
     }
     log.Printf("Parsing IW Information for S1 zipfile '%s'", s1.Path)
     
-    if IWs, err = s1.Info(ext); err != nil {
+    if IWs, err = s1.Info(dst); err != nil {
         err = Handle(err, "failed to parse IW information for zip '%s'",
             s1.Path)
         return
@@ -70,36 +59,57 @@ func loadS1(path, root string) (ret S1Zips, err error) {
 }
 
 
-func (self *Config) extOpt(satellite string) *ExtractOpt {
-    return &ExtractOpt{pol: self.General.Pol, 
-        root: filepath.Join(self.General.CachePath, satellite)}
+//func (s *selector) extOpt(satellite string) *ExtractOpt {
+    //return &ExtractOpt{pol: s.Pol, 
+        //root: filepath.Join(s.CachePath, satellite)}
+//}
+
+type GeneralOpt struct {
+    //DataPath   string     `cli:"" usage:""`
+    OutputDir  string `cli:"o,out" usage:"Output directory"`
+    Pol        string `cli:"p,pol" usage:"Polarisation used" dft:"vv"`
+    MasterDate string `cli:"m,master" usage:"Master date"`
+    CachePath  string `cli:"cache" usage:"Cache path" json:"CACHE_PATH"`
+    Looks      RngAzi `cli:"l,looks" usage:""`
+    InFile     string `cli:"i,infile" usage:"Input file"`   
 }
 
-func stepSelect(self *Config) error {
-    dataPath := self.General.DataPath
-    Select := self.PreSelect
-    
-    if len(dataPath) == 0 {
-        return fmt.Errorf("DataPath needs to be specified")
-    }
+type dataSelector struct {
+    GeneralOpt
+    DataFiles  []string `cli:"d,data" usage:"List of datafiles to process"`
+    DateStart  string   `cli:"b,start" usage:"Start of date range"`
+    DateStop   string   `cli:"e,stop" usage:"End of date range"`
+    LowerLeft  LatLon   `cli:"ll,lowerLeft" usage:"Rectangle coordinates"`
+    UpperRight LatLon   `cli:"ur,upperRight" usage:"Rectangle coordinates"`
+    CheckZips  bool     `cli:"c,checkZips" usage:"Check zipfile integrity"`  
+}
 
-    ll, ur := Select.LowerLeft, Select.UpperRight
+var DataSelect = &cli.Command{
+    Name: "select",
+    Desc: "Select SAR images for processing",
+    Argv: func() interface{} { return &dataSelector{} },
+    Fn: dataSelect,
+}
+
+func dataSelect(ctx *cli.Context) (err error) {
+    sel := ctx.Argv().(*dataSelector)
+    
+    ll, ur := sel.LowerLeft, sel.UpperRight
 
     aoi := AOI{
         Point{X: ll.Lon, Y: ll.Lat}, Point{X: ll.Lon, Y: ur.Lat},
         Point{X: ur.Lon, Y: ur.Lat}, Point{X: ur.Lon, Y: ll.Lat},
     }
     
-    extInfo := self.extOpt("sentinel1")
+    extInfo := sel.extOpt("sentinel1")
     root := extInfo.root
     
-    dateStart, dateStop := Select.DateStart, Select.DateStop
+    dateStart, dateStop := sel.DateStart, sel.DateStop
 
-    zipfiles, err := filepath.Glob(filepath.Join(dataPath,
-        "S1*_IW_SLC*.zip"))
+    dataFiles := sel.DataFiles
     
-    if err != nil {
-        return Handle(err, "failed to Glob zipfiles")
+    if len(dataFiles) == 0 {
+        return fmt.Errorf("At least one datafile must be specified!")
     }
     
     var startCheck, stopCheck checkerFun
@@ -162,7 +172,7 @@ func stepSelect(self *Config) error {
         IWs IWInfos
     )
     
-    for _, zip := range zipfiles {
+    for _, zip := range dataFiles {
         if s1zip, IWs, err = parseS1(zip, root, extInfo); err != nil {
             return Handle(err,
                 "failed to import S1Zip data from '%s'", zip)
@@ -176,25 +186,39 @@ func stepSelect(self *Config) error {
     return nil
 }
 
+
+type dataImporter struct {
+    GeneralOpt
+    IWs        [3]IMinmax `cli:"iws" usage:""`
+    
+}
+
+var DataImport = &cli.Command{
+    Name: "import",
+    Desc: "Import SAR datafiles",
+    Argv: func() interface{} { return &dataImporter{} },
+    Fn: dataImport,
+}
+
 var s1Import = Gamma.Must("S1_import_SLC_from_zipfiles")
 
-func stepImport(self *Config) (err error) {
+func dataImport(ctx *cli.Context) (err error) {
     const (
         tpl = "iw%d_number_of_bursts: %d\niw%d_first_burst: %f\niw%d_last_burst: %f\n"
         burst_table = "burst_number_table"
         ziplist = "ziplist"
     )
     
-    pol := self.General.Pol
+    imp := ctx.Argv().(*dataImporter)
     
-    if len(self.infile) == 0 {
-        return Handle(nil, "inputfile must by specified")
+    pol, path := imp.Pol, imp.InFile
+    
+    if len(path) == 0 {
+        return fmt.Errorf("inputfile must by specified")
     }
     
-    extInfo := self.extOpt("sentinel1")
-    
-    root, path := extInfo.root, self.infile
-    
+    extInfo := sel.extOpt("sentinel1")
+    root := extInfo.root
     
     var zips S1Zips
     if zips, err = loadS1(path, root); err != nil {
@@ -203,9 +227,9 @@ func stepImport(self *Config) (err error) {
     
     var master *S1Zip = nil
     
-    sort.Sort(ByDate(zips))
+    //sort.Sort(ByDate(zips))
     
-    masterDate := self.General.MasterDate
+    masterDate := imp.MasterDate
     
     for _, s1zip := range zips {
         if date2str(s1zip, DShort) == masterDate {
@@ -213,8 +237,9 @@ func stepImport(self *Config) (err error) {
         }
     }
     
-    masterIW, err := master.Info(extInfo)
-    if err != nil {
+    
+    var masterIW IWInfos
+    if masterIW, err = master.Info(extInfo); err != nil {
         return Handle(err, "failed to parse S1Zip data from master '%s'",
             master.Path)
     }
@@ -224,6 +249,7 @@ func stepImport(self *Config) (err error) {
         return FileOpenErr.Wrap(err, burst_table)
     }
     defer fburst.Close()
+    
     
     _, err = fburst.WriteString(fmt.Sprintf("zipfile: %s\n", master.Path))
     if err != nil {
@@ -322,6 +348,8 @@ func stepImport(self *Config) (err error) {
     return nil
 }
 
+/*
+
 func stepGeocode (c *Config) error {
     outDir := c.General.OutputDir
     
@@ -336,7 +364,7 @@ func stepCoreg(self *Config) (err error) {
     outDir := self.General.OutputDir
     coreg := self.Coreg
     
-    path := self.infile
+    path := self.InFile
     
     var file FileReader
     if file, err = NewReader(path); err != nil {
@@ -464,20 +492,7 @@ func stepCoreg(self *Config) (err error) {
     
     return nil
 }
-
-
-func Search(s1 *S1Zip, zips []*S1Zip) *S1Zip {
-    
-    date1 := date2str(s1, DShort)
-    
-    for _, zip := range zips {
-        if date1 == date2str(zip, DShort)  && s1.Path != zip.Path {
-            return zip
-        }
-    }
-    
-    return nil
-}
+*/
 
 func toZiplist(name string, one, two *S1Zip) error {
     var file Writer
@@ -505,6 +520,20 @@ func toZiplist(name string, one, two *S1Zip) error {
     }
     return nil
 }
+
+func Search(s1 *S1Zip, zips []*S1Zip) *S1Zip {
+    
+    date1 := date2str(s1, DShort)
+    
+    for _, zip := range zips {
+        if date1 == date2str(zip, DShort)  && s1.Path != zip.Path {
+            return zip
+        }
+    }
+    
+    return nil
+}
+
 
 /*
 [check_ionosphere]
