@@ -168,6 +168,19 @@ func (mm *IMinmax) Decode(s string) (err error) {
     return split.Wrap()
 }
 
+func (ll *LatLon) Decode(s string) (err error) {
+    if len(s) == 0 {
+        return EmptyStringError
+    }
+    
+    split := NewSplitParser(s, ",")
+    
+    ll.Lat = split.Float(0, 64)
+    ll.Lon = split.Float(1, 64)
+    
+    return split.Wrap()
+}
+
 func delim(msg, sym string) {
     msg = fmt.Sprintf("%s %s %s", sym, msg, sym)
     syms := strings.Repeat(sym, len(msg))

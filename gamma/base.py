@@ -21,7 +21,6 @@ class Project(object):
     
     def select(self, path, *args, **kwargs):
         datas = ["-d" + path for path in iglob(pjoin(path, "*.zip"))]
-    
         gamma.select(" ".join(datas), *args, **self.general, **kwargs)
     
     def data_import(self, *args, **kwargs):

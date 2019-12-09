@@ -4,7 +4,7 @@ import (
     "fmt"
     "os"
 
-    "../gamma"
+    gamma "../src"
     "github.com/mkideal/cli"
 )
 

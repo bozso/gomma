@@ -1,7 +1,11 @@
+from sys import path
+
+path.append("/home/istvan/progs/utils")
+
 from utils import Ninja
 from glob import glob
 
-sources = glob("../gamma/*.go")
+sources = glob("../src/*.go")
 
 n = Ninja(open("build.ninja", "w"))
 
