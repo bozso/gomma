@@ -3,20 +3,18 @@ from os.path import join
 from glob import iglob
 
 data = join("/mnt", "Dszekcso", "ASC")
+out = join("/mnt", "bozso_i", "dszekcso", "asc")
 
 proj = Project(
     looks="1,1",
-    out="",
+    out=out,
     pol="vv",
     master="20161205",
 )
 
 def preproc():
-    datas = ["-d" + path for path in iglob(join(data, "*.zip"))]
-    
-    print(datas)
-    
-    proj.select(datas, start="", stop="", lowerLeft="", upperRight="",
+    proj.select(data, start="20161201", stop="20170131",
+        lowerLeft="46.050571,18.649662", upperRight="46.139456,18.878696",
         outfile="preselect.list")
 
 def main():
