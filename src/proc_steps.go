@@ -234,11 +234,11 @@ func dataImport(ctx *cli.Context) (err error) {
             master.Path)
     }
     
-    fburst, file := NewWriterFile(burst_table);
-    if fburst.Wrap() != nil {
+    fburst := NewWriterFile(burst_table);
+    if err = fburst.Wrap(); err != nil {
         return
     }
-    defer file.Close()
+    defer fburst.Close()
     
     fburst.WriteFmt("zipfile: %s\n", master.Path)
     
@@ -322,7 +322,7 @@ func dataImport(ctx *cli.Context) (err error) {
         }
         
         if slc, err = slc.Move(slcDir); err != nil {
-            return err
+            return
         }
         
         if _, err = writer.WriteString(slc.Tab); err != nil {
@@ -487,11 +487,11 @@ func stepCoreg(self *Config) (err error) {
 */
 
 func toZiplist(name string, one, two *S1Zip) (err error) {
-    file, file_ := NewWriterFile(name)
+    file := NewWriterFile(name)
     if err = file.Wrap(); err != nil {
         return
     }
-    defer file_.Close()
+    defer file.Close()
     
     if two == nil {
         file.WriteString(one.Path)

@@ -488,10 +488,16 @@ func NewWriter(wr io.Writer) (w Writer) {
     return
 }
 
-func NewWriterFile(name string) (w Writer, file *os.File) {
-    file, w.err = os.Create(name)
-    w.Writer = bufio.NewWriter(file)
-    w.path = name
+func (w *Writer) Close() {
+    if w.File != nil {
+        w.File.Close()
+    }
+    w.Writer.Flush()
+}
+
+func NewWriterFile(name string) (w Writer) {
+    w.File, w.err = os.Create(name)
+    w.Writer = bufio.NewWriter(w.File)
     return
 }
 
@@ -518,15 +524,16 @@ func (w *Writer) WriteFmt(tpl string, args ...interface{}) int {
 }
 
 func (w *Writer) Wrap() error {
-    if w.err != nil {
-        if len(w.path) != 0 { 
-            return fmt.Errorf("error while writing to file '%s': %w",
-                w.path, w.err)
-        } else {
-            return fmt.Errorf("error while writing: %w", w.err)
-        }
+    if w.err == nil {
+        return nil
     }
-    return w.err
+
+    if name := w.File.Name(); w.File != nil { 
+        return fmt.Errorf("error while writing to file '%s': %w",
+            name, w.err)
+    } else {
+        return fmt.Errorf("error while writing: %w", w.err)
+    }
 }
 
 func Wrap(err1 error, err2 error) error {
