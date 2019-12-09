@@ -1,7 +1,8 @@
+from functools import partial
 from sys import path
 from os.path import join as pjoin
 
-__all__ = ("gamma", "progs")
+__all__ = ("gamma", "progs", "Project")
 
 progs = pjoin("/home", "istvan", "progs")
 
