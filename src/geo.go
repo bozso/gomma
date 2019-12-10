@@ -71,14 +71,14 @@ type (
     
     CodeOpt struct {
         RngAzi
-        Nlines int `name:"nlines" default:"0"`
-        Npoints int `name:"npoint" default:"4"`
-        Oversamp float64 `name:"oversamp" default:"2.0"`
-        MaxRad float64 `name:"maxRadious" default:"0.0"`
-        InterpolMode InterpolationMode
-        FlipInput bool `name:"flipIn"`
-        FlipOutput bool `name:"flipOut"`
-        Order int `name:"order" default:"5"`
+        Nlines       int               `cli:"nlines" dft:"0"`
+        Npoints      int               `cli:"n,npoint" dft:"4"`
+        Oversamp     float64           `cli:"o,oversamp" dft:"2.0"`
+        MaxRad       float64           `cli:"m,maxRadious" dft:"0.0"`
+        InterpolMode InterpolationMode `cli:"int,interpol dft:"NearestNeighbour"`
+        FlipInput    bool              `cli:"flipIn"`
+        FlipOutput   bool              `cli:"flipOut"`
+        Order        int               `cli:"r,order" dft:"5"`
     }
 )
 
@@ -96,6 +96,38 @@ const (
     Constant
     Gauss
 )
+
+func (i *InterpolationMode) Decode(s string) (err error) {
+    switch s {
+    case "NearestNeighbour":
+        *i = NearestNeighbour
+    case "BicubicSpline":
+        *i = BicubicSpline
+    case "BicubicSplineLog":
+        *i = BicubicSplineLog
+    case "BicubicSplineLogSqrt":
+        *i = BicubicSplineSqrt
+    case "BSpline":
+        *i = BSpline
+    case "BSplineSqrt":
+        *i = BSplineSqrt
+    case "Lanczos":
+        *i = Lanczos
+    case "LanczosSqrt":
+        *i = LanczosSqrt
+    case "InverseDistance":
+        *i = InvDist
+    case "InverseSquaredDistance":
+        *i = InvSquaredDist
+    case "Constant":
+        *i = Constant
+    case "Gauss":
+        *i = Gauss
+    default:
+        err = UnrecognizedMode{got: s, name:"Interpolation Mode"}
+    }
+    return
+}
 
 func (i InterpolationMode) String() string {
     switch i {

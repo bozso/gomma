@@ -1,12 +1,13 @@
 package gamma
 
 import (
+    "errors"
     //"log"
     //"reflect"
     "fmt"
     //"os"
     "strings"
-    //"path/filepath"
+    "path/filepath"
     "github.com/mkideal/cli"
 )
 
@@ -18,6 +19,8 @@ type (
         Meta string `cli:"*meta" usage:"Metadata json file"`
     }
 )
+
+var ParseError = errors.New("failed to parse command line arguments")
 
 const (
     ParseErr CWerror = "failed to parse command line arguments"
@@ -52,51 +55,15 @@ type process struct {
     InputFile   string `cli:"in" usage:"Input file list"`
 }
 
-//var Process = &cli.Command{
-    //Name: "proc",
-    //Desc: "Execute processing steps",
-    //Argv: func() interface{} { return &process{} },
-    //Fn: proc,
-//}
-
-//func proc(ctx *cli.Context) (err error) {
-    //proc := ctx.Argv().(*process) 
-    
-    //start, stop, err := proc.Parse()
-    //if err != nil {
-        //err = Handle(err, "failed to  parse processing steps")
-        //return
-    //}
-    
-    //if err = proc.RunSteps(start, stop); err != nil {
-        //err = Handle(err, "error occurred while running processing steps")
-        //return
-    //}
-    //return nil
-//}
-
-//func stepIndex(step string) int {
-    //for ii, _step := range stepList {
-        //if step == _step {
-            //return ii
-        //}
-    //}
-    //return -1
-//}
 
 //func listSteps() {
     //fmt.Println("Available processing steps: ", stepList)
 //}
 
 
-const (
-    StepErr Werror = "step '%s' not in list of available steps"
-)
-
-
 type UnrecognizedMode struct {
     name, got string
-    Err error
+    err error
 }
 
 func (e UnrecognizedMode) Error() string {
@@ -104,13 +71,13 @@ func (e UnrecognizedMode) Error() string {
 }
 
 func (e UnrecognizedMode) Unwrap() error {
-    return e.Err
+    return e.err
 }
 
 type ModeError struct {
     name string
     got fmt.Stringer
-    Err error
+    err error
 }
 
 func (e ModeError) Error() string {
@@ -118,7 +85,7 @@ func (e ModeError) Error() string {
 }
 
 func (e ModeError) Unwrap() error {
-    return e.Err
+    return e.err
 }
 
 //func (proc process) Parse() (istart int, istop int, err error) {
@@ -193,6 +160,55 @@ func InitGamma(ctx *cli.Context) (err error) {
     }
     return
 }
+
+
+type like struct {
+    In    string `cli:"*i,in" usage:"Reference metadata file"`
+    Out   string `cli:"*o,out" usage:"Output metadata file"`
+    Dtype string `cli:"d,dtype" usage:"Output file datatype"`
+    Ext   string `cli:"e,ext" usage:"Extension of datafile" dft:"dat"`
+}
+
+var Like = &cli.Command{
+    Name: "like",
+    Desc: "Initialize Gamma datafile with given datatype and shape",
+    Argv: func() interface{} { return &like{} },
+    Fn: liker,
+}
+
+func liker(ctx *cli.Context) (err error) {
+    l := ctx.Argv().(*like)
+    
+    in, out := l.In, l.Out
+    
+    dt, dtype := l.Dtype, Unknown
+    
+    if len(dt) > 0 {
+        dtype = str2dtype(dt)
+    }
+    
+    var indat DatFile
+    if err = Load(in, &indat); err != nil {
+        return
+    }
+    
+    if dtype == Unknown {
+        dtype = indat.Dtype()
+    }
+    
+    if out, err = filepath.Abs(out); err != nil {
+        return
+    }
+    
+    outdat := DatFile{
+        Dat: fmt.Sprintf("%s.%s", out, l.Ext),
+        URngAzi: indat.URngAzi,
+        DType: dtype,
+    }
+    
+    return Save(out + ".json", &outdat)
+}
+
 
 //type(
     //Batcher struct {
@@ -374,56 +390,6 @@ func InitGamma(ctx *cli.Context) (err error) {
     //}
     
     //return nil
-//}
-
-//type Like struct {
-    //In    string `name:"in"`
-    //Out   string `name:"out"`
-    //Dtype string `name:"dtype"`
-    //Ext   string `name:"ext" default:"dat"`
-//}
-
-//func like(args Args) (err error) {
-    //l := Like{}
-    
-    //if err = args.ParseStruct(&l); err != nil {
-        //err = ParseErr.Wrap(err)
-        //return
-    //}
-    
-    //in, out := l.In, l.Out
-    
-    //if len(in) == 0 && len(out) == 0 {
-        //err = fmt.Errorf("expected parameter 'in' and 'out' to be set")
-        //return
-    //}
-    
-    //dt, dtype := l.Dtype, Unknown
-    
-    //if len(dt) > 0 {
-        //dtype = str2dtype(dt)
-    //}
-    
-    //var indat DatFile
-    //if err = Load(in, &indat); err != nil {
-        //return
-    //}
-    
-    //if dtype == Unknown {
-        //dtype = indat.Dtype()
-    //}
-    
-    //if out, err = filepath.Abs(out); err != nil {
-        //return
-    //}
-    
-    //outdat := DatFile{
-        //Dat: fmt.Sprintf("%s.%s", out, l.Ext),
-        //URngAzi: indat.URngAzi,
-        //DType: dtype,
-    //}
-    
-    //return Save(out + ".json", &outdat)
 //}
 
 
@@ -686,9 +652,9 @@ func splitIfg(args Args) (err error) {
 
 type (
     Stat struct {
-        Out string `pos:"1"`
-        MetaFile
+        Out string `cli:"*o,out" usage:"Output file`
         Subset
+        MetaFile
     }
 )
 
@@ -716,25 +682,25 @@ func stat(args Args) (err error) {
 }
 
 
-type(
-    Coder struct {
-        Lookup   string `pos:"0"`
-        Infile   string `pos:"1"`
-        Outfile  string `name:"out"`
-        Mode     string `name:"mode"`
-        Intpol   string `name:"intpol" default:"nearest"`
-        Shape    string `name:"shape"`
-        CodeOpt
-    }
-)
+type geoCoder struct {
+    Lookup   string `cli:"*l,lookup" usage:"Lookup table file"`
+    Infile   string `cli:"*infile" usage:"Input datafile"`
+    Outfile  string `cli:"*out" usage:"Output datafile"`
+    Mode     string `cli:"mode" usage:"Geocode direction; from or to radar cordinates"`
+    Shape    string `cli:"s,shape" usage:"Shape of the output file"`
+    CodeOpt
+}
 
-func geocode(args Args) (err error) {
-    c := Coder{}
-    
-    if err = args.ParseStruct(&c); err != nil {
-        err = ParseErr.Wrap(err)
-        return
-    }
+
+var GeoCode = &cli.Command{
+    Name: "geocode",
+    Desc: "",
+    Argv: func() interface{} { return &geoCoder{} },
+    Fn: geoCode,
+}
+
+func geoCode(ctx *cli.Context) (err error) {
+    c := ctx.Argv().(*geoCoder)
     
     shape := c.Shape
     
@@ -747,40 +713,6 @@ func geocode(args Args) (err error) {
         c.Rng = dat.Rng()
         c.Azi = dat.Azi()
     }
-    
-    imode := NearestNeighbour
-    
-    switch c.Intpol {
-    case "nearest":
-        imode = NearestNeighbour
-    case "bic":
-        imode = BicubicSpline
-    case "bic_log":
-        imode = BicubicSplineLog
-    case "bic_sqrt":
-        imode = BicubicSplineSqrt
-    case "bsp":
-        imode = BSpline
-    case "bsp_sqrt":
-        imode = BSplineSqrt
-    case "lanc":
-        imode = Lanczos
-    case "lanc_sqrt":
-        imode = LanczosSqrt
-    case "inv_dist":
-        imode = InvDist
-    case "inv_sqrd_dist":
-        imode = InvSquaredDist
-    case "const":
-        imode = Constant
-    case "gauss":
-        imode = Gauss
-    default:
-        err = UnrecognizedMode{name: "interpolation option", got: c.Intpol}
-        return
-    }
-    
-    c.InterpolMode = imode
     
     var l Lookup
     if err = Load(c.Lookup, &l); err != nil {

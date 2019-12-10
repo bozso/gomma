@@ -120,17 +120,17 @@ func NewS1Zip(zipPath, pol string) (s1 *S1Zip, err error) {
 
 func (s1 *S1Zip) Info(dst string) (iws IWInfos, err error) {
     
-    var ext Extractor
-    if ext, err = s1.newExtractor(dst); err != nil {
-        err = StructCreateError.Wrap(err, "Extractor")
+    var ext = s1.newExtractor(dst)
+    if err = ext.Wrap(); err != nil {
         return
     }
     defer ext.Close()
 
     var _annot string
     for ii := 1; ii < 4; ii++ {
-        if _annot, err = ext.extract(annot, ii); err != nil {
-            err = ExtractError{file: "annotation", path: s1.Path}
+        _annot = ext.Extract(annot, ii)
+        
+        if err = ext.Wrap(); err != nil {
             return
         }
 
@@ -686,44 +686,30 @@ const (
 func (s1 *S1Zip) ImportSLC(dst string) (err error) {
     var _annot, _calib, _tiff, _noise string
     
-    var ext Extractor
-    if ext, err = s1.newExtractor(dst); err != nil {
-        err = StructCreateError.Wrap(err, "Extractor")
+    var ext = s1.newExtractor(dst)
+    if err = ext.Wrap(); err != nil {
         return
     }
 
     defer ext.Close()
 
-    path, pol := s1.Path, s1.pol
+    pol := s1.pol
     tab := s1.tabName("slc", pol)
 
     file, err := os.Create(tab)
-
     if err != nil {
         err = FileOpenErr.Wrap(err, tab)
         return
     }
-
     defer file.Close()
 
     for ii := 1; ii < 4; ii++ {
-        if _annot, err = ext.extract(annot, ii); err != nil {
-            err = ExtractErr.Wrap(err, "annotation", path)
-            return
-        }
+        _annot = ext.Extract(annot, ii)
+        _calib = ext.Extract(calib, ii)
+        _tiff  = ext.Extract(tiff, ii)
+        _noise = ext.Extract(noise, ii)
 
-        if _calib, err = ext.extract(calib, ii); err != nil {
-            err = ExtractErr.Wrap(err, "calibration", path)
-            return
-        }
-
-        if _tiff, err = ext.extract(tiff, ii); err != nil {
-            err = ExtractErr.Wrap(err, "TIFF", path)
-            return
-        }
-
-        if _noise, err = ext.extract(noise, ii); err != nil {
-            err = ExtractErr.Wrap(err, "noise", path)
+        if err = ext.Wrap(); err != nil {
             return
         }
 
@@ -750,20 +736,14 @@ func (s1 *S1Zip) ImportSLC(dst string) (err error) {
 }
 
 func (s1 *S1Zip) Quicklook(dst string) (s string, err error) {
-    var ext Extractor
-    if ext, err = s1.newExtractor(dst); err != nil {
-        err = StructCreateError.Wrap(err, "Extractor")
+    var ext = s1.newExtractor(dst)
+    if err = ext.Wrap(); err != nil {
         return
     }
     defer ext.Close()
 
-    path := s1.Path
-
-    if s, err = ext.extract(quicklook, 0); err != nil {
-        err = ExtractErr.Wrap(err, "annotation", path)
-    }
-
-    return
+    s = ext.Extract(quicklook, 0)
+    return s, ext.Wrap()
 }
 
 func (d ByDate) Len() int      { return len(d) }

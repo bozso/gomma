@@ -488,6 +488,19 @@ func NewWriter(wr io.Writer) (w Writer) {
     return
 }
 
+func (w *Writer) Wrap() error {
+    if w.err == nil {
+        return nil
+    }
+
+    if w.File != nil { 
+        return fmt.Errorf("error while writing to file '%s': %w",
+            w.File.Name(), w.err)
+    } else {
+        return fmt.Errorf("error while writing: %w", w.err)
+    }
+}
+
 func (w *Writer) Close() {
     if w.File != nil {
         w.File.Close()
@@ -498,6 +511,7 @@ func (w *Writer) Close() {
 func NewWriterFile(name string) (w Writer) {
     w.File, w.err = os.Create(name)
     w.Writer = bufio.NewWriter(w.File)
+    
     return
 }
 
@@ -523,19 +537,6 @@ func (w *Writer) WriteFmt(tpl string, args ...interface{}) int {
     return w.WriteString(fmt.Sprintf(tpl, args...))
 }
 
-func (w *Writer) Wrap() error {
-    if w.err == nil {
-        return nil
-    }
-
-    if name := w.File.Name(); w.File != nil { 
-        return fmt.Errorf("error while writing to file '%s': %w",
-            name, w.err)
-    } else {
-        return fmt.Errorf("error while writing: %w", w.err)
-    }
-}
-
 func Wrap(err1 error, err2 error) error {
     return fmt.Errorf("%w: %w", err1, err2)
 }
@@ -558,6 +559,27 @@ func (e CWerror) Wrap(err error) error {
 
 func (e CWerror) Make() error {
     return fmt.Errorf(string(e))
+}
+
+type FileOpenError struct {
+    path string
+    err error
+}
+
+func (e FileOpenError) Error() string {
+    return fmt.Sprintf("failed to open file '%s'", e.path)
+}
+
+func (e FileOpenError) Unwrap() error {
+    return e.err
+}
+
+func Mkdir(name string) (err error) {
+    if err = os.MkdirAll(name, os.ModePerm); err != nil {
+        err = fmt.Errorf("failed to create directory '%s': %w", name,
+            err)
+    }
+    return
 }
 
 const (

@@ -19,6 +19,7 @@ func main() {
         cli.Tree(gamma.Init),
         cli.Tree(gamma.DataSelect),
         cli.Tree(gamma.DataImport),
+        cli.Tree(gamma.Like),
     ).Run(os.Args[1:]); err != nil {
         fmt.Fprintln(os.Stderr, err)
         os.Exit(1)
