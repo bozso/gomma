@@ -74,15 +74,12 @@ func (s SLC) MakeMLI(opt MLIOpt) (ret MLI, err error) {
 
 type (
     SBIOpt struct {
-        NormSquintDiff float64 `name:"nsquint" default:"0.5"`
-        InvWeight      bool    `name:"invw"`
-        Keep           bool    `name:"keep"`
-        Looks          RngAzi
-    }
-    
-    SBIOut struct {
-        Ifg IFG
-        Mli MLI
+        NormSquintDiff float64 `cli:"n,nsquint" dft:"0.5"`
+        InvWeight      bool    `cli:"i,invw"`
+        Keep           bool    `cli:"k,keep"`
+        Looks          RngAzi  `cli:"L,looks"`
+        Ifg            string  `cli:"ifg"`
+        Mli            string  `cli:"mli"`
     }
 )
 
@@ -97,23 +94,15 @@ func (opt *SBIOpt) Default() {
     }
 }
 
-func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (ret SBIOut, err error) {
+func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (err error) {
     opt.Default()
-    
-    if ret.Ifg, err = TmpIFG(); err != nil {
-        return
-    }
-    
-    if ret.Mli, err = TmpMLI(); err != nil {
-        return
-    }
     
     iwflg, cflg := 0, 0
     if opt.InvWeight { iwflg = 1 }
     if opt.Keep { cflg = 1 }
     
     _, err = sbiInt(ref.Dat, ref.Par, slave.Dat, slave.Par,
-                    ret.Ifg.Dat, ret.Ifg.Par, ret.Mli.Dat, ret.Mli.Par, 
+                    opt.Ifg, opt.Ifg + ".off", opt.Mli, opt.Mli + ".par", 
                     opt.NormSquintDiff, opt.Looks.Rng, opt.Looks.Azi,
                     iwflg, cflg)
     
@@ -123,18 +112,18 @@ func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (ret SBIOut, err error) {
         return
     }
     
-    return ret, nil
+    return nil
 }
 
 type (
     SSIMode int
     
     SSIOpt struct {
-        Hgt    string `name:"" default:""`
-        LtFine string `name:"lookup" default:""`
-        OutDir string `name:"out" default:"."`
-        Keep bool     `name:"keep"`
-        Mode SSIMode
+        Hgt    string  `cli:"h,hgt"`
+        LtFine string  `cli:"l,lookup"`
+        OutDir string  `cli:"o,out" dft:"."`
+        Keep   bool    `cli:"k,keep"`
+        Mode   SSIMode `cli:"sm,ssiMode"`
     }
     
     SSIOut struct {

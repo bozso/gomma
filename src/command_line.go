@@ -2,13 +2,14 @@ package gamma
 
 import (
     "errors"
-    //"log"
-    //"reflect"
     "fmt"
-    //"os"
     "strings"
     "path/filepath"
     "github.com/mkideal/cli"
+
+    //"os"
+    //"log"
+    //"reflect"
 )
 
 type (
@@ -30,36 +31,16 @@ var (
     BatchModes = []string{"quicklook", "mli / MLI", "ras"}
 )
 
-type (
-    root struct {
-        cli.Helper
-    }
-)
+type root struct {
+    cli.Helper
+}
+
 
 var Root = &cli.Command{
     Desc: "Gamma Golang wrapper command line program.",
     Argv: func() interface{} { return &root{} },
     Fn: func(ctx *cli.Context) error { return nil },
 }
-
-type process struct {
-    cli.Helper
-    Conf        string `cli:"conf" usage:"Processing configuration file" dft:"gamma.json"`
-    Step        string `cli:"step" usage:"Execute single step"`
-    Start       string `cli:"start" usage:"Starting step"`
-    Stop        string `cli:"stop" usage:"Stoppong step"` 
-    Log         string `cli:"log" usage:"Logfile" dft:"gamma.log"`
-    CachePath   string `cli:"cache"`
-    Skip        bool   `cli:"skip" usage: "Skip optional steps"`
-    Show        bool   `cli:"show" usage:"Show available steps"`
-    InputFile   string `cli:"in" usage:"Input file list"`
-}
-
-
-//func listSteps() {
-    //fmt.Println("Available processing steps: ", stepList)
-//}
-
 
 type UnrecognizedMode struct {
     name, got string
@@ -88,110 +69,34 @@ func (e ModeError) Unwrap() error {
     return e.err
 }
 
-//func (proc process) Parse() (istart int, istop int, err error) {
-    //if proc.Show {
-        //listSteps()
-        //os.Exit(0)
-    //}
-
-    //istep, istart, istop := stepIndex(proc.Step), stepIndex(proc.Start),
-        //stepIndex(proc.Stop)
-
-    //if istep == -1 {
-        //if istart == -1 {
-            //listSteps()
-            //err = StepErr.Make(proc.Start)
-            //return
-        //}
-
-        //if istop == -1 {
-            //listSteps()
-            //err = StepErr.Make(proc.Stop)
-            //return
-        //}
-    //} else {
-        //istart = istep
-        //istop = istep + 1
-    //}
-
-    //return istart, istop, nil
-//}
-
-//func (proc process) RunSteps(start, stop int) (err error) {
-    //config := Config{InFile: proc.InputFile}
-    
-    //if err = LoadJson(proc.Conf, &config); err != nil {
-        //return
-    //}
-    
-    //for ii := start; ii < stop; ii++ {
-        //name := stepList[ii]
-        //step := steps[name]
-
-        //delim(fmt.Sprintf("START: %s", name), "*")
-
-        //if err = step(&config); err != nil {
-            //return Handle(err, "error while running step '%s'",
-                //name)
-        //}
-
-        //delim(fmt.Sprintf("END: %s", name), "*")
-    //}
-    //return nil
-//}
-
-
-type initGamma struct {
-    Outfile string `cli:"*out" usage:"Outfile"`
-}
-
-var Init = &cli.Command{
-    Name: "init",
-    Desc: "Initialize Gamma (pre)processing",
-    Argv: func() interface{} { return &initGamma{} },
-    Fn: InitGamma,
-}
-
-func InitGamma(ctx *cli.Context) (err error) {
-    conf := ctx.Argv().(*initGamma).Outfile
-    
-    if err = MakeDefaultConfig(conf); err != nil {
-        err = Handle(err, "failed to create config file")
-    }
-    return
-}
-
-
-type like struct {
-    In    string `cli:"*i,in" usage:"Reference metadata file"`
-    Out   string `cli:"*o,out" usage:"Output metadata file"`
-    Dtype string `cli:"d,dtype" usage:"Output file datatype"`
-    Ext   string `cli:"e,ext" usage:"Extension of datafile" dft:"dat"`
-}
-
 var Like = &cli.Command{
     Name: "like",
     Desc: "Initialize Gamma datafile with given datatype and shape",
     Argv: func() interface{} { return &like{} },
-    Fn: liker,
+    Fn: likeFn,
 }
 
-func liker(ctx *cli.Context) (err error) {
+type like struct {
+    In    string `cli:"*i,in" usage:"Reference metadata file"`
+    Out   string `cli:"*o,out" usage:"Output metadata file"`
+    Dtype DType  `cli:"d,dtype" usage:"Output file datatype" dft:"Uknown"`
+    Ext   string `cli:"e,ext" usage:"Extension of datafile" dft:"dat"`
+}
+
+func likeFn(ctx *cli.Context) (err error) {
     l := ctx.Argv().(*like)
     
     in, out := l.In, l.Out
     
-    dt, dtype := l.Dtype, Unknown
     
-    if len(dt) > 0 {
-        dtype = str2dtype(dt)
-    }
     
     var indat DatFile
     if err = Load(in, &indat); err != nil {
         return
     }
     
+    dtype := l.Dtype
+
     if dtype == Unknown {
         dtype = indat.Dtype()
     }
@@ -209,399 +114,178 @@ func liker(ctx *cli.Context) (err error) {
     return Save(out + ".json", &outdat)
 }
 
-
-//type(
-    //Batcher struct {
-        //Mode     string `cli:"*m,mode"`
-        //Infile   string `cli:"*i,in"`
-        //Conf     string `cli:"conf" dft:"gamma.conf"`
-        //OutDir   string `cli:"out" dft:"."`
-        //Filetype string `cli:"f,ftype"`
-        //Mli      string `cli:"mli"`
-        //RasArgs
-        //Config
-    //}
-//)
-
-//func batch(args Args) (err error) {
-    //batch := Batcher{}
-    
-    //if err = args.ParseStruct(&batch); err != nil {
-        //err = ParseErr.Wrap(err)
-        //return
-    //}
-
-    ////fmt.Printf("%#v\n", batch)
-    
-    //switch batch.Mode {
-    //case "quicklook":
-        //if err = batch.Quicklook(); err != nil {
-            //return
-        //}
-    //case "mli", "MLI":
-        //if err = batch.MLI(); err != nil {
-            //return
-        //}
-    //case "ras", "raster", "plot":
-        //if err = batch.Raster(); err != nil {
-            //return
-        //}
-    //default:
-        //err = Handle(nil, "unrecognized mode: '%s'! Choose from: %v",
-            //batch.Mode, BatchModes)
-        //return
-    //}
-    //return nil
-//}
-
-//func (b Batcher) Quicklook() error {
-    //cache := filepath.Join(b.General.CachePath, "sentinel1")
-
-    //info := &ExtractOpt{root: cache, pol: b.General.Pol}
-
-    //path := b.Infile
-    //file, err := NewReader(path)
-
-    //if err != nil {
-        //return err
-    //}
-
-    //defer file.Close()
-
-    //for file.Scan() {
-        //line := file.Text()
-
-        //s1, err := NewS1Zip(line, cache)
-
-        //if err != nil {
-            //return Handle(err, "failed to parse Sentinel-1 '%s'", s1.Path)
-        //}
-
-        //image, err := s1.Quicklook(info)
-
-        //if err != nil {
-            //return Handle(err, "failed to retreive quicklook file '%s'",
-                //s1.Path)
-        //}
-
-        //fmt.Println(image)
-    //}
-
-    //return nil
-//}
-
-//func (b Batcher) MLI() (err error) {
-    //path := b.InFile
-    
-    //var file FileReader
-    //if file, err = NewReader(path); err != nil {
-        //return
-    //}
-
-    //defer file.Close()
-    
-    //opt := &MLIOpt {
-        //Looks: b.General.Looks,
-    //}
-    
-    //mliDir := b.OutDir
-    
-    //if err = os.MkdirAll(mliDir, os.ModePerm); err != nil {
-        //return Handle(err, "failed to create directory '%s'", mliDir)
-    //}
-    
-    //for file.Scan() {
-        //line := file.Text()
-        
-        
-        //var s1 S1SLC
-        //if s1, err = FromTabfile(line); err != nil {
-            //err = Handle(err, "failed to parse S1SLC tabfile '%s'", line)
-            //return
-        //}
-        
-        //var name string
-        //if name, err = filepath.Abs(filepath.Join(mliDir, s1.Format(DateShort))); err != nil {
-            //return
-        //}
-        
-        //var mli MLI
-        //if mli, err = NewMLI(name + ".mli", ""); err != nil {
-            //err = Handle(err, "could not create MLI struct")
-            //return
-        //}
-        
-        //var exist bool
-        //if exist, err = mli.Exist(); err != nil {
-            //return
-        //}
-        
-        //json := name + ".json"
-        
-        //if exist {
-            //if err = Save(json, &mli); err != nil {
-                //return
-            //}
-            //continue
-        //}
-        
-        //if err = s1.MLI(&mli, opt); err != nil {
-            //return Handle(err, "failed to retreive MLI file for '%s'",
-                //line)
-        //}
-        
-        //if err = Save(json, &mli); err != nil {
-            //return
-        //}
-        //fmt.Println(json) 
-    //}
-
-    //return nil
-//}
-
-//func (b Batcher) Raster() (err error) {
-    //path := b.Infile
-    //opt := b.RasArgs
-    
-    //var file FileReader
-    //if file, err = NewReader(path); err != nil {
-        //return err
-    //}
-    //defer file.Close()
-    
-    //for file.Scan() {
-        //line := file.Text()
-        
-        //if len(line) == 0 {
-            //continue
-        //}
-        
-        //var data DatFile
-        //if err = Load(line, &data); err != nil {
-            //err = Handle(err, "failed to load datafile from '%s'", line)
-            //return
-        //}
-        
-        //if err = data.Raster(opt); err != nil {
-            //err = Handle(err, "failed to create raster file for '%s'",
-                //line)
-            //return
-        //}
-    //}
-    
-    //return nil
-//}
-
-
-//type(
-    //Mover struct {
-        //OutDir   string `cli:"out" usage:"Output directory" dft:"."`
-        //MetaFile
-    //}
-//)
-
-//func move(args Args) (err error) {
-    //m := Mover{}
-    
-    //if err = args.ParseStruct(&m); err != nil {
-        //err = ParseErr.Wrap(err)
-        //return
-    //}
-    
-    //path := m.Meta
-    
-    //var dat DatParFile
-    //if err = Load(path, &dat); err != nil {
-        //err = Handle(err, "failed to parse json metadatafile '%s'", path)
-        //return
-    //}
-    
-    //out := m.OutDir
-    
-    //if dat, err = dat.Move(out); err != nil {
-        //return err
-    //}
-    
-    //if path, err = Move(path, out); err != nil {
-        //return err
-    //}
-    
-    //if err = SaveJson(path, dat); err != nil {
-        //err = Handle(err, "failed to refresh json metafile")
-        //return err
-    //}
-    
-    //return nil
-//}
-
-//type (
-    //Coregister struct {
-        //CoregOpt
-        //Master  string `name:"master" default:""`
-        //Slave   string `name:"slave" default:""`
-        //Ref     string `name:"ref" default:""`
-        //Outfile string `name:"out" default:""`
-    //}
-
-//)
-
-/*
-func coreg(args Args) error {
-    c := Coregister{}
-    
-    args.ParseStruct(&c)
-    
-    sm, ss, sr := c.Master, c.Slave, c.Ref
-    
-    if len(sm) == 0 {
-        return EmptyStringErr.Make("master", sm)
-    }
-    
-    if len(ss) == 0 {
-        return EmptyStringErr.Make("slave", ss)
-    }
-    
-    ref *S1SLC
-    
-    if len(r) == 0 {
-        ref = nil
-    } else {
-        r, err := FromTabfile(sr)
-        if err != nil {
-            return ParseTabErr.Wrap(sr)
-        }
-        ref = &r
-    }
-    
-    s, err := FromTabfile(ss)
-    if err != nil {
-        return ParseTabErr.Wrap(ss)
-    }
-    
-    m, err := FromTabfile(sm)
-    if err != nil {
-        return ParseTabErr.Wrap(sm)
-    }
-    
-    
-    c.CoregOpt
+var MoveFile = &cli.Command{
+    Name: "move",
+    Desc: "Move a datafile and metadatafile to a given directory",
+    Argv: func() interface{} { return &move{} },
+    Fn: moveFn,
 }
-*/
+
+type move struct {
+    OutDir   string `cli:"out" usage:"Output directory" dft:"."`
+    MetaFile
+}
 
 
-//type Creater struct {
-    //Dtype      string `name:"dtype"`
-    //Ftype      string `name:"ftype"`
-    //ParfileExt string `name:"parExt"`
-    //DatParFile
-    //MetaFile
-//}
-
-//func create(args Args) (err error) {
-    //c := Creater{}
+func moveFn(ctx *cli.Context) (err error) {
+    m := ctx.Argv().(*move)
+    path := m.Meta
     
-    //if err = args.ParseStruct(&c); err != nil {
-        //err = ParseErr.Wrap(err)
-        //return
-    //}
-    
-    //dat := c.Dat
-    
-    //if len(dat) == 0 {
-        //if err = c.DatParFile.Tmp(); err != nil {
-            //return
-        //}
-    //}
-    
-    //ext := c.ParfileExt
-    //if len(ext) == 0 {
-        //ext = "par"
-    //}
-    
-    //par := c.Par
-    //if len(par) == 0 {
-        //par = fmt.Sprintf("%s.%s", dat, ext)
-    //}
-    
-    
-    //dt_, dt := c.Dtype, Unknown
-    
-    //if len(dt_) > 0 {
-        //dt, err = str2dtype(dt_)
-        //if err != nil {
-            //return
-        //}
-    //}
-    
-    //dat, err = fp.Abs(dat)
-    //if err != nil { return }
-    
-    //par, err = fp.Abs(par)
-    //if err != nil { return }
-        
-    //datf, err := NewDataFile(dat, par, dt) 
-    //if err != nil {
-        //err = DataCreateErr.Wrap(err, "DataFile")
-        //return
-    //}
-    
-    
-    //var Dat DataFile
-    //ftype := str.ToUpper(c.Ftype)
-    //switch ftype {
-    //case "MLI":
-        //Dat = MLI{dataFile: datf}
-    //default:
-        //err = fmt.Errorf("unrecognized filetype '%s'", ftype)
-        //return
-    //}
-    
-    //if err = Dat.Save(c.Meta); err != nil {
-        //err = Handle(err, "failed to save datafile to metafile '%s'",
-            //c.MetaFile)
-        //return
-    //}
-    
-    //return nil
-//}
-
-
-type (
-    SplitIfg struct {
-        SBIOpt
-        SSIOpt
-        SpectrumMode string `name:"mode"`
-        Master       string `name:"master"`
-        Slave        string `name:"slave"`
-        Mli          string `name:"mli"`
-    }
-)
-
-func splitIfg(args Args) (err error) {
-    si := SplitIfg{}
-    si.Mode = Ifg
-    
-    if err := args.ParseStruct(&si); err != nil {
-        return ParseErr.Wrap(err)
-    }
-    
-    ms, ss := si.Master, si.Slave
-    
-    if len(ms) == 0 || len(ss) == 0 {
-        return fmt.Errorf("both master and slave SLC files should be specified")
-    }
-    
-    var m, s SLC
-    
-    if err = Load(ms, &m); err != nil {
+    var dat DatParFile
+    if err = Load(path, &dat); err != nil {
+        err = Handle(err, "failed to parse json metadatafile '%s'", path)
         return
     }
     
+    out := m.OutDir
+    
+    if dat, err = dat.Move(out); err != nil {
+        return err
+    }
+    
+    if path, err = Move(path, out); err != nil {
+        return err
+    }
+    
+    if err = SaveJson(path, dat); err != nil {
+        err = Handle(err, "failed to refresh json metafile")
+        return err
+    }
+    
+    return nil
+}
+
+
+var Coreg = &cli.Command{
+    Name: "coreg",
+    Desc: "Coregister two Sentinel-1 SAR images",
+    Argv: func() interface{} { return &coreg{} },
+    Fn: coregFn,
+}
+
+type coreg struct {
+    S1CoregOpt
+    Master  string `cli:"*m,master"`
+    Slave   string `cli:"*s,slave"`
+    Ref     string `cli:"ref"`
+}
+
+func coregFn(ctx *cli.Context) (err error) {
+    c := ctx.Argv().(*coreg)
+    
+    sm, ss, sr := c.Master, c.Slave, c.Ref
+    
+    var ref *S1SLC
+    
+    if len(sr) == 0 {
+        ref = nil
+    } else {
+        var ref_ S1SLC
+        if ref_, err = FromTabfile(sr); err != nil {
+            err = ParseTabErr.Wrap(err, sr)
+            return
+        }
+        ref = &ref_
+    }
+    
+    var s, m S1SLC
+    if s, err = FromTabfile(ss); err != nil {
+        return ParseTabErr.Wrap(err, ss)
+    }
+    
+    if m, err = FromTabfile(sm); err != nil {
+        return ParseTabErr.Wrap(err, sm)
+    }
+    
+    c.Tab, c.ID = m.Tab, m.Format(DateShort)
+    
+    var out S1CoregOut
+    if out, err = c.Coreg(&s, ref); err != nil {
+        return
+    }
+    
+    if err = Save("", &out.Ifg); err != nil {
+        return
+    }
+    
+    fmt.Printf("Created RSLC: %s", out.Rslc.Tab)
+    fmt.Printf("Created Interferogram: %s", out.Ifg.jsonName())
+    
+    return nil
+}
+
+var Create = &cli.Command{
+    Name: "make",
+    Desc: "Create metafile for an existing datafile",
+    Argv: func() interface{} { return &create{} },
+    Fn: createFn,
+}
+
+type create struct {
+    Dat        string `cli:"d,dat"`
+    Par        string `cli:"p,par"`
+    Dtype      DType  `cli:"D,dtype" dft:"Unknown"`
+    Ftype      string `cli:"f,ftype"`
+    Ext        string `cli:"P,parExt"`
+    MetaFile
+}
+
+func createFn(ctx *cli.Context) (err error) {
+    c := ctx.Argv().(*create)
+
+    var dat string
+    if dat, err = filepath.Abs(c.Dat); err != nil {
+        return
+    }
+    
+    var par string
+    if par, err = filepath.Abs(c.Par); err != nil {
+        return
+    }
+        
+    
+    var datf DatParFile
+    if datf, err = NewDatParFile(dat, par, c.Ext, c.Dtype); err != nil {
+        err = StructCreateError.Wrap(err, "DatParFile")
+        return
+    }
+    
+    return Save(c.Meta, &datf)
+}
+
+
+var SplitIFG = &cli.Command{
+    Name: "splitIfg",
+    Desc: "Split Beam/Spectrum Interferometry",
+    Argv: func() interface{} { return &splitIfg{} },
+    Fn: splitIfgFn,
+}
+
+type splitIfg struct {
+    SBIOpt
+    SSIOpt
+    SpectrumMode string `cli:"M,mode"`
+    Master       string `cli:"*m,master"`
+    Slave        string `cli:"*s,slave"`
+    Mli          string `cli:"mli"`
+}
+
+
+func splitIfgFn(ctx *cli.Context) (err error) {
+    si := ctx.Argv().(*splitIfg)
+
+    ms, ss := si.Master, si.Slave
+    
+    var m, s SLC
+
+    if err = Load(ms, &m); err != nil {
+        return
+    }
+
     if err = Load(ss, &s); err != nil {
         return
     }
     
-    id := ID(m, s, DShort)
     mode := strings.ToUpper(si.SpectrumMode)
     
     switch mode {
@@ -610,18 +294,10 @@ func splitIfg(args Args) (err error) {
             return
         }
         
-        var out SBIOut
-        if out, err = m.SplitBeamIfg(s, si.SBIOpt); err != nil {
+        if err = m.SplitBeamIfg(s, si.SBIOpt); err != nil {
             return err
         }
         
-        if err = Save(id + "_sbi_mli.json", &out.Mli); err != nil {
-            return
-        }
-        
-        if err = Save(id + "_sbi_ifg.json", &out.Ifg); err != nil {
-            return
-        }
     //case "SPECTRUM", "S":
         //opt := si.SSIOpt
         
@@ -645,7 +321,7 @@ func splitIfg(args Args) (err error) {
         // still need to figure out the returned files
         //return nil
     default:
-        return fmt.Errorf("unrecognized Split Interferogram mode: '%s'", mode)
+        return UnrecognizedMode{name:"Split Interferogram", got: mode}
     }
     return nil
 }
@@ -682,7 +358,14 @@ func stat(args Args) (err error) {
 }
 
 
-type geoCoder struct {
+var GeoCode = &cli.Command{
+    Name: "geocode",
+    Desc: "",
+    Argv: func() interface{} { return &geoCode{} },
+    Fn: geoCodeFn,
+}
+
+type geoCode struct {
     Lookup   string `cli:"*l,lookup" usage:"Lookup table file"`
     Infile   string `cli:"*infile" usage:"Input datafile"`
     Outfile  string `cli:"*out" usage:"Output datafile"`
@@ -692,15 +375,8 @@ type geoCoder struct {
 }
 
 
-var GeoCode = &cli.Command{
-    Name: "geocode",
-    Desc: "",
-    Argv: func() interface{} { return &geoCoder{} },
-    Fn: geoCode,
-}
-
-func geoCode(ctx *cli.Context) (err error) {
-    c := ctx.Argv().(*geoCoder)
+func geoCodeFn(ctx *cli.Context) (err error) {
+    c := ctx.Argv().(*geoCode)
     
     shape := c.Shape
     

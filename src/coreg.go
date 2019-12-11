@@ -9,81 +9,78 @@ import (
 )
 
 type (
-    S1Coreg struct {
-        Tab, ID, OutDir, RslcPath, IfgPath string
-        Hgt, Poly1, Poly2 string
-        Looks RngAzi
-        Clean, UseInter bool
-        CoregOpt
-    }
-    
-    CoregOut struct {
+    S1CoregOut struct {
         RSLC SLC
         Rslc S1SLC
         Ifg IFG
-        Ok bool
+    }
+    
+    S1CoregOpt struct {
+        Tab, ID          string
+        IfgPath          string  `cli:"i,ifg" usage:"Output interferogram metafile"`
+        RslcPath         string  `cli:"r,rslc" usage:"Output RSLC metafile"`
+        OutDir           string  `cli:"o,outdir" usage:"Output directory"`
+        Hgt              string  `cli:"h,hgt" usage:""`
+        Poly1            string  `cli:"p1,poly1" usage:""`
+        Poly2            string  `cli:"p2,poly2" usage:""`
+        Looks            RngAzi  `cli:"l,looks" usage:""`
+        Clean            bool    `cli:"c,clean" usage:""`
+        UseInter         bool    `cli:"u,useInter" usage:""`
+        CoherenceThresh  float64 `cli:"c,coh"    dft:"0.8"`
+        FractionThresh   float64 `cli:"f,frac"   dft:"0.01"`
+        PhaseStdevThresh float64 `cli:"p,phase"  dft:"0.8"`
+        Mli              string  `cli:"mli"`
     }
 )
 
 var coregFun = Gamma.Must("S1_coreg_TOPS")
 
-func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
-    ret.Ok = false
+func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
     cleaning, flag1 := 0, 0
     
-    if self.Clean {
+    if sc.Clean {
         cleaning = 1
     }
     
-    if self.UseInter {
+    if sc.UseInter {
         flag1 = 1
     }
     
-    slc1Tab, slc1ID := self.Tab, self.ID
+    slc1Tab, slc1ID := sc.Tab, sc.ID
     slc2Tab, slc2ID := slc.Tab, slc.Format(DateShort)
     
     // TODO: parse opt.hgt
-    hgt := self.Hgt
+    hgt := sc.Hgt
     
-    ret.Rslc, err = slc.RSLC(self.OutDir)
-    
-    if err != nil {
-        err = Handle(err, "failed to create RSLC")
+    if c.Rslc, err = slc.RSLC(sc.OutDir); err != nil {
         return
     }
     
-    exist, err := ret.Rslc.Exist()
-    
-    if err != nil {
-        err = Handle(err, "failed to check whether target RSLC exists")
+    exist := false
+    if exist, err = c.Rslc.Exist(); err != nil {
         return
     }
     
     if exist {
         log.Printf("Coregistered RSLC already exists, moving it to directory.")
         
-        if ret.Rslc, err = ret.Rslc.Move(self.RslcPath); err != nil {
-            err = Handle(err, "failed to move '%s' to RSLC directory",
-                ret.Rslc.Tab)
+        if c.Rslc, err = c.Rslc.Move(sc.RslcPath); err != nil {
             return
         }
         
-        ret.Ok = true
-        
-        return ret, nil
+        return c, nil
     }
     
     if ref == nil {
         log.Printf("Coregistering: '%s'", slc2Tab)
         
-        _, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, ret.Rslc.Tab, hgt,
-                          self.Looks.Rng, self.Looks.Azi, self.Poly1,
-                          self.Poly2, self.CoherenceThresh,
-                          self.FractionThresh, self.PhaseStdevThresh,
+        _, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, c.Rslc.Tab,
+                          hgt, sc.Looks.Rng, sc.Looks.Azi, sc.Poly1,
+                          sc.Poly2, sc.CoherenceThresh,
+                          sc.FractionThresh, sc.PhaseStdevThresh,
                           cleaning, flag1)
         
         if err != nil {
-            err = Handle(err, "coregistration failed")
             return
         }
     } else {
@@ -92,20 +89,18 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
         log.Printf("Coregistering: '%s'. Reference: '%s'", slc2Tab,
             rslcRefTab)
         
-        _, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, ret.Rslc.Tab, hgt,
-                          self.Looks.Rng, self.Looks.Azi, self.Poly1,
-                          self.Poly2, self.CoherenceThresh,
-                          self.FractionThresh, self.PhaseStdevThresh,
+        _, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, c.Rslc.Tab,
+                          hgt, sc.Looks.Rng, sc.Looks.Azi, sc.Poly1,
+                          sc.Poly2, sc.CoherenceThresh,
+                          sc.FractionThresh, sc.PhaseStdevThresh,
                           cleaning, flag1, rslcRefTab, rslcRefID)
         
         if err != nil {
-            err = Handle(err, "coregistration failed")
             return
         }
     }
     
-    if ret.RSLC, err = NewSLC(slc2ID + ".rslc", ""); err != nil {
-        err = Handle(err, "failed to create SLC struct")
+    if c.RSLC, err = NewSLC(slc2ID + ".rslc", ""); err != nil {
         return
     }
     
@@ -118,36 +113,20 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
     }
     
     ifg.Quality = ID + ".results"
-    
-    if err != nil {
-        err = Handle(err, "failed to create IFG '%s'", ID + ".diff")
+        
+    if c.Rslc, err = c.Rslc.Move(sc.RslcPath); err != nil {
         return
     }
     
-    if ret.Ok, err = ifg.CheckQuality(); err != nil {
-        err = Handle(err, "failed to check coregistration quality '%s'",
-            ifg.Quality)
-        return
-    }
-    
-    if !ret.Ok {
-        return ret, nil
-    }
-    
-    if ret.Rslc, err = ret.Rslc.Move(self.RslcPath); err != nil {
-        err = Handle(err, "failed to move '%s' to RSLC directory", ret.Rslc.Tab)
-        return
-    }
-    
-    if ret.Ifg, err = ifg.Move(self.IfgPath); err != nil {
+    if c.Ifg, err = ifg.Move(sc.IfgPath); err != nil {
         err = Handle(err, "failed to move interferogram '%s' to IFG directory",
             ifg.Dat)
         return
     }
 
-    if self.Clean {
+    if sc.Clean {
         var glob []string
-        pattern := filepath.Join(self.OutDir, slc1ID + "*")
+        pattern := filepath.Join(sc.OutDir, slc1ID + "*")
         
         if glob, err = filepath.Glob(pattern); err != nil {
             err = Handle(err, "globbing for leftover files from coregistration failed")
@@ -161,7 +140,7 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
             }
         }
         
-        pattern = filepath.Join(self.OutDir, slc2ID + "*")
+        pattern = filepath.Join(sc.OutDir, slc2ID + "*")
         
         if glob, err = filepath.Glob(pattern); err != nil {
             err = Handle(err, "globbing for leftover files from coregistration failed")
@@ -176,5 +155,5 @@ func (self *S1Coreg) Coreg(slc, ref *S1SLC) (ret CoregOut, err error) {
         }
     }
     
-    return ret, nil
+    return c, nil
 }

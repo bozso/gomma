@@ -15,8 +15,8 @@ import (
 type (    
     Serialize interface {
         jsonMap() JSONMap
+        jsonName() string
         FromJson(JSONMap) error        
-        Datfile() string
     }
     
     IDatFile interface {
@@ -56,29 +56,31 @@ const (
     Any
 )
 
-func str2dtype(in string) DType {
-    in = strings.ToUpper(in)
+func (d *DType) Decode(s string) error {
+    in := strings.ToUpper(s)
     
     switch in {
     case "FLOAT":
-        return Float
+        *d = Float
     case "DOUBLE":
-        return Double
+        *d = Double
     case "SCOMPLEX":
-        return ShortCpx
+        *d = ShortCpx
     case "FCOMPLEX":
-        return FloatCpx
+        *d = FloatCpx
     case "SUN", "RASTER", "BMP":
-        return Raster
+        *d = Raster
     case "UNSIGNED CHAR":
-        return UChar
+        *d = UChar
     case "SHORT":
-        return Short
+        *d = Short
     case "ANY":
-        return Any
+        *d = Any
     default:
-        return Unknown
+        *d = Unknown
     }
+    
+    return nil
 }
 
 func (d DType) String() string {
@@ -267,6 +269,10 @@ func (d DatFile) Dtype() DType {
     return d.DType
 }
 
+func (d DatFile) jsonName() string {
+    return d.Dat + ".json"
+}
+
 func (d DatFile) jsonMap() JSONMap {
     return JSONMap{
         "datafile": d.Dat,
@@ -288,7 +294,7 @@ func (d *DatFile) FromJson(m JSONMap) (err error) {
         return
     }
     
-    d.DType = str2dtype(dt)
+    d.Decode(dt)
     
     if d.rng, err = m.Int("range_samples"); err != nil {
         //err = RngError.Wrap(err, path)
@@ -702,7 +708,7 @@ func Move(path string, dir string) (ret string, err error) {
 
 func Save(path string, d Serialize) (err error) {
     if len(path) == 0 {
-        if path, err = filepath.Abs(d.Datfile() + ".json"); err != nil {
+        if path, err = filepath.Abs(d.jsonName()); err != nil {
             return
         }
     }

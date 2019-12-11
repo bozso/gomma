@@ -226,6 +226,11 @@ func FromTabfile(tab string) (s1 S1SLC, err error) {
     return
 }
 
+
+func (s1 S1SLC) jsonName() string {
+    return s1.Tab + ".json"
+}
+
 func (s1 S1SLC) Move(dir string) (ms1 S1SLC, err error) {
     newtab := filepath.Join(dir, filepath.Base(s1.Tab))
     
@@ -359,7 +364,8 @@ func (s1 S1SLC) DerampSlave(ref *S1SLC, looks RngAzi, keep bool) (ret S1SLC, err
 }
 
 func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
-    tab := filepath.Join(outDir, strings.ReplaceAll(filepath.Base(s1.Tab), "SLC_tab", "RSLC_tab"))
+    tab := strings.ReplaceAll(filepath.Base(s1.Tab), "SLC_tab", "RSLC_tab")
+    tab = filepath.Join(outDir, tab)
 
     file, err := os.Create(tab)
 

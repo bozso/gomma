@@ -43,14 +43,6 @@ type (
         Master                    MLI
     }
 
-    CoregOpt struct {
-        CoherenceThresh  float64 `name:"coh"    default:"0.8"`
-        FractionThresh   float64 `name:"frac"   default:"0.01"`
-        PhaseStdevThresh float64 `name:"phase"  default:"0.8"`
-        MasterIdx        int     `name:"master" default:"0"`
-        Mli              string  `name:"mli"`
-        Hgt              string  `name:"hgt"`
-    }
 
     IfgSelectOpt struct {
         Bperp  Minmax
@@ -69,7 +61,6 @@ type (
         General       GeneralOpt
         PreSelect     PreSelectOpt
         Geocoding     GeocodeOpt
-        Coreg         CoregOpt
         IFGSelect     IfgSelectOpt
         CalcCoherence CoherenceOpt
     }
@@ -123,12 +114,6 @@ var (
                 Rng: 500,
                 Azi: 500,
             },
-        },
-
-        Coreg: CoregOpt{
-            CoherenceThresh:  0.8,
-            FractionThresh:   0.01,
-            PhaseStdevThresh: 0.8,
         },
 
         IFGSelect: IfgSelectOpt{
