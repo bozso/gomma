@@ -1,13 +1,81 @@
 package gamma;
 
 import (
-    "fmt";
-    "testing";
-);
+    "fmt"
+    "testing"
+    "os"
+    "io/ioutil"
+)
 
-const NUM = 10000000;
-const buf = 1000;
+const NUM = 10000000
+const NUMErr = 10000
+const buf = 1000
 
+var mainErr = NewModuleErr("test")
+
+
+func testError1() error {
+    var ferr = mainErr("testError1")
+    
+    if err := testError2(); err != nil {
+        return ferr.Wrap(err, "failed to load some file")
+    }
+    
+    return nil
+}
+
+
+func testError2() error {
+    var ferr = mainErr("testError2")
+    
+    file, err := os.Open("asd")
+    if err != nil {
+        return ferr.Wrap(err, "failed to open file")
+    }
+    defer file.Close()
+    
+    return nil
+}
+
+func testError1Vanilla() error {
+    if err := testError2(); err != nil {
+        return err
+    }
+    
+    return nil
+}
+
+
+func testError2Vanilla() error {
+    
+    file, err := os.Open("asd")
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+    
+    return nil
+}
+
+func BenchmarkVanillaError(b *testing.B) {
+    b.ReportAllocs()
+    
+    for ii := 0; ii < NUMErr; ii++ {
+        if err := testError1Vanilla(); err != nil {
+            fmt.Fprintf(ioutil.Discard, "Error occurred: %s\n", err)
+        }
+    }
+}
+
+func BenchmarkCustomError(b *testing.B) {
+    b.ReportAllocs()
+    
+    for ii := 0; ii < NUMErr; ii++ {
+        if err := testError1(); err != nil {
+            fmt.Fprintf(ioutil.Discard, "Error occurred: %s\n", err)
+        }
+    }
+}
 
 func BenchmarkAppend(b *testing.B) {
     b.ReportAllocs();

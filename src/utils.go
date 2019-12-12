@@ -415,7 +415,7 @@ func NewSplitParser(s, sep string) (sp SplitParser) {
     
     if len(sp.split) == 0 {
         sp.err = fmt.Errorf("could no be split into " +
-            "multiple parts with separator '%s'", s, sep)
+            "multiple parts with separator '%s'", sep)
     }
     return
 }
