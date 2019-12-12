@@ -40,9 +40,9 @@ class DataFile(dict):
     @classmethod
     def make(cls, meta, dat=None, par=None, ext=None, dtype="Unknown"):
         if dat is None:
-            dat = utils.get_tmp() + ".dat"
+            dat = utils.tmp_file() + ".dat"
         
-        gamma.make(meta=meta, data=dat, par=par, parExt=ext,
+        gamma.make(meta=meta, dat=dat, par=par, parExt=ext,
             dtype=dtype)
         
         return cls(meta)

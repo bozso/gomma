@@ -2,7 +2,6 @@
     "azimuth_lines": 1009,
     "datafile": "/home/istvan/progs/gamma/testfiles/vv.mli",
     "dtype": "FLOAT",
-    "ftype": "MLI",
-    "paramfile": "/home/istvan/progs/gamma/testfiles/vv.mli.par",
+    "parameterfile": "/home/istvan/progs/gamma/testfiles/vv.mli.par",
     "range_samples": 1005
 }

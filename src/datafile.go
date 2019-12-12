@@ -498,6 +498,24 @@ func (d DatParFile) ParseFmt() (string, error) {
     return d.Param("image_format")
 }
 
+func (d DatParFile) ParseDtype() (dt DType, err error) {
+    var s string
+    
+    if s, err = d.Param("image_format"); err != nil {
+        return
+    }
+    
+    dt.Decode(s)
+    
+    if dt == Unknown {
+        err = fmt.Errorf("failed to determine data type based on '%s'",
+            s)
+        return
+    }
+    
+    return dt, nil
+}
+
 const (
     TimeParseErr Werror = "failed retreive %s from date string '%s'"
 )

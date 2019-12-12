@@ -88,8 +88,6 @@ func likeFn(ctx *cli.Context) (err error) {
     
     in, out := l.In, l.Out
     
-    
-    
     var indat DatFile
     if err = Load(in, &indat); err != nil {
         return
@@ -111,7 +109,7 @@ func likeFn(ctx *cli.Context) (err error) {
         DType: dtype,
     }
     
-    return Save(out + ".json", &outdat)
+    return Save(out, &outdat)
 }
 
 var MoveFile = &cli.Command{
@@ -226,27 +224,38 @@ type create struct {
     Par        string `cli:"p,par"`
     Dtype      DType  `cli:"D,dtype" dft:"Unknown"`
     Ftype      string `cli:"f,ftype"`
-    Ext        string `cli:"P,parExt"`
+    Ext        string `cli:"P,parExt" dft:"par"`
     MetaFile
 }
 
 func createFn(ctx *cli.Context) (err error) {
     c := ctx.Argv().(*create)
-
+    
+    fmt.Printf("%#v\n", *c)
+    
     var dat string
     if dat, err = filepath.Abs(c.Dat); err != nil {
         return
     }
     
-    var par string
-    if par, err = filepath.Abs(c.Par); err != nil {
-        return
+    par := c.Par
+    if len(par) > 0 {
+        if par, err = filepath.Abs(par); err != nil {
+            return
+        }
     }
-        
     
     var datf DatParFile
     if datf, err = NewDatParFile(dat, par, c.Ext, c.Dtype); err != nil {
         err = StructCreateError.Wrap(err, "DatParFile")
+        return
+    }
+    
+    if err = datf.Parse(); err != nil {
+        return
+    }
+    
+    if datf.DType, err = datf.ParseDtype(); err != nil {
         return
     }
     
