@@ -141,3 +141,24 @@ func (sl Slice) Contains(s string) bool {
     }
     return false
 }
+
+type ( 
+    ModuleName string
+    FnName string
+    
+    OpError struct {
+        module ModuleName
+        fn     FnName
+        err    error
+    }
+    
+    opErrorFactory func(fn FnName) OpError
+)
+
+
+
+func NewModuleErr(mod ModuleName) opErrorFactory {
+    return func(fn FnName) (err OpError) {
+        return OpError{module: mod, fn: fn}
+    }
+}
