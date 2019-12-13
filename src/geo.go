@@ -4,8 +4,6 @@ import (
     "log"
     "fmt"
     "os"
-    "strings"
-    "strconv"
     "path/filepath"
 )
 
@@ -23,19 +21,25 @@ type Lookup struct {
     DatFile
 }
 
-func NewDEM(dat, par string) (ret DEM, err error) {
-    ret.DatParFile, err = NewDatParFile(dat, par, "par", Float)
+func NewDEM(dat, par string) (d DEM, err error) {
+    var ferr = merr("NewDEM")
+    
+    if d.DatParFile, err = NewDatParFile(dat, par, "par", Float);
+       err != nil {
+        err = ferr.Wrap(err)
+    }
+    
     return
 }
 
-func (d DEM) NewLookup(path string) (ret Lookup) {
-    ret.Dat = path
-    ret.URngAzi = d.URngAzi
-    ret.DType =  FloatCpx
+func (d DEM) NewLookup(path string) (l Lookup) {
+    l.Dat = path
+    l.URngAzi = d.URngAzi
+    l.DType =  FloatCpx
     return
 }
 
-func (d DEM) TmpLookup() (ret Lookup, err error) {
+func (d DEM) TmpLookup() (l Lookup, err error) {
     var path string
     if path, err = TmpFile(""); err != nil {
         return
@@ -44,26 +48,48 @@ func (d DEM) TmpLookup() (ret Lookup, err error) {
     return d.NewLookup(path), nil
 }
 
-func (dem DEM) ParseRng() (int, error) {
-    return dem.Int("width", 0)
+func (dem DEM) ParseRng() (i int, err error) {
+    var ferr = merr("DEM.ParseRng")
+    
+    if i, err = dem.Int("width", 0); err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return 
 }
 
-func (dem DEM) ParseAzi() (int, error) {
-    return dem.Int("nlines", 0)
+func (dem DEM) ParseAzi() (i int, err error) {
+    var ferr = merr("DEM.ParseAzi")
+    
+    if i, err = dem.Int("nlines", 0); err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return 
 }
 
-func (d DEM) Raster(opt RasArgs) error {
+func (d DEM) Raster(opt RasArgs) (err error) {
+    var ferr = merr("DEM.Raster")
     opt.Mode = Power
     opt.Parse(d)
     
-    return d.DatFile.Raster(opt)
+    if err = d.DatFile.Raster(opt); err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return
 }
 
-func (l Lookup) Raster(opt RasArgs) error {
+func (l Lookup) Raster(opt RasArgs) (err error) {
+    var ferr = merr("Lookup.Raster")
     opt.Mode = MagPhase
     opt.Parse(l)
+
+    if err = l.DatFile.Raster(opt); err != nil {
+        err = ferr.Wrap(err)
+    }
     
-    return l.DatFile.Raster(opt)
+    return
 }
 
 type (
@@ -98,6 +124,8 @@ const (
 )
 
 func (i *InterpolationMode) Decode(s string) (err error) {
+    var ferr = merr("InterpolationMode.Decode")
+    
     switch s {
     case "NearestNeighbour":
         *i = NearestNeighbour
@@ -124,7 +152,7 @@ func (i *InterpolationMode) Decode(s string) (err error) {
     case "Gauss":
         *i = Gauss
     default:
-        err = UnrecognizedMode{got: s, name:"Interpolation Mode"}
+        err = ferr.Wrap(UnrecognizedMode{got: s, name:"Interpolation Mode"})
     }
     return
 }
@@ -193,10 +221,13 @@ func (opt *CodeOpt) Parse() (lrIn int, lrOut int) {
 
 var g2r = Gamma.Must("geocode")
 
-func (l Lookup) geo2radar(infile IDatFile, opt CodeOpt) (ret DatFile, err error) {
+func (l Lookup) geo2radar(infile IDatFile, opt CodeOpt) (d DatFile, err error) {
+    var ferr = merr("Lookup.geo2radar")
+    
     lrIn, lrOut := opt.Parse()
     
     if err = opt.RngAzi.Check(); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
@@ -215,7 +246,7 @@ func (l Lookup) geo2radar(infile IDatFile, opt CodeOpt) (ret DatFile, err error)
     case Gauss:
         interp = 4
     default:
-        err = ModeError{name: "interpolation option", got: intm}
+        err = ferr.Wrap(ModeError{name: "interpolation option", got: intm})
         return
     }
     
@@ -237,35 +268,43 @@ func (l Lookup) geo2radar(infile IDatFile, opt CodeOpt) (ret DatFile, err error)
         case Double:
             dt = 6
         default:
-            err = WrongTypeError{DType: dtype, kind: "geo2radar"}
+            err = ferr.Wrap(WrongTypeError{DType: dtype, kind: "geo2radar"})
             return
     }
     
     
-    if ret, err = TmpDatFile("dat", dtype); err != nil {
+    if d, err = TmpDatFile("dat", dtype); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
     
     //log.Fatalf("%#v\n", opt)
     
-    ret.rng = opt.Rng
-    ret.azi = opt.Azi
+    d.rng = opt.Rng
+    d.azi = opt.Azi
     
     _, err = g2r(l.Dat, infile.Datfile(), infile.Rng(),
-                 ret.Dat, ret.rng,
+                 d.Dat, d.rng,
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Oversamp,
                  opt.MaxRad, opt.Npoints)
     
-    return ret, err
+    if err != nil {
+        err = ferr.Wrap(err)
+        return
+    }
+    
+    return d, err
 }
 
 var r2g = Gamma.Must("geocode_back")
 
-func (l Lookup) radar2geo(infile IDatFile, opt CodeOpt) (ret DatFile, err error) {
+func (l Lookup) radar2geo(infile IDatFile, opt CodeOpt) (d DatFile, err error) {
+    var ferr = merr("Lookup.radar2geo")
     lrIn, lrOut := opt.Parse()
     
     if err = opt.RngAzi.Check(); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
@@ -294,7 +333,7 @@ func (l Lookup) radar2geo(infile IDatFile, opt CodeOpt) (ret DatFile, err error)
         case LanczosSqrt:
             interp = 7
         default:
-            err = ModeError{name: "interpolation option", got: intm}
+            err = ferr.Wrap(ModeError{name: "interpolation option", got: intm})
             return
         }
     }
@@ -316,33 +355,39 @@ func (l Lookup) radar2geo(infile IDatFile, opt CodeOpt) (ret DatFile, err error)
         case Double:
             dt = 5
         default:
-            err = WrongTypeError{DType: dtype, kind: "radar2geo"}
+            err = ferr.Wrap(WrongTypeError{DType: dtype, kind: "radar2geo"})
             return
     }
     
-    if ret, err = TmpDatFile("dat", dtype); err != nil {
+    if d, err = TmpDatFile("dat", dtype); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
-    ret.rng = opt.Rng
-    ret.azi = opt.Azi
+    d.rng = opt.Rng
+    d.azi = opt.Azi
     
     _, err = r2g(infile.Datfile(), infile.Rng(), l.Dat,
-                 ret.Dat, ret.rng,
+                 d.Dat, d.rng,
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Order)
     
-    return ret, err
+    if err != nil {
+        err = ferr.Wrap(err)
+        return
+    }
+    
+    return d, nil
 }
 
 var coord2sarpix = Gamma.Must("coord_to_sarpix")
 
-func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
+func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ra RngAzi, err error) {
+    var ferr = merr("LatLon.ToRadar")
     const par = "corrected SLC/MLI range, azimuth pixel (int)"
     
     out, err := coord2sarpix(mpar, "-", ll.Lat, ll.Lon, hgt, diffPar)
-    
     if err != nil {
-        err = Handle(err, "failed to retreive radar coordinates")
+        err = ferr.WrapFmt(err, "failed to retreive radar coordinates")
         return
     }
     
@@ -351,28 +396,31 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ret RngAzi, err error) {
     line, err := params.Param(par)
     
     if err != nil {
-        err = Handle(err, "failed to retreive range, azimuth")
+        err = ferr.WrapFmt(err, "failed to retreive range, azimuth")
         return
     }
     
-    split := strings.Split(line, " ")
     
-    if len(split) < 2 {
-        err = fmt.Errorf("split to retreive range, azimuth failed")
+    split := NewSplitParser(line, " ")
+    
+    if err = split.Wrap(); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
-    if ret.Rng, err = strconv.Atoi(split[0]); err != nil {
-        err = ParseIntErr.Wrap(err, split[0])
+    if len(split.split) < 2 {
+        err = ferr.Wrap(fmt.Errorf("split to retreive range, azimuth failed"))
         return
     }
     
-    if ret.Azi, err = strconv.Atoi(split[1]); err != nil {
-        err = ParseIntErr.Wrap(err, split[1])
-        return
+    ra.Rng = split.Int(0)
+    ra.Azi = split.Int(1)
+    
+    if err = split.Wrap(); err != nil {
+        err = ferr.Wrap(err)
     }
-
-    return ret, nil
+    
+    return
 }
 
 type Hgt struct {
@@ -381,10 +429,16 @@ type Hgt struct {
 
 
 func (h Hgt) Raster(opt RasArgs) (err error) {
+    var ferr = merr("Hgt.Raster")
+    
     opt.Mode = Height
     opt.Parse(h)
     
-    return h.DatFile.Raster(opt)
+    if err = h.DatFile.Raster(opt); err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return
 }
 
 type Geocode struct {
@@ -439,31 +493,24 @@ var (
 )
 
 func (g* GeocodeOpt) Run(outDir string) (err error) {
+    var ferr = merr("GeocodeOpt")
+    
     geodir := filepath.Join(outDir, "geo")
     
-    err = os.MkdirAll(geodir, os.ModePerm)
-    
-    if err != nil {
-        err = DirCreateErr.Wrap(err, geodir)
-        //err = Handle(err, "failed to create directory '%s'!", geodir)
-        return
+    if err = Mkdir(geodir); err != nil {
+        return ferr.Wrap(err)
     }
     
     var demOrig DEM
-    if demOrig, err = NewDEM(filepath.Join(geodir, "srtm.dem"), ""); err != nil {
-        return
+    if demOrig, err = NewDEM(filepath.Join(geodir, "srtm.dem"), "");
+       err != nil {
+        return ferr.Wrap(err)
     }
-    
-    //if err != nil {
-        //err = DataCreateErr.Wrap(err, "DEM")
-        //return
-    //}
     
     vrtPath := g.DEMPath
     
     if len(vrtPath) == 0 {
-        err = fmt.Errorf("path to vrt files not specified")
-        return
+        return ferr.Wrap(fmt.Errorf("path to vrt files not specified"))
     }
     
     overlap := g.DEMOverlap
@@ -483,18 +530,16 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     }
     
     
-    ex, err := Exist(demOrig.Dat)
     
-    if err != nil {
-        err = Handle(err, "failed to check whether original DEM exists")
-        return
+    var ex bool
+    if ex, err = Exist(demOrig.Dat); err != nil {
+        return ferr.WrapFmt(err,
+            "failed to check whether original DEM exists")
     }
     
-    mli, err := NewMLI(g.Master.Dat, g.Master.Par)
-    
-    if err != nil {
-        err = Handle(err, "failed to parse master MLI file")
-        return
+    var mli MLI
+    if mli, err = NewMLI(g.Master.Dat, g.Master.Par); err != nil {
+        return ferr.WrapFmt(err, "failed to parse master MLI file")
     }
     
     if !ex {
@@ -504,8 +549,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         _, err = vrt2dem(vrtPath, mli.Par, demOrig.Dat, demOrig.Par, 2, "-")
         
         if err != nil {
-            err = Handle(err, "failed to create DEM from vrt file")
-            return
+            return ferr.WrapFmt(err, "failed to create DEM from vrt file")
         }
     } else {
         log.Println("DEM already imported.")
@@ -533,16 +577,10 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     }
     
     var dem DEM
-    if dem, err = NewDEM(filepath.Join(geodir, "dem_seg.dem"), ""); err != nil {
-        return
+    if dem, err = NewDEM(filepath.Join(geodir, "dem_seg.dem"), "");
+       err != nil {
+        return ferr.Wrap(err)
     }
-    
-    //if err != nil {
-        //err = DataCreateErr.Wrap(err, "DEM")
-        ////err = Handle(err, "failed to create DEM struct")
-        //return
-    //}
-    
     
     geo := Geocode{
         Offs    : filepath.Join(geodir, "offs"),
@@ -556,65 +594,75 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     
     var sigma0, gamma0, lsMap, simSar, zenith, orient, inc, pix, proj DatFile
     
-    if sigma0, err =  mli.Like(filepath.Join(geodir, "sigma0"), Float); err != nil {
-        return
+    if sigma0, err =  mli.Like(filepath.Join(geodir, "sigma0"), Float);
+       err != nil {
+        return ferr.Wrap(err)
     }
     
-    if gamma0, err =  mli.Like(filepath.Join(geodir, "gamma0"), Float); err != nil {
-        return
+    if gamma0, err =  mli.Like(filepath.Join(geodir, "gamma0"), Float);
+       err != nil {
+        return ferr.Wrap(err)
     }
     
     // datatype of lsmap?
-    if lsMap, err =  mli.Like(filepath.Join(geodir, "lsmap"), Float); err != nil {
-        return
+    if lsMap, err =  mli.Like(filepath.Join(geodir, "lsmap"), Float);
+       err != nil {
+        return ferr.Wrap(err)
     }
     
-    if simSar, err =  mli.Like(filepath.Join(geodir, "sim_sar"), Float); err != nil {
-        return
+    if simSar, err =  mli.Like(filepath.Join(geodir, "sim_sar"), Float);
+       err != nil {
+        return ferr.Wrap(err)
     }
     
-    if zenith, err =  mli.Like(filepath.Join(geodir, "zenith"), Float); err != nil {
-        return
+    if zenith, err =  mli.Like(filepath.Join(geodir, "zenith"), Float);
+       err != nil {
+        return ferr.Wrap(err)
     }
     
-    if orient, err =  mli.Like(filepath.Join(geodir, "orient"), Float); err != nil {
-        return
+    if orient, err =  mli.Like(filepath.Join(geodir, "orient"), Float);
+       err != nil {
+        return ferr.Wrap(err)
     }
     
-    if inc, err =  mli.Like(filepath.Join(geodir, "inclination"), Float); err != nil {
-        return
+    if inc, err =  mli.Like(filepath.Join(geodir, "inclination"), Float);
+       err != nil {
+        return ferr.Wrap(err)
     }
     
-    if proj, err =  mli.Like(filepath.Join(geodir, "projection"), Float); err != nil {
-        return
+    if proj, err =  mli.Like(filepath.Join(geodir, "projection"), Float);
+       err != nil {
+        return ferr.Wrap(err)
     }
     
-    if pix, err =  mli.Like(filepath.Join(geodir, "pixel_area"), Float); err != nil {
-        return
+    if pix, err =  mli.Like(filepath.Join(geodir, "pixel_area"), Float);
+       err != nil {
+        return ferr.Wrap(err)
     }
     
     var lookup Lookup
     if lookup.DatFile, err = dem.Like(filepath.Join(geodir, "lookup"), FloatCpx);
        err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     var lookupOld string
     if lookupOld, err = TmpFile(""); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     var ex1 bool
     if ex1, err = Exist(lookup.Dat); err != nil {
-        err = Handle(err, "failed to check whether lookup table exists")
+        return ferr.WrapFmt(err,
+            "failed to check whether lookup table exists")
         return
     }
     
-    ex2, err := Exist(dem.Par)
     
-    if err != nil {
-        err = Handle(err, "failed to check whether DEM parameter exists")
-        return
+    var ex2 bool
+    if ex2, err = Exist(dem.Par); err != nil {
+        return ferr.WrapFmt(err,
+            "failed to check whether DEM parameter exists")
     }
     
     if !ex1 && !ex2 {
@@ -648,7 +696,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
                        lsMap.Dat, g.nPixel, 2, g.RngOversamp)
         
         if err != nil {
-            return
+            return ferr.Wrap(err)
         }      
     } else {
         log.Println("Initial lookup table already created.")
@@ -660,13 +708,13 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
                        inc.Dat, sigma0.Dat, gamma0.Dat, g.AreaFactor)
     
     if err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     _, err = createDiffPar(mli.Par, nil, geo.DiffPar, SLC_MLI, NonInter)
     
     if err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     log.Println("Refining lookup table.")
@@ -677,27 +725,22 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         for ii := 0; ii < itr; ii++ {
             log.Printf("ITERATION %d / %d\n", ii + 1, itr)
             
-            err = os.Remove(geo.DiffPar)
-            
-            if err != nil {
-                err = Handle(err, "failed to remove file '%s'", geo.DiffPar)
-                return
+            if err = os.Remove(geo.DiffPar); err != nil {
+                return ferr.WrapFmt(err, "failed to remove file '%s'",
+                    geo.DiffPar)
             }
 
             // copy previous lookup table
-            err = os.Rename(lookup.Dat, lookupOld)
-            
-            if err != nil {
-                err = Handle(err, "failed to move lookup file '%s'",
-                    lookup.Dat)
-                return
+            if err = os.Rename(lookup.Dat, lookupOld); err != nil {
+                return ferr.WrapFmt(err,
+                    "failed to move lookup file '%s'", lookup.Dat)
             }
             
             _, err = createDiffPar(mli.Par, nil, geo.DiffPar,
                                    SLC_MLI, NonInter)
             
             if err != nil {
-                return
+                return ferr.Wrap(err)
             }
             
             _, err = offsetPwrm(geo.Sigma0, mli.Dat, geo.DiffPar, geo.Offs,
@@ -706,7 +749,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
                                 g.CCThresh, g.LanczosOrder, g.BandwithFrac)
             
             if err != nil {
-                return
+                return ferr.Wrap(err)
             }
             
             _, err = offsetFitm(geo.Offs, geo.Ccp, geo.DiffPar, geo.Coffs,
@@ -714,7 +757,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
             
             
             if err != nil {
-                return
+                return ferr.Wrap(err)
             }
 
             // update previous lookup table
@@ -723,7 +766,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
                                lookup.Dat, 1)
             
             if err != nil {
-                return
+                return ferr.Wrap(err)
             }
 
             // create new simulated ampliutides with the new lookup table
@@ -731,7 +774,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
                                inc.Dat, sigma0.Dat, gamma0.Dat, g.AreaFactor)
             
             if err != nil {
-                return
+                return ferr.Wrap(err)
             }
 
         }
@@ -746,7 +789,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     
     for _, s := range toSave {
         if err = Save("", s); err != nil {
-            return
+            return ferr.Wrap(err)
         }
     }
     

@@ -26,8 +26,11 @@ const (
     DShort
 )
 
-func ParseDate(format dateFormat, str string) (ret time.Time, err error) {
-    var form string
+func ParseDate(format dateFormat, str string) (t time.Time, err error) {
+    var (
+        ferr = merr("ParseDate")
+        form string
+    )
 
     switch format {
     case DLong:
@@ -38,51 +41,51 @@ func ParseDate(format dateFormat, str string) (ret time.Time, err error) {
         break
     }
 
-    ret, err = time.Parse(form, str)
-
-    if err != nil {
-        err = Handle(err, "failed to parse date '%s'", str)
+    if t, err = time.Parse(form, str); err != nil {
+        err = ferr.WrapFmt(err, "failed to parse date '%s'", str)
         return
     }
 
-    return ret, nil
+    return t, nil
 }
 
-func NewDate(format dateFormat, start, stop string) (ret date, err error) {
-    var _start, _stop time.Time
+func NewDate(format dateFormat, start, stop string) (d date, err error) {
+    var (
+        ferr = merr("NewDate")
+        _start, _stop time.Time
+    )
     
-    _start, err = ParseDate(format, start)
-    if err != nil {
-        err = Handle(err, "failed to parse date: '%s'", start)
+    if _start, err = ParseDate(format, start); err != nil {
+        err = ferr.WrapFmt(err, "failed to parse date: '%s'", start)
         return
     }
 
     _stop, err = ParseDate(format, stop)
     if err != nil {
-        err = Handle(err, "failed to parse date: '%s'", start)
+        err = ferr.WrapFmt(err, "failed to parse date: '%s'", start)
         return
     }
 
     // TODO: Optional check duration, is it max or min
     delta := _start.Sub(_stop) / 2.0
-    ret.center = _stop.Add(delta)
+    d.center = _stop.Add(delta)
 
-    ret.start = _start
-    ret.stop = _stop
+    d.start = _start
+    d.stop = _stop
 
-    return ret, nil
+    return d, nil
 }
 
-func (self *date) Start() time.Time {
-    return self.start
+func (d *date) Start() time.Time {
+    return d.start
 }
 
-func (self *date) Center() time.Time {
-    return self.center
+func (d *date) Center() time.Time {
+    return d.center
 }
 
-func (self *date) Stop() time.Time {
-    return self.stop
+func (d *date) Stop() time.Time {
+    return d.stop
 }
 
 func Before(one, two Date) bool {

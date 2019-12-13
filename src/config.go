@@ -141,8 +141,10 @@ func (ra *RngAzi) Default() {
 }
 
 func (mm *IMinmax) Decode(s string) (err error) {
+    var ferr = merr("IMinmax.Decode")
+    
     if len(s) == 0 {
-        return EmptyStringError
+        return ferr.Wrap(EmptyStringError{})
     }
     
     split := NewSplitParser(s, ",")
@@ -150,12 +152,18 @@ func (mm *IMinmax) Decode(s string) (err error) {
     mm.Min = split.Int(0)
     mm.Max = split.Int(1)
     
-    return split.Wrap()
+    if err = split.Wrap(); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    return nil
 }
 
 func (ll *LatLon) Decode(s string) (err error) {
+    var ferr = merr("LatLon.Decode")
+
     if len(s) == 0 {
-        return EmptyStringError
+        return ferr.Wrap(EmptyStringError{})
     }
     
     split := NewSplitParser(s, ",")
@@ -163,7 +171,11 @@ func (ll *LatLon) Decode(s string) (err error) {
     ll.Lat = split.Float(0, 64)
     ll.Lon = split.Float(1, 64)
     
-    return split.Wrap()
+    if err = split.Wrap(); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    return nil
 }
 
 func delim(msg, sym string) {
@@ -195,35 +207,38 @@ func MakeDefaultConfig(path string) (err error) {
     return nil
 }
 
-func SaveJson(path string, val interface{}) error {
-    out, err := json.MarshalIndent(val, "", "    ")
+func SaveJson(path string, val interface{}) (err error) {
+    var ferr = merr("SaveJson")
     
-    if err != nil {
-        return Handle(err, "failed to json encode struct: %v", val)
+    var out []byte
+    if out, err = json.MarshalIndent(val, "", "    "); err != nil {
+        return ferr.WrapFmt(err,
+            "failed to json encode struct: %v", val)
     }
 
-    f, err := os.Create(path)
-    if err != nil {
-        return Handle(err, "failed to create file: %s", path)
+    var f *os.File
+    if f, err = os.Create(path); err != nil {
+        return ferr.WrapFmt(err, "failed to create file: %s", path)
     }
     defer f.Close()
 
     if _, err = f.Write(out); err != nil {
-        return Handle(err, "failed to write to file '%s'", path)
+        return ferr.WrapFmt(err, "failed to write to file '%s'", path)
     }
 
     return nil
 }
 
-func LoadJson(path string, val interface{}) error {
-    data, err := ReadFile(path)
-
-    if err != nil {
-        return Handle(err, "failed to read file '%s'", path)
+func LoadJson(path string, val interface{}) (err error) {
+    var ferr = merr("LoadJson")
+    
+    var data []byte
+    if data, err = ReadFile(path); err != nil {
+        return ferr.WrapFmt(err, "failed to read file '%s'", path)
     }
     
     if err := json.Unmarshal(data, &val); err != nil {
-        return Handle(err, "failed to parse json data %s'", data)
+        return ferr.WrapFmt(err, "failed to parse json data %s'", data)
     }
 
     return nil

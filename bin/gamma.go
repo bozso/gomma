@@ -17,7 +17,7 @@ func testError1() error {
     var ferr = mainErr("testError1")
     
     if err := testError2(); err != nil {
-        return ferr.Wrap(err, "failed to load some file")
+        return ferr.WrapFmt(err, "failed to load some file")
     }
     
     return nil
@@ -29,7 +29,7 @@ func testError2() error {
     
     file, err := os.Open("asd")
     if err != nil {
-        return ferr.Wrap(err, "failed to open file")
+        return ferr.WrapFmt(err, "failed to open file")
     }
     defer file.Close()
     

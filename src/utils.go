@@ -91,19 +91,24 @@ func StringToVal(v reflect.Value, kind reflect.Kind, in string) error {
     return nil
 }
 
-type emptyStringError struct {
-    err error
+type EmptyStringError struct {
+    variable string
+    err      error
 }
 
-func (e emptyStringError) Error() string {
-    return fmt.Sprintf("expected non empty string")
+func (e EmptyStringError) Error() (s string) {
+    s = "expected non empty string"
+    
+    if v := e.variable; len(v) > 0 {
+        s = fmt.Sprintf("%s for '%s'", s, v)
+    }
+    
+    return
 }
 
-func (e emptyStringError) Unwrap() error {
+func (e EmptyStringError) Unwrap() error {
     return e.err
 }
-
-var EmptyStringError emptyStringError
 
 const (
     ParseFieldErr Werror = "parsing of struct field '%s' failed"
@@ -590,3 +595,60 @@ const (
     MoveErr Werror = "failed to move '%s' to '%s'"
     EmptyStringErr Werror = "expected %s to be a non empty string"
 )
+
+type ( 
+    ModuleName string
+    FnName string
+    
+    OpError struct {
+        module ModuleName
+        fn     FnName
+        ctx    string
+        err    error
+    }
+    
+    opErrorFactory func(fn FnName) OpError
+)
+
+
+func NewModuleErr(mod ModuleName) opErrorFactory {
+    return func(fn FnName) (err OpError) {
+        return OpError{module: mod, fn: fn}
+    }
+}
+
+func (e OpError) Error() (s string) {
+    s = fmt.Sprintf("\n  %s/%s", e.module, e.fn)
+    
+    if ctx := e.ctx; len(ctx) > 0 {
+        s = fmt.Sprintf("%s: %s", s, ctx)
+    } 
+    
+    if e.err != nil {
+        s = fmt.Sprintf("%s: %s", s, e.err)
+    }
+    
+    return
+}
+
+func (e OpError) Unwrap() error {
+    return e.err
+}
+
+func (e OpError) Wrap(err error) error {
+    e.err = err
+    return e
+}
+
+func (e OpError) WrapFmt(err error, msg string, args ...interface{}) error {
+    e.err = err
+    e.ctx = fmt.Sprintf(msg, args...)
+    
+    return e
+}
+
+func (e OpError) Fmt(msg string, args ...interface{}) error {
+    e.err = fmt.Errorf(msg, args...)
+    
+    return e
+}

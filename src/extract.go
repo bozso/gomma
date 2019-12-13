@@ -59,14 +59,17 @@ func (ex *Extractor) Extract(mode tplType, iw int) (s string) {
 func (ex Extractor) extract(template, dst string) (s string, err error) {
     //log.Fatalf("%s %s", root, template)
     
-    var matched, exist bool
+    var (
+        ferr = merr("Extractor.extract")
+        matched, exist bool
+    )
     
     // go through files in the zipfile
     for _, zipfile := range ex.ReadCloser.File {
         name := zipfile.Name
         
         if matched, err = regexp.MatchString(name, template); err != nil {
-            err = Handle(err,
+            err = ferr.WrapFmt(err,
                 "failed to check whether zipped file '%s' matches templates",
                 name)
             return
@@ -83,13 +86,13 @@ func (ex Extractor) extract(template, dst string) (s string, err error) {
         //    name, template, matched)
         
         if exist, err = Exist(s); err != nil {
-            err = Handle(err, "stat failed on file '%s'", name)
+            err = ferr.WrapFmt(err, "stat failed on file '%s'", name)
             return
         }
         
         if !exist {
             if err = extractFile(zipfile, s); err != nil {
-                err = ExtractError{name, err}
+                err = ferr.Wrap(ExtractError{name, err})
                 return
             }
         }
@@ -99,30 +102,33 @@ func (ex Extractor) extract(template, dst string) (s string, err error) {
 }
 
 func extractFile(src *zip.File, dst string) (err error) {
-    srcName := src.Name
+    var (
+        ferr = merr("extractFile")
+        srcName = src.Name
+        in io.ReadCloser
+    )
 
-    var in io.ReadCloser 
     if in, err = src.Open(); err != nil {
-        return FileOpenError{srcName, err}
+        return ferr.Wrap(FileOpenError{srcName, err})
     }
     defer in.Close()
     
     dir := filepath.Dir(dst)
     if err = Mkdir(dir); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     var out *os.File
     if out, err = os.Create(dst); err != nil {
-        return FileCreateErr.Wrap(err, dst)
+        return ferr.Wrap(FileOpenError{dst, err})
     }
     defer out.Close()
     
     log.Printf("Extracting '%s' into '%s'", srcName, dst)
     
     if _, err = io.Copy(out, in); err != nil {
-        return Handle(err, "failed to copy contents of '%s' into '%s'",
-            srcName, dst)
+        return ferr.WrapFmt(err,
+            "failed to copy contents of '%s' into '%s'", srcName, dst)
     }
 
     return nil

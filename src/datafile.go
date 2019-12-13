@@ -126,8 +126,10 @@ type RngAzi struct {
 }
 
 func (ra *RngAzi) Decode(s string) (err error) {
+    var ferr = merr("RngAzi.Decode")
+    
     if len(s) == 0 {
-        return EmptyStringError
+        return ferr.Wrap(EmptyStringError{})
     }
     
     split := NewSplitParser(s, ",")
@@ -135,17 +137,24 @@ func (ra *RngAzi) Decode(s string) (err error) {
     ra.Rng = split.Int(0)
     ra.Azi = split.Int(1)
     
-    return split.err
+    if err := split.Wrap(); err != nil {
+        return ferr.Wrap(err) 
+    }
+    
+    return nil
 }
 
 func (ra RngAzi) Check() (err error) {
+    var ferr = merr("RngAzi.Check")
+     
     if ra.Rng == 0 {
-        return ZeroDimError{dim: "range samples / columns"}
+        return ferr.Wrap(ZeroDimError{dim: "range samples / columns"})
     }
     
     if ra.Azi == 0 {
-        return ZeroDimError{dim: "azimuth lines / rows"}
+        return ferr.Wrap(ZeroDimError{dim: "azimuth lines / rows"})
     }
+    
     return nil
 }
 
@@ -216,8 +225,9 @@ type (
 )
 
 func NewDatFile(path string, dt DType) (ret DatFile, err error) {
+    var ferr = merr("NewDatFile")
     if len(path) == 0 {
-        err = fmt.Errorf("expected datafile path to be a non empty string")
+        err = ferr.Wrap(EmptyStringError{variable:"datafile"})
         return
     }
     
@@ -237,15 +247,19 @@ func TmpDatFile(ext string, dt DType) (ret DatFile, err error) {
 }
 
 func (d DatFile) Like(name string, dtype DType) (ret DatFile, err error) {
+    var ferr = merr("DatFile.Like")
+    
     if dtype == Unknown {
         dtype = d.DType
     }
     
     if name, err = filepath.Abs(name); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
     if ret, err = NewDatFile(name, dtype); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
@@ -283,44 +297,50 @@ func (d DatFile) jsonMap() JSONMap {
 }
 
 func (d *DatFile) FromJson(m JSONMap) (err error) {
+    var ferr = merr("DatFile.FromJson")
+    
     if d.Dat, err = m.String("datafile"); err != nil {
-        err = Handle(err, "failed to retreive datafile")
-        return
+        return ferr.WrapFmt(err, "failed to retreive datafile")
     }
     
     var dt string
     if dt, err = m.String("dtype"); err != nil {
-        err = Handle(err, "failed to retreive dtype")
-        return
+        return ferr.WrapFmt(err, "failed to retreive dtype")
     }
     
     d.Decode(dt)
     
     if d.rng, err = m.Int("range_samples"); err != nil {
-        //err = RngError.Wrap(err, path)
-        return
+        return ferr.Wrap(err)
     }
     
     if d.azi, err = m.Int("azimuth_lines"); err != nil {
-        //err = AziError.Wrap(err, path)
-        return
+        return ferr.Wrap(err)
     }
     
     return nil
 }
 
-func (d DatFile) Move(dir string) (ret DatFile, err error) {
-    if ret.Dat, err = Move(d.Dat, dir); err != nil {
+func (d DatFile) Move(dir string) (dm DatFile, err error) {
+    var ferr = merr("DatFile.Move")
+    
+    if dm.Dat, err = Move(d.Dat, dir); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
-    ret.URngAzi, ret.DType = d.URngAzi, d.DType
+    dm.URngAzi, dm.DType = d.URngAzi, d.DType
     
-    return ret, nil
+    return dm, nil
 }
 
-func (d DatFile) Exist() (ret bool, err error) {
-    ret, err = Exist(d.Dat)
+func (d DatFile) Exist() (b bool, err error) {
+    var ferr = merr("DatFile.Exist")
+    if b, err = Exist(d.Dat); err != nil {
+        err = ferr.Wrap(err)
+        return
+    }
+    
     return
 }
 
@@ -335,42 +355,51 @@ func (s ShapeMismatchError) Error() string {
                        s.n2)
 }
 
-func SameCols(one IDatFile, two IDatFile) error {
+func SameCols(one IDatFile, two IDatFile) (err error) {
+    var ferr = merr("SameCols")
+    
     n1, n2 := one.Rng(), two.Rng()
     
     if n1 != n2 {
-        return ShapeMismatchError{
+        return ferr.Wrap(ShapeMismatchError{
             dat1: one.Datfile(),
             dat2: two.Datfile(),
             n1:n1,
             n2:n2,
             dim: "range samples / columns",
-        }
+        })
     }
     return nil
 }
 
 func SameRows(one IDatFile, two IDatFile) error {
+    var ferr = merr("SameRows")
     n1, n2 := one.Azi(), two.Azi()
     
     if n1 != n2 {
-        return ShapeMismatchError{
+        return ferr.Wrap(ShapeMismatchError{
             dat1: one.Datfile(),
             dat2: two.Datfile(),
             n1:n1,
             n2:n2,
             dim: "azimuth lines / rows",
-        }
+        })
     }
     return nil
 }
 
 func SameShape(one IDatFile, two IDatFile) (err error) {
+    var ferr = merr("SameShape")
+    
     if err = SameCols(one, two); err != nil {
-        return
+        return ferr.Wrap(err)
+    }
+
+    if err = SameRows(one, two); err != nil {
+        return ferr.Wrap(err)
     }
     
-    return SameRows(one, two)
+    return nil
 }
     
 type DatParFile struct {
@@ -379,8 +408,11 @@ type DatParFile struct {
     time.Time `json:"-"`
 }
 
-func NewDatParFile(dat, par, ext string, dt DType) (ret DatParFile, err error) {
-    if ret.DatFile, err = NewDatFile(dat, dt); err != nil {
+func NewDatParFile(dat, par, ext string, dt DType) (d DatParFile, err error) {
+    var ferr = merr("NewDatParFile")
+    
+    if d.DatFile, err = NewDatFile(dat, dt); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
@@ -388,10 +420,10 @@ func NewDatParFile(dat, par, ext string, dt DType) (ret DatParFile, err error) {
         par = fmt.Sprintf("%s.%s", dat, ext)
     }
     
-    ret.Par = par
-    ret.Sep = ":"
+    d.Par = par
+    d.Sep = ":"
     
-    return ret, nil
+    return d, nil
 }
 
 func TmpDatParFile(ext string, parExt string, dt DType) (ret DatParFile, err error) {
@@ -410,40 +442,52 @@ func TmpDatParFile(ext string, parExt string, dt DType) (ret DatParFile, err err
 }
 
 func (d *DatParFile) Parse() (err error) {
+    var ferr = merr("DatParFile.Parse")
+    
     if d.rng, err = d.ParseRng(); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     if d.azi, err = d.ParseAzi(); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     if d.Time, err = d.ParseDate(); err != nil {
-        return
+        return ferr.Wrap(err)
     }
+    
     return nil
 }
 
-func (d DatParFile) Move(dir string) (ret DatParFile, err error) {
-    if ret.DatFile, err = d.DatFile.Move(dir); err != nil {
+func (d DatParFile) Move(dir string) (dm DatParFile, err error) {
+    var ferr = merr("DatParFile.Move")
+    
+    if dm.DatFile, err = d.DatFile.Move(dir); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
-    if ret.Par, err = Move(d.Par, dir); err != nil {
+    if dm.Par, err = Move(d.Par, dir); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
-    return ret, nil
+    return dm, nil
 }
 
-func (d DatParFile) Exist() (ret bool, err error) {
-    var de, pe bool
+func (d DatParFile) Exist() (b bool, err error) {
+    var (
+        ferr = merr("DatParFile.Exist")
+        de, pe bool
+    )
     
     if de, err = d.DatFile.Exist(); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
     if pe, err = Exist(d.Par); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
@@ -458,14 +502,18 @@ func (d DatParFile) jsonMap() JSONMap {
 }
 
 func (d *DatParFile) FromJson(m JSONMap) (err error) {
+    var ferr = merr("DatParFile.FromJson")
+    
     if err = d.DatFile.FromJson(m); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
     if d.Par, err = m.String("parameterfile"); err != nil {
-        err = Handle(err, "failed to retreive paramfile")
+        err = ferr.WrapFmt(err, "failed to retreive paramfile")
         return
     }
+
     d.Sep = ":"
     
     return nil    
@@ -486,30 +534,52 @@ func (d DatParFile) TimeStr(format dateFormat) string {
     return ""
 }
 
-func (d DatParFile) ParseRng() (int, error) {
-    return d.Int("range_samples", 0)
+func (d DatParFile) ParseRng() (i int, err error) {
+    var ferr = merr("DatParFile.ParseRng")
+    
+    if i, err = d.Int("range_samples", 0); err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return
 }
 
-func (d DatParFile) ParseAzi() (int, error) {
-    return d.Int("azimuth_lines", 0)
+func (d DatParFile) ParseAzi() (i int, err error) {
+    var ferr = merr("DatParFile.ParseAzi")
+    
+    if i, err = d.Int("azimuth_lines", 0); err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return
 }
 
-func (d DatParFile) ParseFmt() (string, error) {
-    return d.Param("image_format")
+func (d DatParFile) ParseFmt() (s string, err error) {
+    var ferr = merr("DatParFile.ParseFmt")
+    
+    if s, err = d.Param("image_format"); err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return
 }
 
 func (d DatParFile) ParseDtype() (dt DType, err error) {
-    var s string
+    var (
+        ferr = merr("DatParFile.ParseDtype")
+        s string
+    )
     
     if s, err = d.Param("image_format"); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
     dt.Decode(s)
     
     if dt == Unknown {
-        err = fmt.Errorf("failed to determine data type based on '%s'",
-            s)
+        err = ferr.Wrap(fmt.Errorf("failed to determine data type based on '%s'",
+            s))
         return
     }
     
@@ -520,12 +590,14 @@ const (
     TimeParseErr Werror = "failed retreive %s from date string '%s'"
 )
 
-func (d DatParFile) ParseDate() (ret time.Time, err error) {
-
+func (d DatParFile) ParseDate() (t time.Time, err error) {
+    var ferr = merr("DatParFile.ParseDate")
+    
     dateStr, err := d.Param("date")
     
     if err != nil {
-        err = Handle(err, "failed to retreive date from '%s'", d.Par)
+        err = ferr.WrapFmt(err, "failed to retreive date from '%s'",
+            d.Par)
         return
     }
     
@@ -534,7 +606,7 @@ func (d DatParFile) ParseDate() (ret time.Time, err error) {
     year, err := strconv.Atoi(split[0])
     
     if err != nil {
-        err = TimeParseErr.Wrap(err, "year", dateStr)
+        err = ferr.Wrap(TimeParseErr.Wrap(err, "year", dateStr))
         return
     }
     
@@ -571,7 +643,7 @@ func (d DatParFile) ParseDate() (ret time.Time, err error) {
     day, err := strconv.Atoi(split[2])
         
     if err != nil {
-        err = TimeParseErr.Wrap(err, "day", dateStr)
+        err = ferr.Wrap(TimeParseErr.Wrap(err, "day", dateStr))
         return
     }
     
@@ -585,27 +657,29 @@ func (d DatParFile) ParseDate() (ret time.Time, err error) {
         hour, err = strconv.Atoi(split[3])
             
         if err != nil {
-            err = TimeParseErr.Wrap(err, "hour", dateStr)
+            err = ferr.Wrap(TimeParseErr.Wrap(err, "hour", dateStr))
             return
         }
         
         min, err = strconv.Atoi(split[4])
             
         if err != nil {
-            err = TimeParseErr.Wrap(err, "minute", dateStr)
+            err = ferr.Wrap(TimeParseErr.Wrap(err, "minute", dateStr))
             return
         }
         
         sec, err = strconv.ParseFloat(split[5], 64)
             
         if err != nil {
-            err = TimeParseErr.Wrap(err, "seconds", dateStr)
+            err = ferr.Wrap(TimeParseErr.Wrap(err, "seconds", dateStr))
             return
         }
     }        
     // TODO: parse nanoseconds
     
-    return time.Date(year, month, day, hour, min, int(sec), 0, time.UTC), nil
+    t = time.Date(year, month, day, hour, min, int(sec), 0, time.UTC)
+    
+    return t, nil
 }
 
 func ID(one IDatParFile, two IDatParFile, format dateFormat) string {
@@ -708,16 +782,17 @@ type(
     //}
 //}
 
-func Move(path string, dir string) (ret string, err error) {
-    dst, err := filepath.Abs(filepath.Join(dir, filepath.Base(path)));
+func Move(path string, dir string) (s string, err error) {
+    var ferr = merr("Move")
+    
+    dst, err := filepath.Abs(filepath.Join(dir, filepath.Base(path)))
     if err != nil {
-        err = Handle(err, "failed to create absolute path")
+        err = ferr.WrapFmt(err, "failed to create absolute path")
         return
     }
     
     if err = os.Rename(path, dst); err != nil {
-        err = MoveErr.Wrap(err, path, dst)
-        //err = Handle(err, "failed to move file '%s' to '%s'", path, dst)
+        err = ferr.Wrap(MoveErr.Wrap(err, path, dst))
         return
     }
     
@@ -725,29 +800,40 @@ func Move(path string, dir string) (ret string, err error) {
 }
 
 func Save(path string, d Serialize) (err error) {
+    var ferr = merr("Save")
+    
     if len(path) == 0 {
         if path, err = filepath.Abs(d.jsonName()); err != nil {
-            return
+            return ferr.Wrap(err)
         }
     }
     
-    return SaveJson(path, d.jsonMap())
+    if err = SaveJson(path, d.jsonMap()); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    return nil
 }
 
 func Load(path string, d Serialize) (err error) {
+    var ferr = merr("Load")
     
     data, err := ReadFile(path)
     if err != nil {
-        err = Handle(err, "failed to read file '%s'", path)
-        return
+        return ferr.WrapFmt(err, "failed to read file '%s'", path)
+        
     }
     
     m := make(JSONMap)
     
     if err = json.Unmarshal(data, &m); err != nil {
-        err = Handle(err, "failed to parse json data %s'", data)
-        return
+        return ferr.WrapFmt(err, "failed to parse json data %s'", data)
+        
     }
     
-    return d.FromJson(m) 
+    if err = d.FromJson(m); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    return nil 
 }

@@ -84,13 +84,15 @@ type like struct {
 }
 
 func likeFn(ctx *cli.Context) (err error) {
+    var ferr = merr("likeFn")
+    
     l := ctx.Argv().(*like)
     
     in, out := l.In, l.Out
     
     var indat DatFile
     if err = Load(in, &indat); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     dtype := l.Dtype
@@ -100,7 +102,7 @@ func likeFn(ctx *cli.Context) (err error) {
     }
     
     if out, err = filepath.Abs(out); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     outdat := DatFile{
@@ -109,7 +111,11 @@ func likeFn(ctx *cli.Context) (err error) {
         DType: dtype,
     }
     
-    return Save(out, &outdat)
+    if err = Save(out, &outdat); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    return nil
 }
 
 var MoveFile = &cli.Command{
@@ -126,28 +132,29 @@ type move struct {
 
 
 func moveFn(ctx *cli.Context) (err error) {
+    var ferr = merr("moveFn")
+    
     m := ctx.Argv().(*move)
     path := m.Meta
     
     var dat DatParFile
     if err = Load(path, &dat); err != nil {
-        err = Handle(err, "failed to parse json metadatafile '%s'", path)
-        return
+        return ferr.WrapFmt(err,
+            "failed to parse json metadatafile '%s'", path) 
     }
     
     out := m.OutDir
     
     if dat, err = dat.Move(out); err != nil {
-        return err
+        return ferr.Wrap(err)
     }
     
     if path, err = Move(path, out); err != nil {
-        return err
+        return ferr.Wrap(err)
     }
     
     if err = SaveJson(path, dat); err != nil {
-        err = Handle(err, "failed to refresh json metafile")
-        return err
+        return ferr.WrapFmt(err, "failed to refresh json metafile")
     }
     
     return nil
@@ -169,6 +176,8 @@ type coreg struct {
 }
 
 func coregFn(ctx *cli.Context) (err error) {
+    var ferr = merr("coregFn")
+    
     c := ctx.Argv().(*coreg)
     
     sm, ss, sr := c.Master, c.Slave, c.Ref
@@ -180,30 +189,29 @@ func coregFn(ctx *cli.Context) (err error) {
     } else {
         var ref_ S1SLC
         if ref_, err = FromTabfile(sr); err != nil {
-            err = ParseTabErr.Wrap(err, sr)
-            return
+            return ferr.Wrap(err)
         }
         ref = &ref_
     }
     
     var s, m S1SLC
     if s, err = FromTabfile(ss); err != nil {
-        return ParseTabErr.Wrap(err, ss)
+        return ferr.Wrap(err)
     }
     
     if m, err = FromTabfile(sm); err != nil {
-        return ParseTabErr.Wrap(err, sm)
+        return ferr.Wrap(err)
     }
     
     c.Tab, c.ID = m.Tab, m.Format(DateShort)
     
     var out S1CoregOut
     if out, err = c.Coreg(&s, ref); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     if err = Save("", &out.Ifg); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     fmt.Printf("Created RSLC: %s", out.Rslc.Tab)
@@ -229,37 +237,40 @@ type create struct {
 }
 
 func createFn(ctx *cli.Context) (err error) {
+    var ferr = merr("createFn")
     c := ctx.Argv().(*create)
-    
-    fmt.Printf("%#v\n", *c)
     
     var dat string
     if dat, err = filepath.Abs(c.Dat); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     par := c.Par
     if len(par) > 0 {
         if par, err = filepath.Abs(par); err != nil {
-            return
+            return ferr.Wrap(err)
         }
     }
     
     var datf DatParFile
     if datf, err = NewDatParFile(dat, par, c.Ext, c.Dtype); err != nil {
         err = StructCreateError.Wrap(err, "DatParFile")
-        return
+        return ferr.Wrap(err)
     }
     
     if err = datf.Parse(); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     if datf.DType, err = datf.ParseDtype(); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
-    return Save(c.Meta, &datf)
+    if err = Save(c.Meta, &datf); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    return nil
 }
 
 
@@ -281,6 +292,8 @@ type splitIfg struct {
 
 
 func splitIfgFn(ctx *cli.Context) (err error) {
+    var ferr = merr("splitIfgFn")
+    
     si := ctx.Argv().(*splitIfg)
 
     ms, ss := si.Master, si.Slave
@@ -288,11 +301,11 @@ func splitIfgFn(ctx *cli.Context) (err error) {
     var m, s SLC
 
     if err = Load(ms, &m); err != nil {
-        return
+        return ferr.Wrap(err)
     }
 
     if err = Load(ss, &s); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     mode := strings.ToUpper(si.SpectrumMode)
@@ -300,11 +313,11 @@ func splitIfgFn(ctx *cli.Context) (err error) {
     switch mode {
     case "BEAM", "B":
         if err = SameShape(m, s); err != nil {
-            return
+            return ferr.Wrap(err)
         }
         
         if err = m.SplitBeamIfg(s, si.SBIOpt); err != nil {
-            return err
+            return ferr.Wrap(err)
         }
         
     //case "SPECTRUM", "S":
@@ -330,7 +343,8 @@ func splitIfgFn(ctx *cli.Context) (err error) {
         // still need to figure out the returned files
         //return nil
     default:
-        return UnrecognizedMode{name:"Split Interferogram", got: mode}
+        err = UnrecognizedMode{name:"Split Interferogram", got: mode}
+        return ferr.Wrap(err)
     }
     return nil
 }
@@ -385,6 +399,8 @@ type geoCode struct {
 
 
 func geoCodeFn(ctx *cli.Context) (err error) {
+    var ferr = merr("geoCodeFn")
+    
     c := ctx.Argv().(*geoCode)
     
     shape := c.Shape
@@ -401,12 +417,12 @@ func geoCodeFn(ctx *cli.Context) (err error) {
     
     var l Lookup
     if err = Load(c.Lookup, &l); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     var dat DatFile
     if err = Load(c.Infile, &dat); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     mode := strings.ToUpper(c.Mode)
@@ -415,22 +431,26 @@ func geoCodeFn(ctx *cli.Context) (err error) {
     switch mode {
     case "TORADAR", "RADAR":
         if out, err = l.geo2radar(dat, c.CodeOpt); err != nil {
-            return
+            return ferr.Wrap(err)
         }
     case "TOGEO", "GEO":
         if out, err = l.radar2geo(dat, c.CodeOpt); err != nil {
-            return
+            return ferr.Wrap(err)
         }
     default:
         err = UnrecognizedMode{name: "geocoding", got: mode}
-        return
+        return ferr.Wrap(err)
     }
     
     if out, err = out.Move("."); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
-    return Save(c.Outfile, &out)
+    if err = Save(c.Outfile, &out); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    return nil
 }
 
 type Plotter struct {
@@ -440,10 +460,11 @@ type Plotter struct {
 }
 
 func raster(args Args) (err error) {
+    var ferr = merr("raster")
     p := Plotter{}
     
     if err = args.ParseStruct(&p); err != nil {
-        return ParseErr.Wrap(err)
+        return ferr.Wrap(err)
     }
         
     mode, m := Undefined, strings.ToUpper(p.PlotMode)
@@ -477,11 +498,14 @@ func raster(args Args) (err error) {
     
     var dat DatFile
     if err = Load(p.Infile, &dat); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
+    if err = dat.Raster(p.RasArgs); err != nil {
+        return ferr.Wrap(err)
+    }
     
-    return dat.Raster(p.RasArgs)
+    return nil
 }
 
 var PlotCmdFiles = map[string]Slice{
@@ -497,17 +521,18 @@ const (
 )
 
 func (m JSONMap) String(name string) (ret string, err error) {
+    var ferr = merr("JSONMap.String")
     tmp, ok := m[name]
     
     if !ok {
-        err = KeyErr.Make(name, m)
+        err = ferr.Wrap(KeyErr.Make(name, m))
         return
     }
     
     ret, ok = tmp.(string)
     
     if !ok {
-        err = TypeErr.Make(tmp, name, "string")
+        err = ferr.Wrap(TypeErr.Make(tmp, name, "string"))
         return
     }
     
@@ -515,10 +540,12 @@ func (m JSONMap) String(name string) (ret string, err error) {
 }
 
 func (m JSONMap) Int(name string) (ret int, err error) {
+    var ferr = merr("JSONMap.Int")
+    
     tmp, ok := m[name]
     
     if !ok {
-        err = KeyErr.Wrap(err, name, m)
+        err = ferr.Wrap(KeyErr.Wrap(err, name, m))
         return
     }
     
@@ -538,7 +565,8 @@ func (m JSONMap) Int(name string) (ret int, err error) {
     case float64:
         return int(v), nil
     default:
-        err = fmt.Errorf("failed to convert '%s' of type '%T' to int", tmp, tmp)
+        err = ferr.WrapFmt(err,
+            "failed to convert '%s' of type '%T' to int", tmp, tmp)
         return
     }
 }

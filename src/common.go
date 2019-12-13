@@ -6,9 +6,10 @@ import (
     "path"
     "strings"
     "path/filepath"
-    "fmt"
     //"os"
 )
+
+var merr = NewModuleErr("gamma")
 
 type (
     Slice []string
@@ -140,50 +141,4 @@ func (sl Slice) Contains(s string) bool {
         }
     }
     return false
-}
-
-type ( 
-    ModuleName string
-    FnName string
-    
-    OpError struct {
-        module ModuleName
-        fn     FnName
-        ctx    string
-        err    error
-    }
-    
-    opErrorFactory func(fn FnName) OpError
-)
-
-
-func NewModuleErr(mod ModuleName) opErrorFactory {
-    return func(fn FnName) (err OpError) {
-        return OpError{module: mod, fn: fn}
-    }
-}
-
-func (e OpError) Error() (s string) {
-    s = fmt.Sprintf("\n  %s/%s", e.module, e.fn)
-    
-    if ctx := e.ctx; len(ctx) > 0 {
-        s = fmt.Sprintf("%s: %s", s, ctx)
-    } 
-    
-    if e.err != nil {
-        s = fmt.Sprintf("%s: %s", s, e.err)
-    }
-    
-    return
-}
-
-func (e OpError) Unwrap() error {
-    return e.err
-}
-
-func (e OpError) Wrap(err error, msg string, args ...interface{}) error {
-    e.err = err
-    e.ctx = fmt.Sprintf(msg, args...)
-    
-    return e
 }

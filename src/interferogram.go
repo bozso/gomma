@@ -1,10 +1,8 @@
 package gamma
 
 import (
-    "os"
     "time"
     "log"
-    "bufio"
     "strings"
     "strconv"
 )
@@ -37,13 +35,6 @@ const (
     FingeVisibility
 )
 
-const (
-    Real CpxToReal = iota
-    Imaginary
-    Intensity
-    Magnitude
-    Phase
-)
 
 var (
     createOffset  = Gamma.Must("create_offset")
@@ -67,9 +58,11 @@ type IFG struct {
     DeltaT    time.Duration `json:"-"`
 }
 
-func NewIFG(dat, off, diffpar string) (ret IFG, err error) {
-    if ret.DatParFile, err = NewDatParFile(dat, off, "off", FloatCpx);
+func NewIFG(dat, off, diffpar string) (ifg IFG, err error) {
+    var ferr = merr("NewIFG")
+    if ifg.DatParFile, err = NewDatParFile(dat, off, "off", FloatCpx);
        err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
@@ -77,9 +70,9 @@ func NewIFG(dat, off, diffpar string) (ret IFG, err error) {
         diffpar = dat + ".diff_par"
     }
     
-    ret.DiffPar = NewGammaParam(diffpar)
+    ifg.DiffPar = NewGammaParam(diffpar)
     
-    return ret, nil
+    return
 }
 
 func TmpIFG() (ret IFG, err error) {
@@ -93,72 +86,83 @@ func TmpIFG() (ret IFG, err error) {
     return ret, nil
 }
 
-func (i IFG) jsonMap() JSONMap {
-    ret := i.DatParFile.jsonMap()
+func (ifg IFG) jsonMap() (js JSONMap) {
+    js = ifg.DatParFile.jsonMap()
     
-    ret["quality"] = i.Quality
-    ret["diffparfile"] = i.DiffPar
-    ret["simulated_unwrapped"] = i.SimUnwrap
+    js["quality"] = ifg.Quality
+    js["diffparfile"] = ifg.DiffPar
+    js["simulated_unwrapped"] = ifg.SimUnwrap
     
-    return ret
+    return
 }
 
-func (i IFG) Move(dir string) (ret IFG, err error) {
-    if ret.DatParFile, err = i.DatParFile.Move(dir); err != nil {
+func (i IFG) Move(dir string) (im IFG, err error) {
+    var ferr = merr("IFG.Move")
+    
+    if im.DatParFile, err = i.DatParFile.Move(dir); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
-    if ret.DiffPar.Par, err = Move(i.DiffPar.Par, dir); err != nil {
+    if im.DiffPar.Par, err = Move(i.DiffPar.Par, dir); err != nil {
+        err = ferr.Wrap(err)
         return
     }
-    ret.DiffPar.Sep = ":"
+    
+    im.DiffPar.Sep = ":"
     
     if len(i.SimUnwrap) > 0 {
-        if ret.SimUnwrap, err = Move(i.SimUnwrap, dir); err != nil {
+        if im.SimUnwrap, err = Move(i.SimUnwrap, dir); err != nil {
+            err = ferr.Wrap(err)
             return
         }
     }
     
     if len(i.Quality) > 0 {
-        if ret.Quality, err = Move(i.Quality, dir); err != nil {
+        if im.Quality, err = Move(i.Quality, dir); err != nil {
+            err = ferr.Wrap(err)
             return
         }
     }
-    return ret, nil
+    
+    return
 }
 
 func (i *IFG) FromJson(m JSONMap) (err error) {
+    var ferr = merr("IFG.FromJson")
+    
     if err = i.DatParFile.FromJson(m); err != nil {
-        return
+        return ferr.Wrap(err)
     }
     
     if i.DType != FloatCpx {
         err = TypeMismatchError{ftype:"IFG", expected:"complex",
             DType:i.DType}
-        return
+        return ferr.Wrap(err)
     }
     
     if i.Quality, err = m.String("quality"); err != nil {
-        err = Handle(err, "failed to retreive quality file")
+        err = ferr.WrapFmt(err, "failed to retreive quality file")
         return
     }
     
     if i.DiffPar.Par, err = m.String("diffparfile"); err != nil {
-        err = Handle(err, "failed to diffparfile")
+        err = ferr.WrapFmt(err, "failed to diffparfile")
         return
     }
     i.DiffPar.Sep = ":"
     
     
     if i.SimUnwrap, err = m.String("simulated_unwrapped"); err != nil {
-        err = Handle(err, "failed to simulated unwrapped datafile")
+        err = ferr.WrapFmt(err, "failed to simulated unwrapped datafile")
         return
     }
     
     return nil
 }
     
-func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ret IFG, err error) {
+func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ifg IFG, err error) {
+    var ferr = merr("FromSLC")
     inter := 0
     
     if opt.interact {
@@ -169,10 +173,11 @@ func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ret IFG, err error) {
     
     par1, par2 := slc1.Par, slc2.Par
     
-    _, err = createOffset(par1, par2, ret.Par, opt.algo, rng, azi, inter)
+    // TODO: check arguments!
+    _, err = createOffset(par1, par2, ifg.Par, opt.algo, rng, azi, inter)
     
     if err != nil {
-        err = Handle(err, "failed to create offset table")
+        err = ferr.WrapFmt(err, "failed to create offset table")
         return
     }
     
@@ -182,35 +187,81 @@ func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ret IFG, err error) {
         slcRefPar = ref.Par
     }
     
-    if ret, err = TmpIFG(); err != nil {
-        return
+    if ifg, err = TmpIFG(); err != nil {
+        err = ferr.Wrap(err)
+        return 
     }
     
-    _, err = phaseSimOrb(par1, par2, ret.Par, opt.hgt, ret.SimUnwrap, slcRefPar,
-                         nil, nil, 1)
+    _, err = phaseSimOrb(par1, par2, ifg.Par, opt.hgt, ifg.SimUnwrap,
+        slcRefPar, nil, nil, 1)
     
+    if err != nil {
+        err = ferr.Wrap(err)
+        return 
+    }
+
     dat1, dat2 := slc1.Dat, slc2.Dat
-    _, err = slcDiffIntf(dat1, dat2, par1, par2, ret.Par,
-                         ret.SimUnwrap, ret.DiffPar, rng, azi, 0, 0)
+    _, err = slcDiffIntf(dat1, dat2, par1, par2, ifg.Par,
+        ifg.SimUnwrap, ifg.DiffPar, rng, azi, 0, 0)
     
+    if err != nil {
+        err = ferr.Wrap(err)
+        return 
+    }
     
-    if err = ret.Parse(); err != nil {
-        return
+    if err = ifg.Parse(); err != nil {
+        err = ferr.Wrap(err)
+        return 
     }
     
     // TODO: Check date difference order
-    ret.DeltaT = slc1.Time.Sub(slc2.Time)
+    ifg.DeltaT = slc1.Time.Sub(slc2.Time)
     
-    return ret, nil
+    return
+}
+
+const (
+    Real CpxToReal = iota
+    Imaginary
+    Intensity
+    Magnitude
+    Phase
+)
+
+func (c CpxToReal) String() string {
+    switch c {
+    case Real:
+        return "Real"
+    case Imaginary:
+        return "Imaginary"
+    case Intensity:
+        return "Intensity"
+    case Magnitude:
+        return "Magnitude"
+    case Phase:
+        return "Phase"
+    default:
+        return "Unknown"
+    }
 }
 
 var cpxToReal = Gamma.Must("cpx_to_real")
 
-func (ifg IFG) ToReal(mode CpxToReal) (ret DatFile, err error) {
-    if ret, err = TmpDatFile("real", Float); err != nil {
+func (ifg IFG) ToReal(mode CpxToReal, name string) (d DatFile, err error) {
+    var ferr = merr("IFG.ToReal")
+    
+    if len(name) == 0 {
+        d, err = TmpDatFile("real", Float)
+    } else {
+        d, err = NewDatFile(name, Float)
+    }
+    
+    if err != nil {
+        err = ferr.Wrap(err)
         return
     }
-    ret.URngAzi = ifg.URngAzi
+    
+    d.URngAzi = ifg.URngAzi
     
     Mode := 0
     
@@ -226,29 +277,48 @@ func (ifg IFG) ToReal(mode CpxToReal) (ret DatFile, err error) {
     case Phase:
         Mode = 4
     default:
-        return ret, Handle(nil, "Unrecognized mode!")
-    }
-    
-    if _, err = cpxToReal(ifg.Dat, ret.Dat, ret.Rng, Mode); err != nil {
+        err = ferr.Wrap(ModeError{name:"IFG.ToReal", got:mode})
         return
     }
     
-    return ret, nil
+    if _, err = cpxToReal(ifg.Dat, d.Dat, d.Rng, Mode); err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return
 }
 
 var rasmph_pwr24 = Gamma.Must("rasmph_pwr24")
 
-func (ifg IFG) Raster(opt RasArgs) error {
+func (ifg IFG) Raster(opt RasArgs) (err error) {
+    var ferr = merr("IFG.Raster")
+
     opt.Mode = MagPhasePwr
-    return ifg.Raster(opt)
+    
+    if err = ifg.Raster(opt); err != nil {
+        err = ferr.Wrap(err)
+    }
+    return
 }
 
-func (ifg IFG) rng() (int, error) {
-    return ifg.Int("interferogram_width", 0)
+func (ifg IFG) rng() (i int, err error) {
+    var ferr = merr("IFG.rng")
+    
+    if i, err = ifg.Int("interferogram_width", 0); err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return 
 }
 
-func (ifg IFG) azi() (int, error) {
-    return ifg.Int("interferogram_azimuth_lines", 0)
+func (ifg IFG) azi() (i int, err error) {
+    var ferr = merr("IFG.azi")
+    
+    if i, err = ifg.Int("interferogram_azimuth_lines", 0); err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return 
 }
 
 /*
@@ -259,26 +329,23 @@ func (ifg IFG) imgfmt() (string, error) {
 */
 
 
-func (self IFG) CheckQuality() (ret bool, err error) {
-    qual := self.Quality
+func (ifg IFG) CheckQuality() (b bool, err error) {
+    var (
+        ferr = merr("IFG.CheckQuality")
+        qual = ifg.Quality
+    )
     
-    file, err := os.Open(qual)
-    
-    if err != nil {
-        err = Handle(err, "failed to open file '%s'", qual)
+    var file FileReader
+    if file, err = NewReader(qual); err != nil {
+        err = ferr.Wrap(err)
         return
     }
-    
     defer file.Close()
     
-    scanner := bufio.NewScanner(file)
-    
     offs := 0.0
-    
     var diff float64
-    
-    for scanner.Scan() {
-        line := scanner.Text()
+    for file.Scan() {
+        line := file.Text()
         
         if len(line) == 0 {
             continue
@@ -287,11 +354,12 @@ func (self IFG) CheckQuality() (ret bool, err error) {
         split := strings.Fields(line)
         
         if split[0] == "azimuth_pixel_offset" {
-            diff, err = strconv.ParseFloat(split[1], 64)
+            s := split[1]
+            diff, err = strconv.ParseFloat(s, 64)
             
             if err != nil {
-                err = Handle(err, "failed to parse: '%s' into float64",
-                    split[1])
+                err = ferr.WrapFmt(err,
+                    "failed to parse: '%s' into float64", s)
                 return
             }
             
@@ -302,12 +370,12 @@ func (self IFG) CheckQuality() (ret bool, err error) {
     log.Printf("Sum of azimuth offsets in %s is %f pixel.\n", qual, offs)
     
     if offs > 0.0 || offs < 0.0 {
-        ret = true
+        b = true
     } else {
-        ret = false
+        b = false
     }
     
-    return ret, nil
+    return
 }
 
 //func (self IFG) AdaptFilt(opt AdaptFiltOpt) (ret IFG, cc Coherence, err error) {
@@ -354,13 +422,14 @@ func (self IFG) CheckQuality() (ret bool, err error) {
     //return ret, cc, nil
 //}
 
-func (self IFG) Coherence(opt CoherenceOpt) (ret Coherence, err error) {
+func (ifg IFG) Coherence(opt CoherenceOpt) (c Coherence, err error) {
+    var ferr = merr("IFG.Coherence")
     weightFlag := CoherenceWeight[opt.WeightType]
     
     //log.info("CALCULATING COHERENCE AND CREATING QUICKLOOK IMAGES.")
     //log.info('Weight type is "%s"'.format(weight_type))
     
-    width := self.Rng
+    width := ifg.Rng
     
     log.Printf("Estimating phase slope. ")
     
@@ -368,11 +437,11 @@ func (self IFG) Coherence(opt CoherenceOpt) (ret Coherence, err error) {
     slope := ".cpx"
     
     // parameters: xmin, xmax, ymin, ymax not yet given
-    _, err = phaseSlope(self.Dat, slope, opt.SlopeWindow,
+    _, err = phaseSlope(ifg.Dat, slope, opt.SlopeWindow,
                         opt.SlopeCorrelationThresh)
     
     if err != nil {
-        err = Handle(err, "failed to calculate phase slope")
+        err = ferr.Wrap(err)
         return
     }
 
@@ -380,15 +449,14 @@ func (self IFG) Coherence(opt CoherenceOpt) (ret Coherence, err error) {
     
     mli1, mli2 := "", ""
     
-    _, err = CCAdaptive(self.Dat, mli1, mli2, slope, nil, ret.Dat, width,
+    _, err = CCAdaptive(ifg.Dat, mli1, mli2, slope, nil, c.Dat, width,
                         opt.Box.Min, opt.Box.Max, weightFlag)
     
     if err != nil {
-        err = Handle(err, "adaptive filtering failed")
-        return
+        err = ferr.Wrap(err)
     }
     
-    return ret, nil
+    return
 }
 
 /*
