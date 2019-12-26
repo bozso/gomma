@@ -22,7 +22,7 @@ type Lookup struct {
 }
 
 func NewDEM(dat, par string) (d DEM, err error) {
-    var ferr = merr("NewDEM")
+    var ferr = merr.Make("NewDEM")
     
     if d.DatParFile, err = NewDatParFile(dat, par, "par", Float);
        err != nil {
@@ -49,27 +49,27 @@ func (d DEM) TmpLookup() (l Lookup, err error) {
 }
 
 func (dem DEM) ParseRng() (i int, err error) {
-    var ferr = merr("DEM.ParseRng")
+    var ferr = merr.Make("DEM.ParseRng")
     
     if i, err = dem.Int("width", 0); err != nil {
         err = ferr.Wrap(err)
     }
     
-    return 
+    return i, nil
 }
 
 func (dem DEM) ParseAzi() (i int, err error) {
-    var ferr = merr("DEM.ParseAzi")
+    var ferr = merr.Make("DEM.ParseAzi")
     
     if i, err = dem.Int("nlines", 0); err != nil {
         err = ferr.Wrap(err)
     }
     
-    return 
+    return i, nil
 }
 
 func (d DEM) Raster(opt RasArgs) (err error) {
-    var ferr = merr("DEM.Raster")
+    var ferr = merr.Make("DEM.Raster")
     opt.Mode = Power
     opt.Parse(d)
     
@@ -77,11 +77,12 @@ func (d DEM) Raster(opt RasArgs) (err error) {
         err = ferr.Wrap(err)
     }
     
-    return
+    return nil
 }
 
 func (l Lookup) Raster(opt RasArgs) (err error) {
-    var ferr = merr("Lookup.Raster")
+    var ferr = merr.Make("Lookup.Raster")
+    
     opt.Mode = MagPhase
     opt.Parse(l)
 
@@ -89,7 +90,7 @@ func (l Lookup) Raster(opt RasArgs) (err error) {
         err = ferr.Wrap(err)
     }
     
-    return
+    return nil
 }
 
 type (
@@ -124,7 +125,7 @@ const (
 )
 
 func (i *InterpolationMode) Decode(s string) (err error) {
-    var ferr = merr("InterpolationMode.Decode")
+    var ferr = merr.Make("InterpolationMode.Decode")
     
     switch s {
     case "NearestNeighbour":
@@ -154,7 +155,8 @@ func (i *InterpolationMode) Decode(s string) (err error) {
     default:
         err = ferr.Wrap(UnrecognizedMode{got: s, name:"Interpolation Mode"})
     }
-    return
+    
+    return nil
 }
 
 func (i InterpolationMode) String() string {
@@ -222,7 +224,7 @@ func (opt *CodeOpt) Parse() (lrIn int, lrOut int) {
 var g2r = Gamma.Must("geocode")
 
 func (l Lookup) geo2radar(infile IDatFile, opt CodeOpt) (d DatFile, err error) {
-    var ferr = merr("Lookup.geo2radar")
+    var ferr = merr.Make("Lookup.geo2radar")
     
     lrIn, lrOut := opt.Parse()
     
@@ -294,13 +296,13 @@ func (l Lookup) geo2radar(infile IDatFile, opt CodeOpt) (d DatFile, err error) {
         return
     }
     
-    return d, err
+    return d, nil
 }
 
 var r2g = Gamma.Must("geocode_back")
 
 func (l Lookup) radar2geo(infile IDatFile, opt CodeOpt) (d DatFile, err error) {
-    var ferr = merr("Lookup.radar2geo")
+    var ferr = merr.Make("Lookup.radar2geo")
     lrIn, lrOut := opt.Parse()
     
     if err = opt.RngAzi.Check(); err != nil {
@@ -382,7 +384,7 @@ func (l Lookup) radar2geo(infile IDatFile, opt CodeOpt) (d DatFile, err error) {
 var coord2sarpix = Gamma.Must("coord_to_sarpix")
 
 func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ra RngAzi, err error) {
-    var ferr = merr("LatLon.ToRadar")
+    var ferr = merr.Make("LatLon.ToRadar")
     const par = "corrected SLC/MLI range, azimuth pixel (int)"
     
     out, err := coord2sarpix(mpar, "-", ll.Lat, ll.Lon, hgt, diffPar)
@@ -420,7 +422,7 @@ func (ll LatLon) ToRadar(mpar, hgt, diffPar string) (ra RngAzi, err error) {
         err = ferr.Wrap(err)
     }
     
-    return
+    return ra, nil
 }
 
 type Hgt struct {
@@ -429,7 +431,7 @@ type Hgt struct {
 
 
 func (h Hgt) Raster(opt RasArgs) (err error) {
-    var ferr = merr("Hgt.Raster")
+    var ferr = merr.Make("Hgt.Raster")
     
     opt.Mode = Height
     opt.Parse(h)
@@ -438,7 +440,7 @@ func (h Hgt) Raster(opt RasArgs) (err error) {
         err = ferr.Wrap(err)
     }
     
-    return
+    return nil
 }
 
 type Geocode struct {
@@ -493,7 +495,7 @@ var (
 )
 
 func (g* GeocodeOpt) Run(outDir string) (err error) {
-    var ferr = merr("GeocodeOpt")
+    var ferr = merr.Make("GeocodeOpt")
     
     geodir := filepath.Join(outDir, "geo")
     

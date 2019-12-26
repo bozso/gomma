@@ -141,7 +141,7 @@ func (ra *RngAzi) Default() {
 }
 
 func (mm *IMinmax) Decode(s string) (err error) {
-    var ferr = merr("IMinmax.Decode")
+    var ferr = merr.Make("IMinmax.Decode")
     
     if len(s) == 0 {
         return ferr.Wrap(EmptyStringError{})
@@ -160,7 +160,7 @@ func (mm *IMinmax) Decode(s string) (err error) {
 }
 
 func (ll *LatLon) Decode(s string) (err error) {
-    var ferr = merr("LatLon.Decode")
+    var ferr = merr.Make("LatLon.Decode")
 
     if len(s) == 0 {
         return ferr.Wrap(EmptyStringError{})
@@ -208,7 +208,7 @@ func MakeDefaultConfig(path string) (err error) {
 }
 
 func SaveJson(path string, val interface{}) (err error) {
-    var ferr = merr("SaveJson")
+    var ferr = merr.Make("SaveJson")
     
     var out []byte
     if out, err = json.MarshalIndent(val, "", "    "); err != nil {
@@ -230,7 +230,7 @@ func SaveJson(path string, val interface{}) (err error) {
 }
 
 func LoadJson(path string, val interface{}) (err error) {
-    var ferr = merr("LoadJson")
+    var ferr = merr.Make("LoadJson")
     
     var data []byte
     if data, err = ReadFile(path); err != nil {

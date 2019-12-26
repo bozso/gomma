@@ -84,7 +84,7 @@ type like struct {
 }
 
 func likeFn(ctx *cli.Context) (err error) {
-    var ferr = merr("likeFn")
+    var ferr = merr.Make("likeFn")
     
     l := ctx.Argv().(*like)
     
@@ -132,7 +132,7 @@ type move struct {
 
 
 func moveFn(ctx *cli.Context) (err error) {
-    var ferr = merr("moveFn")
+    var ferr = merr.Make("moveFn")
     
     m := ctx.Argv().(*move)
     path := m.Meta
@@ -176,7 +176,7 @@ type coreg struct {
 }
 
 func coregFn(ctx *cli.Context) (err error) {
-    var ferr = merr("coregFn")
+    var ferr = merr.Make("coregFn")
     
     c := ctx.Argv().(*coreg)
     
@@ -237,7 +237,8 @@ type create struct {
 }
 
 func createFn(ctx *cli.Context) (err error) {
-    var ferr = merr("createFn")
+    var ferr = merr.Make("createFn")
+    
     c := ctx.Argv().(*create)
     
     var dat string
@@ -292,7 +293,7 @@ type splitIfg struct {
 
 
 func splitIfgFn(ctx *cli.Context) (err error) {
-    var ferr = merr("splitIfgFn")
+    var ferr = merr.Make("splitIfgFn")
     
     si := ctx.Argv().(*splitIfg)
 
@@ -399,7 +400,7 @@ type geoCode struct {
 
 
 func geoCodeFn(ctx *cli.Context) (err error) {
-    var ferr = merr("geoCodeFn")
+    var ferr = merr.Make("geoCodeFn")
     
     c := ctx.Argv().(*geoCode)
     
@@ -460,7 +461,7 @@ type Plotter struct {
 }
 
 func raster(args Args) (err error) {
-    var ferr = merr("raster")
+    var ferr = merr.Make("raster")
     p := Plotter{}
     
     if err = args.ParseStruct(&p); err != nil {
@@ -521,7 +522,7 @@ const (
 )
 
 func (m JSONMap) String(name string) (ret string, err error) {
-    var ferr = merr("JSONMap.String")
+    var ferr = merr.Make("JSONMap.String")
     tmp, ok := m[name]
     
     if !ok {
@@ -540,7 +541,7 @@ func (m JSONMap) String(name string) (ret string, err error) {
 }
 
 func (m JSONMap) Int(name string) (ret int, err error) {
-    var ferr = merr("JSONMap.Int")
+    var ferr = merr.Make("JSONMap.Int")
     
     tmp, ok := m[name]
     

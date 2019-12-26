@@ -1,8 +1,0 @@
-rule go
-  command = go build -ldflags="-s -w" -o ${out} ${in}
-  description = Build executable
-
-build ../bin/gamma: go ../bin/gamma.go | utils.go common.go date.go $
-    sentinel1.go plot.go datafile.go extract.go command_line.go config.go $
-    coreg.go geo.go interferogram.go proc_steps.go
-

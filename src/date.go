@@ -28,7 +28,7 @@ const (
 
 func ParseDate(format dateFormat, str string) (t time.Time, err error) {
     var (
-        ferr = merr("ParseDate")
+        ferr = merr.Make("ParseDate")
         form string
     )
 
@@ -51,7 +51,7 @@ func ParseDate(format dateFormat, str string) (t time.Time, err error) {
 
 func NewDate(format dateFormat, start, stop string) (d date, err error) {
     var (
-        ferr = merr("NewDate")
+        ferr = merr.Make("NewDate")
         _start, _stop time.Time
     )
     

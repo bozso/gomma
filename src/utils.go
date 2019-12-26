@@ -607,14 +607,18 @@ type (
         err    error
     }
     
-    opErrorFactory func(fn FnName) OpError
+    opErrorFactory struct {
+        module ModuleName
+    }
 )
 
 
 func NewModuleErr(mod ModuleName) opErrorFactory {
-    return func(fn FnName) (err OpError) {
-        return OpError{module: mod, fn: fn}
-    }
+    return opErrorFactory{mod}
+}
+
+func (o opErrorFactory) Make(fn FnName) OpError {
+    return OpError{module: o.module, fn:fn}
 }
 
 func (e OpError) Error() (s string) {

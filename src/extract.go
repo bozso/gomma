@@ -60,7 +60,7 @@ func (ex Extractor) extract(template, dst string) (s string, err error) {
     //log.Fatalf("%s %s", root, template)
     
     var (
-        ferr = merr("Extractor.extract")
+        ferr = merr.Make("Extractor.extract")
         matched, exist bool
     )
     
@@ -103,7 +103,7 @@ func (ex Extractor) extract(template, dst string) (s string, err error) {
 
 func extractFile(src *zip.File, dst string) (err error) {
     var (
-        ferr = merr("extractFile")
+        ferr = merr.Make("extractFile")
         srcName = src.Name
         in io.ReadCloser
     )

@@ -59,7 +59,8 @@ type IFG struct {
 }
 
 func NewIFG(dat, off, diffpar string) (ifg IFG, err error) {
-    var ferr = merr("NewIFG")
+    var ferr = merr.Make("NewIFG")
+
     if ifg.DatParFile, err = NewDatParFile(dat, off, "off", FloatCpx);
        err != nil {
         err = ferr.Wrap(err)
@@ -97,7 +98,7 @@ func (ifg IFG) jsonMap() (js JSONMap) {
 }
 
 func (i IFG) Move(dir string) (im IFG, err error) {
-    var ferr = merr("IFG.Move")
+    var ferr = merr.Make("IFG.Move")
     
     if im.DatParFile, err = i.DatParFile.Move(dir); err != nil {
         err = ferr.Wrap(err)
@@ -129,7 +130,7 @@ func (i IFG) Move(dir string) (im IFG, err error) {
 }
 
 func (i *IFG) FromJson(m JSONMap) (err error) {
-    var ferr = merr("IFG.FromJson")
+    var ferr = merr.Make("IFG.FromJson")
     
     if err = i.DatParFile.FromJson(m); err != nil {
         return ferr.Wrap(err)
@@ -162,7 +163,7 @@ func (i *IFG) FromJson(m JSONMap) (err error) {
 }
     
 func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ifg IFG, err error) {
-    var ferr = merr("FromSLC")
+    var ferr = merr.Make("FromSLC")
     inter := 0
     
     if opt.interact {
@@ -248,7 +249,7 @@ func (c CpxToReal) String() string {
 var cpxToReal = Gamma.Must("cpx_to_real")
 
 func (ifg IFG) ToReal(mode CpxToReal, name string) (d DatFile, err error) {
-    var ferr = merr("IFG.ToReal")
+    var ferr = merr.Make("IFG.ToReal")
     
     if len(name) == 0 {
         d, err = TmpDatFile("real", Float)
@@ -291,7 +292,7 @@ func (ifg IFG) ToReal(mode CpxToReal, name string) (d DatFile, err error) {
 var rasmph_pwr24 = Gamma.Must("rasmph_pwr24")
 
 func (ifg IFG) Raster(opt RasArgs) (err error) {
-    var ferr = merr("IFG.Raster")
+    var ferr = merr.Make("IFG.Raster")
 
     opt.Mode = MagPhasePwr
     
@@ -302,7 +303,7 @@ func (ifg IFG) Raster(opt RasArgs) (err error) {
 }
 
 func (ifg IFG) rng() (i int, err error) {
-    var ferr = merr("IFG.rng")
+    var ferr = merr.Make("IFG.rng")
     
     if i, err = ifg.Int("interferogram_width", 0); err != nil {
         err = ferr.Wrap(err)
@@ -312,7 +313,7 @@ func (ifg IFG) rng() (i int, err error) {
 }
 
 func (ifg IFG) azi() (i int, err error) {
-    var ferr = merr("IFG.azi")
+    var ferr = merr.Make("IFG.azi")
     
     if i, err = ifg.Int("interferogram_azimuth_lines", 0); err != nil {
         err = ferr.Wrap(err)
@@ -331,7 +332,7 @@ func (ifg IFG) imgfmt() (string, error) {
 
 func (ifg IFG) CheckQuality() (b bool, err error) {
     var (
-        ferr = merr("IFG.CheckQuality")
+        ferr = merr.Make("IFG.CheckQuality")
         qual = ifg.Quality
     )
     
@@ -423,7 +424,7 @@ func (ifg IFG) CheckQuality() (b bool, err error) {
 //}
 
 func (ifg IFG) Coherence(opt CoherenceOpt) (c Coherence, err error) {
-    var ferr = merr("IFG.Coherence")
+    var ferr = merr.Make("IFG.Coherence")
     weightFlag := CoherenceWeight[opt.WeightType]
     
     //log.info("CALCULATING COHERENCE AND CREATING QUICKLOOK IMAGES.")
