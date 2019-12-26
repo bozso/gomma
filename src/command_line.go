@@ -13,7 +13,6 @@ import (
 )
 
 type (
-    Cmd func(Args) error
     JSONMap map[string]interface{}
     
     MetaFile struct {
@@ -360,6 +359,7 @@ type (
 
 var imgStat = Gamma.Must("image_stat")
 
+/*
 func stat(args Args) (err error) {
     s := Stat{}
     
@@ -380,6 +380,7 @@ func stat(args Args) (err error) {
     
     return
 }
+*/
 
 
 var GeoCode = &cli.Command{
@@ -459,7 +460,7 @@ type Plotter struct {
     Infile string `pos:"0"`
     PlotMode string `name:"mode"`
 }
-
+/*
 func raster(args Args) (err error) {
     var ferr = merr.Make("raster")
     p := Plotter{}
@@ -508,6 +509,7 @@ func raster(args Args) (err error) {
     
     return nil
 }
+*/
 
 var PlotCmdFiles = map[string]Slice{
     "pwr": Slice{"pix_sigma0", "pix_gamma0", "sbi_pwr", "cc", "rmli", "mli"},

@@ -29,67 +29,11 @@ type (
     }
 )
 
-type Args struct {
-    opt map[string]string
-    pos []string
-    npos int
-}
-
-func NewArgs(args []string) (ret Args) {
-    ret.opt = make(map[string]string)
-    
-    for _, arg := range args {
-        if strings.Contains(arg, "=") {
-            split := strings.Split(arg, "=")
-            
-            ret.opt[split[0]] = split[1]
-        } else {
-            ret.pos = append(ret.pos, arg)
-        }
-    }
-    
-    ret.npos = len(ret.pos)
-    
-    return
-}
 
 const (
     ParseIntErr Werror = "failed to parse '%s' into an integer"
     ParseFloatErr Werror = "failed to parse '%s' into an float"
 )
-
-func StringToVal(v reflect.Value, kind reflect.Kind, in string) error {
-    switch kind {
-    case reflect.Int:
-        set, err := strconv.Atoi(in)
-        if err != nil {
-            return ParseIntErr.Wrap(err, in)
-        }
-        
-        v.SetInt(int64(set))
-    case reflect.Float32:
-        set, err := strconv.ParseFloat(in, 32)
-        
-        if err != nil {
-            return ParseFloatErr.Wrap(err, in)
-        }
-        
-        v.SetFloat(set)
-    case reflect.Float64:
-        set, err := strconv.ParseFloat(in, 64)
-        
-        if err != nil {
-            return ParseFloatErr.Wrap(err, in)
-        }
-        
-        v.SetFloat(set)
-    case reflect.Bool:
-        v.SetBool(true)
-    case reflect.String:
-        v.SetString(in)
-    }
-    return nil
-}
 
 type EmptyStringError struct {
     variable string
@@ -108,105 +52,6 @@ func (e EmptyStringError) Error() (s string) {
 
 func (e EmptyStringError) Unwrap() error {
     return e.err
-}
-
-const (
-    ParseFieldErr Werror = "parsing of struct field '%s' failed"
-    SetFieldErr Werror = "failed to set struct field '%s'"
-    ParseStructErr Werror = "failed to parse struct %s"
-)
-
-func (h Args) ParseStruct(s interface{}) error {
-    vptr := reflect.ValueOf(s)
-    kind := vptr.Kind()
-    
-    if kind != reflect.Ptr {
-        return fmt.Errorf("expected a pointer to struct not '%v'", kind)
-    }
-    
-    v := vptr.Elem()
-    
-    if err := h.parseStruct(v); err != nil {
-        return ParseStructErr.Wrap(err, v.Type().Name())
-    }
-    return nil
-}
-
-func (h Args) parseStruct(v reflect.Value) error {
-    t := v.Type()
-
-    for ii := 0; ii < v.NumField(); ii++ {
-        sField := t.Field(ii)
-        sValue := v.Field(ii)
-        kind := sField.Type.Kind()
-        
-        //fmt.Printf("Parsing field[%d]: %s\n", ii, sField.Name)
-        
-        if kind == reflect.Struct {
-            if err := h.parseStruct(sValue); err != nil {
-                return ParseFieldErr.Wrap(err, sField.Name)
-            }
-            continue
-        }
-        
-        tag := sField.Tag
-        fmt.Println(tag)
-        
-        if tag == "" {
-            continue
-        }
-        
-        pos := tag.Get("pos")
-        npos := len(pos)
-        
-        if npos > 0 {
-            idx, err := strconv.Atoi(pos)
-            
-            if err != nil {
-                return ParseIntErr.Wrap(err, pos)
-            }
-            
-            if idx >= h.npos {
-                return Handle(nil, 
-                    "index %d is out of the bounds of positional arguments",
-                    idx)
-            }
-            
-            if err = StringToVal(sValue, kind, h.pos[idx]); err != nil {
-                return SetFieldErr.Wrap(err, sField.Name)
-            }
-            continue
-        }
-        
-        name := tag.Get("name")
-        
-        if name == "" || name == "-" {
-            name = sField.Name
-        }
-        
-        if kind == reflect.Bool {
-            val := false
-            for _, pos := range h.pos {
-                if pos == name {
-                    val = true
-                    break
-                }
-            }
-            sValue.SetBool(val)
-            continue
-        }
-        
-        val, ok := h.opt[name]
-        
-        if !ok {
-            val = tag.Get("default")
-        }
-        
-        if err := StringToVal(sValue, kind, val); err != nil {
-            return SetFieldErr.Wrap(err, sField.Name)
-        }
-    }
-    return nil
 }
 
 func MapKeys(dict interface{}) (ret []string) {
@@ -267,7 +112,7 @@ func Handle(err error, format string, args ...interface{}) error {
 
 const (
     CmdErr Werror = "execution of command '%s' failed"
-    ExeErr Werror = `Command '%v' failed!
+    ExeErr Werror = `Command '%s %s' failed!
     Output of command is: %v`
 )
 
@@ -290,7 +135,7 @@ func MakeCmd(cmd string) CmdFun {
         result := string(out)
 
         if err != nil {
-            return "", ExeErr.Wrap(err, cmd, result)
+            return "", ExeErr.Wrap(err, cmd, strings.Join(arg, " "), result)
         }
 
         return result, nil

@@ -1,10 +1,23 @@
 rule go
   command = go build ${in}
-  description = Build executable
+  description = Build debug executable.
 
-build gamma: go gamma.go | ../src/config.go ../src/iono.go ../src/slc.go $
+rule go-release
+  command = go build -trimpath -ldflags="-s -w" ${in}
+  description = Build release executable.
+
+rule deploy-to
+  command = cp ${in} ${out}
+  description = Deploy executable to target server.
+
+build gamma: go-release gamma.go | ../src/config.go ../src/iono.go ../src/slc.go $
     ../src/utils.go ../src/proc_steps.go ../src/gamma_test.go $
     ../src/coreg.go ../src/extract.go ../src/command_line.go $
     ../src/common.go ../src/datafile.go ../src/date.go ../src/plot.go $
     ../src/geo.go ../src/interferogram.go ../src/sentinel1.go
 
+mount = /home/istvan/mount
+
+build $mount/robosztus/packages/bin: deploy-to gamma
+
+default gamma

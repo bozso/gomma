@@ -76,6 +76,8 @@ var (
 )
 
 func NewS1Zip(zipPath, pol string) (s1 *S1Zip, err error) {
+    ferr := merr.Make("NewS1Zip")
+    
     const rexTemplate = "%s-iw%%d-slc-%%s-.*"
 
     zipBase := filepath.Base(zipPath)
@@ -87,8 +89,8 @@ func NewS1Zip(zipPath, pol string) (s1 *S1Zip, err error) {
     start, stop := zipBase[17:32], zipBase[33:48]
 
     if s1.date, err = NewDate(DLong, start, stop); err != nil {
-        err = Handle(err, "Could not create new date from strings: '%s' '%s'",
-            start, stop)
+        err = ferr.WrapFmt(err,
+            "Could not create new date from strings: '%s' '%s'", start, stop)
         return
     }
 
@@ -119,9 +121,11 @@ func NewS1Zip(zipPath, pol string) (s1 *S1Zip, err error) {
 }
 
 func (s1 *S1Zip) Info(dst string) (iws IWInfos, err error) {
+    ferr := merr.Make("S1Zip.Info")
     
     var ext = s1.newExtractor(dst)
     if err = ext.Wrap(); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     defer ext.Close()
@@ -131,11 +135,12 @@ func (s1 *S1Zip) Info(dst string) (iws IWInfos, err error) {
         _annot = ext.Extract(annot, ii)
         
         if err = ext.Wrap(); err != nil {
+            err = ferr.Wrap(err)
             return
         }
 
         if iws[ii-1], err = iwInfo(_annot); err != nil {
-            err = Handle(err,
+            err = ferr.WrapFmt(err,
                 "Parsing of IW information of annotation file '%s' failed!",
                 _annot)
             return
@@ -175,12 +180,16 @@ func NewIW(dat, par, TOPS_par string) (iw S1IW) {
 }
 
 func (iw S1IW) Move(dir string) (miw S1IW, err error) {
+    ferr := merr.Make("S1IW.Move")
+    
     if miw.DatParFile, err = iw.DatParFile.Move(dir); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
     miw.TOPS_par.Par, err = Move(iw.TOPS_par.Par, dir)
-    return
+    
+    return miw, nil
 }
 
 
@@ -196,11 +205,13 @@ type S1SLC struct {
 }
 
 func FromTabfile(tab string) (s1 S1SLC, err error) {
+    ferr := merr.Make("FromTabfile")
+    
     log.Printf("Parsing tabfile: '%s'.\n", tab)
     
     var file FileReader
     if file, err = NewReader(tab); err != nil {
-        err = FileOpenErr.Wrap(err, tab)
+        err = ferr.Wrap(FileOpenErr.Wrap(err, tab))
         return
     }
     defer file.Close()
@@ -220,7 +231,7 @@ func FromTabfile(tab string) (s1 S1SLC, err error) {
     s1.Tab = tab
     
     if s1.Time, err = s1.IWs[0].ParseDate(); err != nil {
-        err = Handle(err, "failed to retreive date for '%s'", tab)
+        err = ferr.WrapFmt(err, "failed to retreive date for '%s'", tab)
     }
     
     return
@@ -232,11 +243,13 @@ func (s1 S1SLC) jsonName() string {
 }
 
 func (s1 S1SLC) Move(dir string) (ms1 S1SLC, err error) {
+    ferr := merr.Make("S1SLC.Move")
+    
     newtab := filepath.Join(dir, filepath.Base(s1.Tab))
     
     var file *os.File
     if file, err = os.Create(newtab); err != nil {
-        err = FileOpenErr.Wrap(err, newtab)
+        err = ferr.Wrap(FileOpenErr.Wrap(err, newtab))
         return
     }
     defer file.Close()
@@ -251,7 +264,7 @@ func (s1 S1SLC) Move(dir string) (ms1 S1SLC, err error) {
         line := fmt.Sprintf("%s %s %s\n", IW.Dat, IW.Par, IW.TOPS_par.Par)
         
         if _, err = file.WriteString(line); err != nil {
-            err = FileWriteErr.Wrap(err, newtab)
+            err = ferr.Wrap(FileWriteErr.Wrap(err, newtab))
             return 
         }
     }
@@ -262,10 +275,12 @@ func (s1 S1SLC) Move(dir string) (ms1 S1SLC, err error) {
 }
 
 func (s1 S1SLC) Exist() (b bool, err error) {
+    ferr := merr.Make("S1SLC.Exist")
+    
     for _, iw := range s1.IWs {
         if b, err = iw.Exist(); err != nil {
-            err = fmt.Errorf("failed to determine whether IW " +
-                "datafile exists: %w", err)
+            err = ferr.WrapFmt(err,
+                "failed to determine whether IW datafile exists")
             return
         }
 
@@ -273,8 +288,7 @@ func (s1 S1SLC) Exist() (b bool, err error) {
             return
         }
     }
-    b = true
-    return
+    return true, nil
 }
 
 type MosaicOpts struct {
@@ -286,6 +300,8 @@ type MosaicOpts struct {
 var mosaic = Gamma.Must("SLC_mosaic_S1_TOPS")
 
 func (s1 S1SLC) Mosaic(opts MosaicOpts) (slc SLC, err error) {
+    ferr := merr.Make("S1SLC.Mosaic")
+    
     opts.Looks.Default()
     
     bflg := 0
@@ -301,6 +317,7 @@ func (s1 S1SLC) Mosaic(opts MosaicOpts) (slc SLC, err error) {
     }
     
     if slc, err = TmpSLC(); err != nil {
+        err = ferr.Wrap(err)
         return
     }
 
@@ -308,34 +325,40 @@ func (s1 S1SLC) Mosaic(opts MosaicOpts) (slc SLC, err error) {
         opts.Looks.Azi, bflg, ref)
     
     if err != nil {
-        err = Handle(err, "failed to mosaic '%s'", s1.Tab)
+        err = ferr.WrapFmt(err, "failed to mosaic '%s'", s1.Tab)
+        return
     }
     
-    return
+    return slc, nil
 }
 
 var derampRef = Gamma.Must("S1_deramp_TOPS_reference")
 
 func (s1 S1SLC) DerampRef() (ds1 S1SLC, err error) {
+    ferr := merr.Make("S1SLC.DerampRef")
+    
     tab := s1.Tab
     
     if _, err = derampRef(tab); err != nil {
-        err = Handle(err, "failed to deramp reference S1SLC '%s'", tab)
+        err = ferr.WrapFmt(err, "failed to deramp reference S1SLC '%s'", tab)
         return
     }
     
     tab += ".deramp"
     
     if ds1, err = FromTabfile(tab); err != nil {
-        err = Handle(err, "failed to import S1SLC from tab '%s'", tab)
+        err = ferr.WrapFmt(err, "failed to import S1SLC from tab '%s'", tab)
         return
     }
+    
     return ds1, nil
 }
 
 var derampSlave = Gamma.Must("S1_deramp_TOPS_slave")
 
 func (s1 S1SLC) DerampSlave(ref *S1SLC, looks RngAzi, keep bool) (ret S1SLC, err error) {
+    ferr := merr.Make("S1SLC.DerampSlave")
+    
     looks.Default()
     
     reftab, tab, id := ref.Tab, s1.Tab, s1.Format(DateShort)
@@ -349,28 +372,31 @@ func (s1 S1SLC) DerampSlave(ref *S1SLC, looks RngAzi, keep bool) (ret S1SLC, err
     _, err = derampSlave(tab, id, reftab, looks.Rng, looks.Azi, clean)
     
     if err != nil {
-        err = Handle(err, "failed to deramp slave S1SLC '%s', reference: '%s'",
-            tab, reftab)
+        err = ferr.WrapFmt(err,
+            "failed to deramp slave S1SLC '%s', reference: '%s'", tab, reftab)
         return
     }
     
     tab += ".deramp"
     
     if ret, err = FromTabfile(tab); err != nil {
-        err = Handle(err, "failed to import S1SLC from tab '%s'", tab)
+        err = ferr.WrapFmt(err, "failed to import S1SLC from tab '%s'", tab)
         return
     }
+    
     return ret, nil
 }
 
 func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
+    ferr := merr.Make("S1SLC.RSLC")
+    
     tab := strings.ReplaceAll(filepath.Base(s1.Tab), "SLC_tab", "RSLC_tab")
     tab = filepath.Join(outDir, tab)
 
     file, err := os.Create(tab)
 
     if err != nil {
-        err = FileCreateErr.Wrap(err, tab)
+        err = ferr.Wrap(FileCreateErr.Wrap(err, tab))
         return
     }
     
@@ -395,7 +421,7 @@ func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
         _, err = file.WriteString(line)
 
         if err != nil {
-            err = FileWriteErr.Wrap(err, tab)
+            err = ferr.Wrap(FileWriteErr.Wrap(err, tab))
             return
         }
     }
@@ -408,6 +434,7 @@ func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
 var MLIFun = Gamma.selectFun("multi_look_ScanSAR", "multi_S1_TOPS")
 
 func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
+    ferr := merr.Make("S1SLC.MLI")
     opt.Parse()
     
     wflag := 0
@@ -420,13 +447,14 @@ func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
                      wflag, opt.refTab)
     
     if err != nil {
-        return StructCreateError.Wrap(err, "MLI")
+        return ferr.Wrap(StructCreateError.Wrap(err, "MLI"))
     }
     
     return nil
 }
 
 func makePoint(info Params, max bool) (ret Point, err error) {
+    ferr := merr.Make("makePoint")
     var tpl_lon, tpl_lat string
 
     if max {
@@ -436,12 +464,12 @@ func makePoint(info Params, max bool) (ret Point, err error) {
     }
 
     if ret.X, err = info.Float(tpl_lon, 0); err != nil {
-        err = Handle(err, "Could not get Longitude value!")
+        err = ferr.WrapFmt(err, "Could not get Longitude value!")
         return
     }
 
     if ret.Y, err = info.Float(tpl_lat, 0); err != nil {
-        err = Handle(err, "Could not get Latitude value!")
+        err = ferr.WrapFmt(err, "Could not get Latitude value!")
         return
     }
 
@@ -458,11 +486,15 @@ type(
     IWInfos [maxIW]IWInfo
 )
 
+var parCmd = Gamma.Must("par_S1_SLC")
+
 func iwInfo(path string) (ret IWInfo, err error) {
+    ferr := merr.Make("iwInfo")
+    
     // num, err := conv.Atoi(str.Split(path, "iw")[1][0]);
 
     if len(path) == 0 {
-        err = Handle(nil, "path to annotation file is an empty string: '%s'",
+        err = ferr.Fmt("path to annotation file is an empty string: '%s'",
             path)
         return
     }
@@ -472,15 +504,15 @@ func iwInfo(path string) (ret IWInfo, err error) {
     par, err := TmpFile("")
 
     if err != nil {
-        return ret, err
+        return ret, ferr.Wrap(err)
     }
 
     TOPS_par := par + ".TOPS_par"
 
-    _, err = Gamma["par_S1_SLC"](nil, path, nil, nil, par, nil, TOPS_par)
+    _, err = parCmd(nil, path, nil, nil, par, nil, TOPS_par)
 
     if err != nil {
-        err = Handle(err, "failed to import parameter files from '%s'",
+        err = ferr.WrapFmt(err, "failed to import parameter files from '%s'",
             path)
         return
     }
@@ -488,7 +520,7 @@ func iwInfo(path string) (ret IWInfo, err error) {
     _info, err := burstCorners(par, TOPS_par)
 
     if err != nil {
-        err = Handle(err, "failed to parse parameter files")
+        err = ferr.WrapFmt(err, "failed to parse parameter files")
         return
     }
 
@@ -499,7 +531,7 @@ func iwInfo(path string) (ret IWInfo, err error) {
     nburst, err := TOPS.Int("number_of_bursts", 0)
 
     if err != nil {
-        err = Handle(err, "failed to retreive number of bursts")
+        err = ferr.WrapFmt(err, "failed to retreive number of bursts")
         return
     }
 
@@ -511,7 +543,7 @@ func iwInfo(path string) (ret IWInfo, err error) {
         numbers[ii-1], err = TOPS.Float(tpl, 0)
 
         if err != nil {
-            err = Handle(err, "failed to get burst number: '%s'", tpl)
+            err = ferr.WrapFmt(err, "failed to get burst number: '%s'", tpl)
             return
         }
     }
@@ -519,14 +551,14 @@ func iwInfo(path string) (ret IWInfo, err error) {
     max, err := makePoint(info, true)
 
     if err != nil {
-        err = Handle(err, "failed to create max latlon point")
+        err = ferr.WrapFmt(err, "failed to create max latlon point")
         return
     }
 
     min, err := makePoint(info, false)
 
     if err != nil {
-        err = Handle(err, "failed to create min latlon point")
+        err = ferr.WrapFmt(err, "failed to create min latlon point")
         return
     }
 
@@ -571,12 +603,13 @@ func checkBurstNum(one, two IWInfos) bool {
 }
 
 func IWAbsDiff(one, two IWInfos) (float64, error) {
+    ferr := merr.Make("IWAbsDiff")
     sum := 0.0
 
     for ii := 0; ii < 3; ii++ {
         nburst1, nburst2 := one[ii].nburst, two[ii].nburst
         if nburst1 != nburst2 {
-            return 0.0, fmt.Errorf(
+            return 0.0, ferr.Fmt(
                 "number of burst in first SLC IW%d (%d) is not equal to " + 
                 "the number of burst in the second SLC IW%d (%d)",
                 ii + 1, nburst1, ii + 1, nburst2)
@@ -611,6 +644,8 @@ func (s1 *S1Zip) SLCNames(mode, pol string, ii int) (dat, par, TOPS string) {
 }
 
 func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
+    ferr := merr.Make("S1Zip.SLC")
+    
     const mode = "slc"
     tab := s1.tabName(mode, pol)
 
@@ -618,11 +653,12 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
     exist, err = Exist(tab)
 
     if err != nil {
+        err = ferr.Wrap(err)
         return
     }
 
     if !exist {
-        err = Handle(err, "tabfile '%s' does not exist", tab)
+        err = ferr.WrapFmt(err, "tabfile '%s' does not exist", tab)
         return
     }
 
@@ -637,9 +673,11 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
 }
 
 func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
+    ferr := merr.Make("S1Zip.MLI")
     //path := filepath.Join(s1.Root, mode)
     
     if ret, err = TmpMLI(); err != nil {
+        err = ferr.Wrap(err)
         return
     }
 
@@ -675,7 +713,7 @@ func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
     err = slc.MLI(&ret, opt)
     
     if err != nil {
-        return ret, err
+        return ret, ferr.Wrap(err)
     }
     
     return ret, nil
@@ -690,6 +728,8 @@ const (
 )
 
 func (s1 *S1Zip) ImportSLC(dst string) (err error) {
+    ferr := merr.Make("S1Zip.ImportSLC")
+    
     var _annot, _calib, _tiff, _noise string
     
     var ext = s1.newExtractor(dst)
@@ -704,7 +744,7 @@ func (s1 *S1Zip) ImportSLC(dst string) (err error) {
 
     file, err := os.Create(tab)
     if err != nil {
-        err = FileOpenErr.Wrap(err, tab)
+        err = ferr.Wrap(FileOpenErr.Wrap(err, tab))
         return
     }
     defer file.Close()
@@ -716,7 +756,7 @@ func (s1 *S1Zip) ImportSLC(dst string) (err error) {
         _noise = ext.Extract(noise, ii)
 
         if err = ext.Wrap(); err != nil {
-            return
+            return ferr.Wrap(err)
         }
 
         dat, par, TOPS_par := s1.SLCNames("slc", pol, ii)
@@ -724,7 +764,8 @@ func (s1 *S1Zip) ImportSLC(dst string) (err error) {
         _, err = Gamma["par_S1_SLC"](_tiff, _annot, _calib, _noise, par, dat,
             TOPS_par)
         if err != nil {
-            err = Handle(err, "failed to import datafiles into gamma format")
+            err = ferr.WrapFmt(err,
+                "failed to import datafiles into gamma format")
             return
         }
 
@@ -733,7 +774,7 @@ func (s1 *S1Zip) ImportSLC(dst string) (err error) {
         _, err = file.WriteString(line)
 
         if err != nil {
-            err = FileWriteErr.Wrap(err, tab)
+            err = ferr.Wrap(FileWriteErr.Wrap(err, tab))
             return
         }
     }
@@ -742,14 +783,23 @@ func (s1 *S1Zip) ImportSLC(dst string) (err error) {
 }
 
 func (s1 *S1Zip) Quicklook(dst string) (s string, err error) {
+    ferr := merr.Make("S1Zip.Quicklook")
+    
     var ext = s1.newExtractor(dst)
     if err = ext.Wrap(); err != nil {
+        err = ferr.Wrap(err)
         return
     }
     defer ext.Close()
 
     s = ext.Extract(quicklook, 0)
-    return s, ext.Wrap()
+    
+    if err = ext.Wrap(); err != nil {
+        err = ferr.Wrap(err)
+        return
+    }
+    
+    return s, nil
 }
 
 func (d ByDate) Len() int      { return len(d) }
