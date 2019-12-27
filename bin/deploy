@@ -1,7 +1,0 @@
-#!/usr/bin/env sh
-
-main() {
-    scp gamma istvan@zafir.ggki.hu:/home/istvan/packages/usr/bin
-}
-
-main
