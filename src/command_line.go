@@ -5,7 +5,7 @@ import (
     "fmt"
     "strings"
     "path/filepath"
-    "github.com/mkideal/cli"
+    "flag"
 
     //"os"
     //"log"
@@ -29,17 +29,6 @@ const (
 var (
     BatchModes = []string{"quicklook", "mli / MLI", "ras"}
 )
-
-type root struct {
-    cli.Helper
-}
-
-
-var Root = &cli.Command{
-    Desc: "Gamma Golang wrapper command line program.",
-    Argv: func() interface{} { return &root{} },
-    Fn: func(ctx *cli.Context) error { return nil },
-}
 
 type UnrecognizedMode struct {
     name, got string
@@ -68,24 +57,117 @@ func (e ModeError) Unwrap() error {
     return e.err
 }
 
-var Like = &cli.Command{
-    Name: "like",
-    Desc: "Initialize Gamma datafile with given datatype and shape",
-    Argv: func() interface{} { return &like{} },
-    Fn: likeFn,
+
+type (
+    Decodable interface {
+        Decode(string) error
+    }
+    
+    Action interface {
+        MakeCli() Cli
+        Run() error
+    }
+    
+    Cli struct {
+        *flag.FlagSet
+        decodables map[string]*Decodable
+        commands map[string]*Action
+    }
+)
+
+func NewCli(name string) (c Cli) {
+    c.FlagSet.Init(name, flag.ContinueOnError)
+    c.decodables = make(map[*string]*Decodable)
+    c.commands = make(map[string]*Action)
+
+    return c
+}
+
+func (c *Cli) AddAction(name string, act *Action) {
+    c.commands[name] = act
+}
+
+func (c *Cli) DecodeVar(name, usage string, dec *Decodable) {
+    str := c.FlagSet.String(name, "", usage)
+    
+    c.decodables[str] = dec
+}
+
+func (c Cli) NoSubcommands() bool {
+    return c.commands == nil || len(c.commands) == 0
+}
+
+func (c Cli) Parse(args []string) (err error) {
+    if err = c.FlagSet.Parse(args); err != nil {
+        return
+    }
+    
+    for key, val := range c.decodables {
+        if err = val.Decode(*key); err != nil {
+            return
+        }
+    }
+}
+
+func (c Cli) Run(args []string) (err error) {
+    if !c.NoSubcommands() {
+        return c.Parse(args)
+    }
+    
+    // TODO: check if args is long enough
+    mode := args[1]
+    
+    c, ok := c.commands[mode]
+    
+    // proper error handling
+    if !ok {
+        return ModeError{}
+    }
+    
+    cli := c.MakeCli()
+    
+    // check lenght of args
+    
+    err = cli.Parse(args[2:])
+    
+    if errors.Is(err, flags.ErrHelp) {
+        cli.PrintDefaults()
+        return nil
+    }
+    
+    if err != nil {
+        return
+    }
+    
+    c.Run()
+}
+
+
+func (c *Cli) SetupGammaCli() {
+    c.AddAction("like", &like{in:"-", out:"-", ext:"dat", DType:Unknown})
 }
 
 type like struct {
-    In    string `cli:"*i,in" usage:"Reference metadata file"`
-    Out   string `cli:"*o,out" usage:"Output metadata file"`
-    Dtype DType  `cli:"d,dtype" usage:"Output file datatype" dft:"Uknown"`
-    Ext   string `cli:"e,ext" usage:"Extension of datafile" dft:"dat"`
+    in    string `cli:"*i,in" usage:`
+    out   string `cli:"*o,out" usage:"Output metadata file"`
+    Dtype DType  `cli:"d,dtype" usage:"" dft:"Uknown"`
+    ext   string `cli:"e,ext" usage:"Extension of datafile" dft:"dat"`
 }
 
-func likeFn(ctx *cli.Context) (err error) {
-    var ferr = merr.Make("likeFn")
+func (l *like) MakeCli() (c Cli) {
+    c = NewCli("like")
     
-    l := ctx.Argv().(*like)
+    //fl := c.NewSubCommand("like",
+        //"Initialize Gamma datafile with given datatype and shape")
+    c.StringFlag("in", "Reference metadata file", &l.in)
+    c.StringFlag("out", "Output metadata file", &l.out)
+    c.VarFlag("out", "Output file datatype", &l.DType)
+    
+    return    
+}
+
+func (l like) Run() (err error) {
+    var ferr = merr.Make("likeFn")
     
     in, out := l.In, l.Out
     
