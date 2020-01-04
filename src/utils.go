@@ -306,15 +306,31 @@ type FileReader struct {
     *os.File
 }
 
-func NewReader(path string) (r FileReader, err error) {
-    if r.File, err = os.Open(path); err != nil {
+func NewReader(path string) (f FileReader, err error) {
+    if f.File, err = os.Open(path); err != nil {
         err = FileOpenErr.Wrap(err, path)
         return
     }
 
-    r.Scanner = bufio.NewScanner(r.File)
+    f.Scanner = bufio.NewScanner(f.File)
 
-    return r, nil
+    return f, nil
+}
+
+func (f *FileReader) Decode(s string) (err error) {
+    var r io.Reader
+    if s == "-" {
+        r = os.Stdin
+    } else {
+        if f.File, err = os.Open(s); err != nil {
+            err = FileOpenErr.Wrap(err, s)
+            return
+        }
+        r = f.File
+    }
+    
+    f.Scanner = bufio.NewScanner(r)
+    return nil
 }
 
 func ReadFile(path string) (b []byte, err error) {
