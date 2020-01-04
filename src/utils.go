@@ -30,6 +30,46 @@ type (
     }
 )
 
+type ColorCode int
+
+const (
+    Info ColorCode = iota
+    Notice
+    Warning
+    Error
+    Debug
+    Bold
+)
+
+func Color(s string, color ColorCode) string {
+    const (
+            info     = "\033[1;34m%s\033[0m"
+            notice   = "\033[1;36m%s\033[0m"
+            warning  = "\033[1;33m%s\033[0m"
+            error_   = "\033[1;31m%s\033[0m"
+            debug    = "\033[0;36m%s\033[0m"
+            bold     = "\033[1;0m%s\033[0m"
+    )
+    
+    var format string
+    
+    switch color {
+    case Info:
+    format = info
+    case Notice:
+    format = notice
+    case Warning:
+    format = warning
+    case Error:
+    format = error_
+    case Debug:
+    format = debug
+    case Bold:
+    format = bold
+    }
+    
+    return fmt.Sprintf(format, s)
+}
 
 const (
     ParseIntErr Werror = "failed to parse '%s' into an integer"
@@ -125,20 +165,26 @@ type (
     }
     
     Action interface {
-        MakeCli() Cli
+        SetCli(*Cli)
         Run() error
     }
     
-    commands map[string]Action
+    subcommand struct {
+        action Action
+        cli Cli
+    }
+    
+    subcommands map[string]subcommand
     
     Cli struct {
+        desc string
         *flag.FlagSet
         decodables map[*string]Decodable
-        commands
+        subcommands
     }
 )
 
-func (c commands) Keys() []string {
+func (c subcommands) Keys() []string {
     s := make([]string, len(c))
     
     ii := 0
@@ -149,16 +195,20 @@ func (c commands) Keys() []string {
     return s
 }
 
-func NewCli(name string) (c Cli) {
+func NewCli(name, desc string) (c Cli) {
+    c.desc = desc
     c.FlagSet = flag.NewFlagSet(name, flag.ContinueOnError)
     c.decodables = make(map[*string]Decodable)
-    c.commands = make(map[string]Action)
+    c.subcommands = make(map[string]subcommand)
     
     return c
 }
 
-func (c *Cli) AddAction(name string, act Action) {
-    c.commands[name] = act
+func (c *Cli) AddAction(name, desc string, act Action) {
+    c.subcommands[name] = subcommand{
+        action: act,
+        cli: NewCli(name, desc),
+    }
 }
 
 func (c *Cli) StringVar(name, usage string, p *string) {
@@ -172,14 +222,16 @@ func (c *Cli) VarFlag(name, usage string, dec Decodable) {
 }
 
 func (c Cli) HasSubcommands() bool {
-    return c.commands != nil && len(c.commands) != 0
+    return c.subcommands != nil && len(c.subcommands) != 0
 }
 
 func (c Cli) Usage() {
+    fmt.Printf("Program: %s. Description: %s\n",
+        Color(c.Name(), Bold), c.desc)
     c.PrintDefaults()
     
     if c.HasSubcommands() {
-        fmt.Printf("\nAvailable subcommands: %s\n", c.commands.Keys())
+        fmt.Printf("\nAvailable subcommands: %s\n", c.subcommands.Keys())
     }
 }
 
@@ -187,8 +239,8 @@ func (c Cli) Parse(args []string) (err error) {
     err = c.FlagSet.Parse(args)
     
     if errors.Is(err, flag.ErrHelp) {
-        c.Usage()
-        return
+        //c.Usage()
+        os.Exit(0)
     }
     
     if err != nil {
@@ -208,7 +260,8 @@ func (c Cli) Run(args []string) (err error) {
     //ferr := merr.Make("Cli.Run")
     
     if !c.HasSubcommands() {
-        return c.Parse(args)
+        err = c.Parse(args)
+        return
     }
     
     l := len(args)
@@ -227,24 +280,22 @@ func (c Cli) Run(args []string) (err error) {
         return nil
     }
     
-    com, ok := c.commands[mode]
+    subcom, ok := c.subcommands[mode]
     
     if !ok {
         return UnrecognizedMode{got:mode, name:"gamma"}
     }
     
-    cli := com.MakeCli()
-    err = cli.Parse(args[1:])
+    cli, act := &subcom.cli, subcom.action
+    subcom.action.SetCli(cli)
     
-    if errors.Is(err, flag.ErrHelp) {
-        return nil
-    }
+    err = cli.Parse(args[1:])
     
     if err != nil {
         return
     }
     
-    return com.Run()
+    return act.Run()
 }
 
 func Fatal(err error, format string, args ...interface{}) {
@@ -637,7 +688,8 @@ func (o opErrorFactory) Make(fn FnName) OpError {
 }
 
 func (e OpError) Error() (s string) {
-    s = fmt.Sprintf("\n  %s/%s", e.module, e.fn)
+    s = fmt.Sprintf("%s/%s", e.module, e.fn)
+    s = fmt.Sprintf("\n  %s", Color(s, Error))
     
     if ctx := e.ctx; len(ctx) > 0 {
         s = fmt.Sprintf("%s: %s", s, ctx)

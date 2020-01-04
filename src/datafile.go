@@ -56,6 +56,10 @@ const (
     Any
 )
 
+func (d *DType) SetCli(c *Cli) {
+    c.VarFlag("dtype", "Datatype of datafile.", d)
+}
+
 func (d *DType) Decode(s string) error {
     in := strings.ToUpper(s)
     

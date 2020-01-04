@@ -35,6 +35,8 @@ type (
 
 var coregFun = Gamma.Must("S1_coreg_TOPS")
 
+//func (s1 *S1CoregOpt)
+
 func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
     var ferr = merr.Make("S1CoregOpt.Coreg")
     

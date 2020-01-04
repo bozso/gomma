@@ -13,9 +13,6 @@ import (
 type (
     JSONMap map[string]interface{}
     
-    MetaFile struct {
-        Meta string `cli:"*meta" usage:"Metadata json file"`
-    }
 )
 
 var ParseError = errors.New("failed to parse command line arguments")
@@ -24,33 +21,44 @@ const (
     ParseErr CWerror = "failed to parse command line arguments"
 )
 
-var (
-    BatchModes = []string{"quicklook", "mli / MLI", "ras"}
-)
-
 
 func (c *Cli) SetupGammaCli() {
-    c.AddAction("like", &like{in:"-", out:"-", ext:"dat", Dtype:Unknown})
+    c.AddAction("like",
+        "Initialize Gamma datafile with given datatype and shape.",
+        &like{ext:"dat", Dtype:Unknown})
+    
+    c.AddAction("move",
+        "Move a datafile and metadatafile to a given directory.",
+        &move{outDir: "."})
+
+    c.AddAction("make",
+        "Create metafile for an existing datafile.",
+        &create{Ext: "par"})    
+
+    c.AddAction("coreg",
+        "Coregister two Sentinel-1 SAR images.",
+        &coreg{})    
 }
+
+type MetaFile struct {
+    Meta string
+}
+
+func (m *MetaFile) SetCli(c *Cli) {
+    c.StringVar("meta", "Metadata json file", &m.Meta)
+}
+
 
 type like struct {
-    in    string `cli:"*i,in" usage:`
-    out   string `cli:"*o,out" usage:"Output metadata file"`
-    Dtype DType  `cli:"d,dtype" usage:"" dft:"Uknown"`
-    ext   string `cli:"e,ext" usage:"Extension of datafile" dft:"dat"`
+    in, out, ext string 
+    Dtype        DType
 }
 
-func (l *like) MakeCli() (c Cli) {
-    c = NewCli("like")
-    
-    //fl := c.NewSubCommand("like",
-        //"Initialize Gamma datafile with given datatype and shape")
+func (l *like) SetCli(c* Cli) {
     c.StringVar("in", "Reference metadata file", &l.in)
     c.StringVar("out", "Output metadata file", &l.out)
     c.VarFlag("dtype", "Output file datatype", &l.Dtype)
     c.StringVar("ext", "Extension of datafile", &l.ext)
-    
-    return    
 }
 
 func (l like) Run() (err error) {
@@ -86,25 +94,19 @@ func (l like) Run() (err error) {
     return nil
 }
 
-/*
-
-var MoveFile = &cli.Command{
-    Name: "move",
-    Desc: "Move a datafile and metadatafile to a given directory",
-    Argv: func() interface{} { return &move{} },
-    Fn: moveFn,
-}
-
 type move struct {
-    OutDir   string `cli:"out" usage:"Output directory" dft:"."`
+    outDir   string
     MetaFile
 }
 
+func (m *move) SetCli(c *Cli) {
+    m.MetaFile.SetCli(c)
+    c.StringVar("out", "Output directory", &m.outDir)
+}
 
-func moveFn(ctx *cli.Context) (err error) {
+func (m move) Run() (err error) {
     var ferr = merr.Make("moveFn")
-    
-    m := ctx.Argv().(*move)
+
     path := m.Meta
     
     var dat DatParFile
@@ -113,7 +115,7 @@ func moveFn(ctx *cli.Context) (err error) {
             "failed to parse json metadatafile '%s'", path) 
     }
     
-    out := m.OutDir
+    out := m.outDir
     
     if dat, err = dat.Move(out); err != nil {
         return ferr.Wrap(err)
@@ -130,25 +132,73 @@ func moveFn(ctx *cli.Context) (err error) {
     return nil
 }
 
-
-var Coreg = &cli.Command{
-    Name: "coreg",
-    Desc: "Coregister two Sentinel-1 SAR images",
-    Argv: func() interface{} { return &coreg{} },
-    Fn: coregFn,
+type create struct {
+    Dat, Par, Ftype, Ext string
+    MetaFile
+    DType
 }
+
+func (cr *create) SetCli(c *Cli) {
+    cr.MetaFile.SetCli(c)
+    cr.DType.SetCli(c)
+    
+    c.StringVar("dat", "Datafile path", &cr.Dat)
+    c.StringVar("par", "Parameterfile path", &cr.Par)
+    c.StringVar("ftype", "Filetype.", &cr.Ftype)
+    c.StringVar("ext", "Extension of parameterfile.", &cr.Ext)
+}
+
+func (c create) Run() (err error) {
+    var ferr = merr.Make("create.Run")
+    
+    var dat string
+    if dat, err = filepath.Abs(c.Dat); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    par := c.Par
+    if len(par) > 0 {
+        if par, err = filepath.Abs(par); err != nil {
+            return ferr.Wrap(err)
+        }
+    }
+    
+    var datf DatParFile
+    if datf, err = NewDatParFile(dat, par, c.Ext, c.DType); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    if err = datf.Parse(); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    if datf.DType, err = datf.ParseDtype(); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    if err = Save(c.Meta, &datf); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    return nil
+}
+
 
 type coreg struct {
+    Master, Slave, Ref string 
     S1CoregOpt
-    Master  string `cli:"*m,master"`
-    Slave   string `cli:"*s,slave"`
-    Ref     string `cli:"ref"`
 }
 
-func coregFn(ctx *cli.Context) (err error) {
-    var ferr = merr.Make("coregFn")
+func (co *coreg) SetCli(c *Cli) {
+    //co.S1CoregOpt.SetCli(c)
     
-    c := ctx.Argv().(*coreg)
+    c.StringVar("master", "Master image.", &co.Master)
+    c.StringVar("slave", "Slave image.", &co.Slave)
+    c.StringVar("ref", "Reference image.", &co.Ref)
+}
+
+func (c coreg) Run() (err error) {
+    var ferr = merr.Make("coregFn")
     
     sm, ss, sr := c.Master, c.Slave, c.Ref
     
@@ -189,61 +239,7 @@ func coregFn(ctx *cli.Context) (err error) {
     
     return nil
 }
-
-var Create = &cli.Command{
-    Name: "make",
-    Desc: "Create metafile for an existing datafile",
-    Argv: func() interface{} { return &create{} },
-    Fn: createFn,
-}
-
-type create struct {
-    Dat        string `cli:"d,dat"`
-    Par        string `cli:"p,par"`
-    Dtype      DType  `cli:"D,dtype" dft:"Unknown"`
-    Ftype      string `cli:"f,ftype"`
-    Ext        string `cli:"P,parExt" dft:"par"`
-    MetaFile
-}
-
-func createFn(ctx *cli.Context) (err error) {
-    var ferr = merr.Make("createFn")
-    
-    c := ctx.Argv().(*create)
-    
-    var dat string
-    if dat, err = filepath.Abs(c.Dat); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    par := c.Par
-    if len(par) > 0 {
-        if par, err = filepath.Abs(par); err != nil {
-            return ferr.Wrap(err)
-        }
-    }
-    
-    var datf DatParFile
-    if datf, err = NewDatParFile(dat, par, c.Ext, c.Dtype); err != nil {
-        err = StructCreateError.Wrap(err, "DatParFile")
-        return ferr.Wrap(err)
-    }
-    
-    if err = datf.Parse(); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if datf.DType, err = datf.ParseDtype(); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if err = Save(c.Meta, &datf); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
-}
-
+/*
 
 var SplitIFG = &cli.Command{
     Name: "splitIfg",
@@ -423,10 +419,7 @@ func geoCodeFn(ctx *cli.Context) (err error) {
     
     return nil
 }
-
-
 */
-
 
 type Plotter struct {
     RasArgs

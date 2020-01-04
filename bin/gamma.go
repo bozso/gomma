@@ -8,7 +8,8 @@ import (
 )
 
 func main() {
-    cli := gamma.NewCli("gamma")
+    cli := gamma.NewCli("gamma",
+        "Wrapper program for the GAMMA SAR processing software.")
     cli.SetupGammaCli()
     
     if err := cli.Run(os.Args[1:]); err != nil {
