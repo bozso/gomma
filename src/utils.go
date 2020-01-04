@@ -1,7 +1,6 @@
 package gamma
 
 import (
-    //"errors"
     "fmt"
     "log"
     "os"
@@ -12,6 +11,8 @@ import (
     "strconv"
     "strings"
     "reflect"
+    "flag"
+    "errors"
 )
 
 type (
@@ -91,7 +92,160 @@ func Exist(s string) (ret bool, err error) {
     return true, nil
 }
 
+type UnrecognizedMode struct {
+    name, got string
+    err error
+}
 
+func (e UnrecognizedMode) Error() string {
+    return fmt.Sprintf("unrecognized mode '%s' for %s", e.got, e.name)
+}
+
+func (e UnrecognizedMode) Unwrap() error {
+    return e.err
+}
+
+type ModeError struct {
+    name string
+    got fmt.Stringer
+    err error
+}
+
+func (e ModeError) Error() string {
+    return fmt.Sprintf("unrecognized mode '%s' for %s", e.got.String(), e.name)
+}
+
+func (e ModeError) Unwrap() error {
+    return e.err
+}
+
+type (
+    Decodable interface {
+        Decode(string) error
+    }
+    
+    Action interface {
+        MakeCli() Cli
+        Run() error
+    }
+    
+    commands map[string]Action
+    
+    Cli struct {
+        *flag.FlagSet
+        decodables map[*string]Decodable
+        commands
+    }
+)
+
+func (c commands) Keys() []string {
+    s := make([]string, len(c))
+    
+    ii := 0
+    for k := range c {
+        s[ii] = k
+        ii++
+    }
+    return s
+}
+
+func NewCli(name string) (c Cli) {
+    c.FlagSet = flag.NewFlagSet(name, flag.ContinueOnError)
+    c.decodables = make(map[*string]Decodable)
+    c.commands = make(map[string]Action)
+    
+    return c
+}
+
+func (c *Cli) AddAction(name string, act Action) {
+    c.commands[name] = act
+}
+
+func (c *Cli) StringVar(name, usage string, p *string) {
+    c.FlagSet.StringVar(p, name, *p, usage) 
+} 
+
+func (c *Cli) VarFlag(name, usage string, dec Decodable) {
+    str := c.FlagSet.String(name, "", usage)
+    
+    c.decodables[str] = dec
+}
+
+func (c Cli) HasSubcommands() bool {
+    return c.commands != nil && len(c.commands) != 0
+}
+
+func (c Cli) Usage() {
+    c.PrintDefaults()
+    
+    if c.HasSubcommands() {
+        fmt.Printf("\nAvailable subcommands: %s\n", c.commands.Keys())
+    }
+}
+
+func (c Cli) Parse(args []string) (err error) {
+    err = c.FlagSet.Parse(args)
+    
+    if errors.Is(err, flag.ErrHelp) {
+        c.Usage()
+        return
+    }
+    
+    if err != nil {
+        return
+    }
+    
+    for key, val := range c.decodables {
+        if err = val.Decode(*key); err != nil {
+            return
+        }
+    }
+    
+    return nil
+}
+
+func (c Cli) Run(args []string) (err error) {
+    //ferr := merr.Make("Cli.Run")
+    
+    if !c.HasSubcommands() {
+        return c.Parse(args)
+    }
+    
+    l := len(args)
+    
+    if l < 1 {
+        fmt.Printf("Expected at least one parameter specifying subcommand.\n")
+        c.Usage()
+        return nil
+    }
+    
+    // TODO: check if args is long enough
+    mode := args[0]
+    
+    if mode == "-help" || mode == "-h" {
+        c.Usage()
+        return nil
+    }
+    
+    com, ok := c.commands[mode]
+    
+    if !ok {
+        return UnrecognizedMode{got:mode, name:"gamma"}
+    }
+    
+    cli := com.MakeCli()
+    err = cli.Parse(args[1:])
+    
+    if errors.Is(err, flag.ErrHelp) {
+        return nil
+    }
+    
+    if err != nil {
+        return
+    }
+    
+    return com.Run()
+}
 
 func Fatal(err error, format string, args ...interface{}) {
     if err != nil {

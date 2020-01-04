@@ -5,17 +5,15 @@ import (
     "os"
 
     gamma "../src"
-    "github.com/mkideal/cli"
 )
 
-var help = cli.HelpCommand("display help information")
-
 func main() {
-    cli = NewCli("gamma")
+    cli := gamma.NewCli("gamma")
     cli.SetupGammaCli()
     
-    if err := cli.Parse(args[1:]); err != nil {
-        fmt.Fprintf(os.Stderr, err)
+    if err := cli.Run(os.Args[1:]); err != nil {
+        fmt.Fprintf(os.Stderr, "Error occurred in main while running: %s\n",
+            err)
         os.Exit(1)
     }
 }

@@ -3,9 +3,7 @@ package gamma
 import (
     "errors"
     "fmt"
-    "strings"
     "path/filepath"
-    "flag"
 
     //"os"
     //"log"
@@ -30,121 +28,9 @@ var (
     BatchModes = []string{"quicklook", "mli / MLI", "ras"}
 )
 
-type UnrecognizedMode struct {
-    name, got string
-    err error
-}
-
-func (e UnrecognizedMode) Error() string {
-    return fmt.Sprintf("unrecognized mode '%s' for %s", e.got, e.name)
-}
-
-func (e UnrecognizedMode) Unwrap() error {
-    return e.err
-}
-
-type ModeError struct {
-    name string
-    got fmt.Stringer
-    err error
-}
-
-func (e ModeError) Error() string {
-    return fmt.Sprintf("unrecognized mode '%s' for %s", e.got.String(), e.name)
-}
-
-func (e ModeError) Unwrap() error {
-    return e.err
-}
-
-
-type (
-    Decodable interface {
-        Decode(string) error
-    }
-    
-    Action interface {
-        MakeCli() Cli
-        Run() error
-    }
-    
-    Cli struct {
-        *flag.FlagSet
-        decodables map[string]*Decodable
-        commands map[string]*Action
-    }
-)
-
-func NewCli(name string) (c Cli) {
-    c.FlagSet.Init(name, flag.ContinueOnError)
-    c.decodables = make(map[*string]*Decodable)
-    c.commands = make(map[string]*Action)
-
-    return c
-}
-
-func (c *Cli) AddAction(name string, act *Action) {
-    c.commands[name] = act
-}
-
-func (c *Cli) DecodeVar(name, usage string, dec *Decodable) {
-    str := c.FlagSet.String(name, "", usage)
-    
-    c.decodables[str] = dec
-}
-
-func (c Cli) NoSubcommands() bool {
-    return c.commands == nil || len(c.commands) == 0
-}
-
-func (c Cli) Parse(args []string) (err error) {
-    if err = c.FlagSet.Parse(args); err != nil {
-        return
-    }
-    
-    for key, val := range c.decodables {
-        if err = val.Decode(*key); err != nil {
-            return
-        }
-    }
-}
-
-func (c Cli) Run(args []string) (err error) {
-    if !c.NoSubcommands() {
-        return c.Parse(args)
-    }
-    
-    // TODO: check if args is long enough
-    mode := args[1]
-    
-    c, ok := c.commands[mode]
-    
-    // proper error handling
-    if !ok {
-        return ModeError{}
-    }
-    
-    cli := c.MakeCli()
-    
-    // check lenght of args
-    
-    err = cli.Parse(args[2:])
-    
-    if errors.Is(err, flags.ErrHelp) {
-        cli.PrintDefaults()
-        return nil
-    }
-    
-    if err != nil {
-        return
-    }
-    
-    c.Run()
-}
-
 
 func (c *Cli) SetupGammaCli() {
-    c.AddAction("like", &like{in:"-", out:"-", ext:"dat", DType:Unknown})
+    c.AddAction("like", &like{in:"-", out:"-", ext:"dat", Dtype:Unknown})
 }
 
 type like struct {
@@ -159,17 +45,18 @@ func (l *like) MakeCli() (c Cli) {
     
     //fl := c.NewSubCommand("like",
         //"Initialize Gamma datafile with given datatype and shape")
-    c.StringFlag("in", "Reference metadata file", &l.in)
-    c.StringFlag("out", "Output metadata file", &l.out)
-    c.VarFlag("out", "Output file datatype", &l.DType)
+    c.StringVar("in", "Reference metadata file", &l.in)
+    c.StringVar("out", "Output metadata file", &l.out)
+    c.VarFlag("dtype", "Output file datatype", &l.Dtype)
+    c.StringVar("ext", "Extension of datafile", &l.ext)
     
     return    
 }
 
 func (l like) Run() (err error) {
-    var ferr = merr.Make("likeFn")
+    var ferr = merr.Make("like.Run")
     
-    in, out := l.In, l.Out
+    in, out := l.in, l.out
     
     var indat DatFile
     if err = Load(in, &indat); err != nil {
@@ -187,7 +74,7 @@ func (l like) Run() (err error) {
     }
     
     outdat := DatFile{
-        Dat: fmt.Sprintf("%s.%s", out, l.Ext),
+        Dat: fmt.Sprintf("%s.%s", out, l.ext),
         URngAzi: indat.URngAzi,
         DType: dtype,
     }
@@ -198,6 +85,8 @@ func (l like) Run() (err error) {
     
     return nil
 }
+
+/*
 
 var MoveFile = &cli.Command{
     Name: "move",
@@ -441,7 +330,6 @@ type (
 
 var imgStat = Gamma.Must("image_stat")
 
-/*
 func stat(args Args) (err error) {
     s := Stat{}
     
@@ -462,7 +350,6 @@ func stat(args Args) (err error) {
     
     return
 }
-*/
 
 
 var GeoCode = &cli.Command{
@@ -536,6 +423,10 @@ func geoCodeFn(ctx *cli.Context) (err error) {
     
     return nil
 }
+
+
+*/
+
 
 type Plotter struct {
     RasArgs

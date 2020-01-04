@@ -2,15 +2,15 @@ package gamma
 
 
 import (
-    "fmt"
+    //"fmt"
     "log"
-    "path/filepath"
-    "os"
+    //"path/filepath"
+    //"os"
     "io"
     "bufio"
     
-    "github.com/mkideal/cli"
-    clix "github.com/mkideal/cli/ext"
+    //"github.com/mkideal/cli"
+    //clix "github.com/mkideal/cli/ext"
     //"sort"
     //"strings"
     // "math"
@@ -67,8 +67,8 @@ type GeneralOpt struct {
     MasterDate string      `cli:"m,master" usage:"Master date"`
     CachePath  string      `cli:"cache" usage:"Cache path" json:"CACHE_PATH"`
     Looks      RngAzi      `cli:"l,looks" usage:""`
-    InFile     clix.Reader `cli:"i,infile" usage:"Input file"`   
-    OutFile    clix.Writer `cli:"o,outfile" usage:"Output file"`   
+    //InFile     clix.Reader `cli:"i,infile" usage:"Input file"`   
+    //OutFile    clix.Writer `cli:"o,outfile" usage:"Output file"`   
 }
 
 type dataSelector struct {
@@ -81,6 +81,7 @@ type dataSelector struct {
     CheckZips  bool     `cli:"c,checkZips" usage:"Check zipfile integrity"`  
 }
 
+/*
 var DataSelect = &cli.Command{
     Name: "select",
     Desc: "Select SAR images for processing",
