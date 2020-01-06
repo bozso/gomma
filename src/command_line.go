@@ -4,10 +4,6 @@ import (
     "errors"
     "fmt"
     "path/filepath"
-
-    //"os"
-    //"log"
-    //"reflect"
 )
 
 type (
@@ -25,15 +21,15 @@ const (
 func (c *Cli) SetupGammaCli() {
     c.AddAction("like",
         "Initialize Gamma datafile with given datatype and shape.",
-        &like{ext:"dat", Dtype:Unknown})
+        &like{})
     
     c.AddAction("move",
         "Move a datafile and metadatafile to a given directory.",
-        &move{outDir: "."})
+        &move{})
 
     c.AddAction("make",
         "Create metafile for an existing datafile.",
-        &create{Ext: "par"})    
+        &create{})
 
     c.AddAction("coreg",
         "Coregister two Sentinel-1 SAR images.",
@@ -45,31 +41,32 @@ type MetaFile struct {
 }
 
 func (m *MetaFile) SetCli(c *Cli) {
-    c.StringVar("meta", "Metadata json file", &m.Meta)
+    c.StringVar(&m.Meta, "meta", "", "Metadata json file")
 }
 
 
 type like struct {
+    indat DatFile
     in, out, ext string 
     Dtype        DType
 }
 
 func (l *like) SetCli(c* Cli) {
-    c.StringVar("in", "Reference metadata file", &l.in)
-    c.StringVar("out", "Output metadata file", &l.out)
-    c.VarFlag("dtype", "Output file datatype", &l.Dtype)
-    c.StringVar("ext", "Extension of datafile", &l.ext)
+    c.VarFlag(&l.indat, "in", "Reference metadata file")
+    c.StringVar(&l.out, "out", "", "Output metadata file")
+    c.VarFlag(&l.Dtype, "dtype", "Output file datatype")
+    c.StringVar(&l.ext, "ext", "dat", "Extension of datafile")
 }
 
 func (l like) Run() (err error) {
     var ferr = merr.Make("like.Run")
     
-    in, out := l.in, l.out
+    out, indat := l.out, l.indat
     
-    var indat DatFile
-    if err = Load(in, &indat); err != nil {
-        return ferr.Wrap(err)
-    }
+    //var indat DatFile
+    //if err = Load(in, &indat); err != nil {
+        //return ferr.Wrap(err)
+    //}
     
     dtype := l.Dtype
 
@@ -101,7 +98,7 @@ type move struct {
 
 func (m *move) SetCli(c *Cli) {
     m.MetaFile.SetCli(c)
-    c.StringVar("out", "Output directory", &m.outDir)
+    c.StringVar(&m.outDir, "out", ".", "Output directory")
 }
 
 func (m move) Run() (err error) {
@@ -142,10 +139,10 @@ func (cr *create) SetCli(c *Cli) {
     cr.MetaFile.SetCli(c)
     cr.DType.SetCli(c)
     
-    c.StringVar("dat", "Datafile path", &cr.Dat)
-    c.StringVar("par", "Parameterfile path", &cr.Par)
-    c.StringVar("ftype", "Filetype.", &cr.Ftype)
-    c.StringVar("ext", "Extension of parameterfile.", &cr.Ext)
+    c.StringVar(&cr.Dat, "dat", "", "Datafile path")
+    c.StringVar(&cr.Par, "par", "", "Parameterfile path")
+    c.StringVar(&cr.Ftype, "ftype", "", "Filetype.")
+    c.StringVar(&cr.Ext, "ext", "par", "Extension of parameterfile.")
 }
 
 func (c create) Run() (err error) {
@@ -190,11 +187,11 @@ type coreg struct {
 }
 
 func (co *coreg) SetCli(c *Cli) {
-    //co.S1CoregOpt.SetCli(c)
+    co.S1CoregOpt.SetCli(c)
     
-    c.StringVar("master", "Master image.", &co.Master)
-    c.StringVar("slave", "Slave image.", &co.Slave)
-    c.StringVar("ref", "Reference image.", &co.Ref)
+    c.StringVar(&co.Master, "master", "", "Master image.")
+    c.StringVar(&co.Slave, "slave", "", "Slave image.")
+    c.StringVar(&co.Ref, "ref", "", "Reference image.")
 }
 
 func (c coreg) Run() (err error) {

@@ -8,8 +8,6 @@ import (
     "path/filepath"
     "strings"
     "strconv"
-    //"log"
-    //"reflect"
 )
 
 type (    
@@ -57,7 +55,7 @@ const (
 )
 
 func (d *DType) SetCli(c *Cli) {
-    c.VarFlag("dtype", "Datatype of datafile.", d)
+    c.VarFlag(d, "dtype", "Datatype of datafile.")
 }
 
 func (d *DType) Decode(s string) error {
@@ -109,103 +107,6 @@ func (d DType) String() string {
         return "UNKNOWN"
     }
 }
-
-type ZeroDimError struct {
-    dim string
-    Err error
-}
-
-
-func (e ZeroDimError) Error() string {
-    return fmt.Sprintf("expected %s to be non zero", e.dim)
-}
-
-func (e ZeroDimError) Unwrap() error {
-    return e.Err
-}
-
-type RngAzi struct {
-    Rng int `json:"rng" name:"rng" default:"0"`
-    Azi int `json:"azi" name:"azi" default:"0"`
-}
-
-func (ra *RngAzi) Decode(s string) (err error) {
-    var ferr = merr.Make("RngAzi.Decode")
-    
-    if len(s) == 0 {
-        return ferr.Wrap(EmptyStringError{})
-    }
-    
-    split := NewSplitParser(s, ",")
-    
-    ra.Rng = split.Int(0)
-    ra.Azi = split.Int(1)
-    
-    if err := split.Wrap(); err != nil {
-        return ferr.Wrap(err) 
-    }
-    
-    return nil
-}
-
-func (ra RngAzi) Check() (err error) {
-    var ferr = merr.Make("RngAzi.Check")
-     
-    if ra.Rng == 0 {
-        return ferr.Wrap(ZeroDimError{dim: "range samples / columns"})
-    }
-    
-    if ra.Azi == 0 {
-        return ferr.Wrap(ZeroDimError{dim: "azimuth lines / rows"})
-    }
-    
-    return nil
-}
-
-
-type TypeMismatchError struct {
-    ftype, expected string
-    DType
-    Err error
-}
-
-func (e TypeMismatchError) Error() string {
-    return fmt.Sprintf("expected datatype '%s' for %s datafile, got '%s'",
-        e.expected, e.ftype, e.DType.String())
-}
-
-func (e TypeMismatchError) Unwrap() error {
-    return e.Err
-}
-
-type UnknownTypeError struct {
-    DType
-    Err error
-}
-
-func (e UnknownTypeError) Error() string {
-    return fmt.Sprintf("unrecognised type '%s', expected a valid datatype",
-        e.DType.String())
-}
-
-func (e UnknownTypeError) Unwrap() error {
-    return e.Err
-}
-
-type WrongTypeError struct {
-    DType
-    kind string
-    Err error
-}
-
-func (e WrongTypeError) Error() string {
-    return fmt.Sprintf("wrong datatype '%s' for %s", e.kind, e.DType.String())
-}
-
-func (e WrongTypeError) Unwrap() error {
-    return e.Err
-}
-
 
 func NewGammaParam(path string) Params {
     return Params{Par: path, Sep: ":", contents: nil}
@@ -808,6 +709,15 @@ func Move(path string, dir string) (s string, err error) {
     return dst, nil
 }
 
+func (d *DatFile) Decode(s string) (err error) {
+    return Load(s, d)
+}
+
+func (d *DatParFile) Decode(s string) (err error) {
+    return Load(s, d)
+}
+
+
 func Save(path string, d Serialize) (err error) {
     var ferr = merr.Make("Save")
     
@@ -845,4 +755,100 @@ func Load(path string, d Serialize) (err error) {
     }
     
     return nil 
+}
+
+type ZeroDimError struct {
+    dim string
+    Err error
+}
+
+
+func (e ZeroDimError) Error() string {
+    return fmt.Sprintf("expected %s to be non zero", e.dim)
+}
+
+func (e ZeroDimError) Unwrap() error {
+    return e.Err
+}
+
+type RngAzi struct {
+    Rng int `json:"rng" name:"rng" default:"0"`
+    Azi int `json:"azi" name:"azi" default:"0"`
+}
+
+func (ra *RngAzi) Decode(s string) (err error) {
+    var ferr = merr.Make("RngAzi.Decode")
+    
+    if len(s) == 0 {
+        return ferr.Wrap(EmptyStringError{})
+    }
+    
+    split := NewSplitParser(s, ",")
+    
+    ra.Rng = split.Int(0)
+    ra.Azi = split.Int(1)
+    
+    if err := split.Wrap(); err != nil {
+        return ferr.Wrap(err) 
+    }
+    
+    return nil
+}
+
+func (ra RngAzi) Check() (err error) {
+    var ferr = merr.Make("RngAzi.Check")
+     
+    if ra.Rng == 0 {
+        return ferr.Wrap(ZeroDimError{dim: "range samples / columns"})
+    }
+    
+    if ra.Azi == 0 {
+        return ferr.Wrap(ZeroDimError{dim: "azimuth lines / rows"})
+    }
+    
+    return nil
+}
+
+
+type TypeMismatchError struct {
+    ftype, expected string
+    DType
+    Err error
+}
+
+func (e TypeMismatchError) Error() string {
+    return fmt.Sprintf("expected datatype '%s' for %s datafile, got '%s'",
+        e.expected, e.ftype, e.DType.String())
+}
+
+func (e TypeMismatchError) Unwrap() error {
+    return e.Err
+}
+
+type UnknownTypeError struct {
+    DType
+    Err error
+}
+
+func (e UnknownTypeError) Error() string {
+    return fmt.Sprintf("unrecognised type '%s', expected a valid datatype",
+        e.DType.String())
+}
+
+func (e UnknownTypeError) Unwrap() error {
+    return e.Err
+}
+
+type WrongTypeError struct {
+    DType
+    kind string
+    Err error
+}
+
+func (e WrongTypeError) Error() string {
+    return fmt.Sprintf("wrong datatype '%s' for %s", e.kind, e.DType.String())
+}
+
+func (e WrongTypeError) Unwrap() error {
+    return e.Err
 }

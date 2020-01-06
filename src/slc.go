@@ -203,3 +203,11 @@ func (m MLI) Raster(opt RasArgs) error {
     return m.Raster(opt)
 }
 
+
+func (slc *SLC) Decode(s string) (err error) {
+    return Load(s, slc)
+}
+
+func (m *MLI) Decode(s string) (err error) {
+    return Load(s, m)
+}

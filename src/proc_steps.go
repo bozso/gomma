@@ -2,20 +2,10 @@ package gamma
 
 
 import (
-    //"fmt"
+    "fmt"
     "log"
-    //"path/filepath"
-    //"os"
     "io"
-    "bufio"
-    
-    //"github.com/mkideal/cli"
-    //clix "github.com/mkideal/cli/ext"
-    //"sort"
-    //"strings"
-    // "math"
-    // "time"
-    // "strconv"
+    "bufio"    
 )
 
 type checkerFun func(*S1Zip) bool
@@ -71,7 +61,15 @@ type GeneralOpt struct {
     //OutFile    clix.Writer `cli:"o,outfile" usage:"Output file"`   
 }
 
-type dataSelector struct {
+func (g *GeneralOpt) SetCli(c *Cli) {
+    c.StringVar(&g.OutputDir, "out", ".", "Output directory")
+    c.StringVar(&g.Pol, "pol", "vv", "POlarisation used.")
+    c.StringVar(&g.MasterDate, "masterDate", "", "")
+    c.StringVar(&g.CachePath, "cachePath", "", "Cache path.")
+    c.VarFlag(&g.Looks, "looks", "Range, azimuth looks.")
+}
+
+type dataSelect struct {
     GeneralOpt
     DataFiles  []string `cli:"d,data" usage:"List of datafiles to process"`
     DateStart  string   `cli:"b,start" usage:"Start of date range"`
@@ -81,17 +79,19 @@ type dataSelector struct {
     CheckZips  bool     `cli:"c,checkZips" usage:"Check zipfile integrity"`  
 }
 
-/*
-var DataSelect = &cli.Command{
-    Name: "select",
-    Desc: "Select SAR images for processing",
-    Argv: func() interface{} { return &dataSelector{} },
-    Fn: dataSelect,
+func (d *dataSelect) SetCli(c *Cli) {
+    d.GeneralOpt.SetCli(c)
+    
+    d.DataFiles.SetCli(c)
+    
+    c.StringVar(&d.DateStart, "start", "", "Start of date range.")
+    c.StringVar(&d.DateStop, "stop", "", "End of date range.")
+    c.VarFlag(&d.LowerLeft, "lowerLeft", "Rectangle coordinates.")
+    c.VarFlag(&d.UpperRight, "upperRight", "Rectangle coordinates.")
+    c.BoolVar(&d.CheckZips, "checkZips", false, "Check zipfile integrity.")
 }
 
-func dataSelect(ctx *cli.Context) (err error) {
-    sel := ctx.Argv().(*dataSelector)
-    
+func (sel dataSelect) Run() (err error) {
     dataFiles := sel.DataFiles
     if len(dataFiles) == 0 {
         return fmt.Errorf("At least one datafile must be specified!")
@@ -185,7 +185,7 @@ func dataSelect(ctx *cli.Context) (err error) {
     return nil
 }
 
-
+/*
 type dataImporter struct {
     GeneralOpt
     IWs        [3]IMinmax `cli:"iws" usage:"IW burst indices"`

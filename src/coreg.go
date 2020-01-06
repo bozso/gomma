@@ -5,7 +5,6 @@ import (
     "fmt"
     "log"
     "path/filepath"
-    //str "strings"
 )
 
 type (
@@ -35,7 +34,33 @@ type (
 
 var coregFun = Gamma.Must("S1_coreg_TOPS")
 
-//func (s1 *S1CoregOpt)
+func (s1 *S1CoregOpt) SetCli(c *Cli) {
+
+    c.StringVar(&s1.IfgPath, "ifg",
+        "Output interferogram metadata file", "")
+        
+    c.StringVar(&s1.RslcPath, "rslc", "", "Output RSLC metadata file")
+    c.StringVar(&s1.OutDir, "outDir", "", "Output directory")
+
+    c.StringVar(&s1.Poly1, "poly1", "", "Polynom 1")
+    c.StringVar(&s1.Poly2, "poly2", "", "Polynom 2")
+    
+    c.VarFlag(&s1.Looks, "looks", "Number of looks.")
+    
+    c.BoolVar(&s1.Clean, "clean", false, "Cleanup temporary files.")
+    c.BoolVar(&s1.UseInter, "useInter", false, "Use intermediate files.")
+    
+    c.Float64Var(&s1.CoherenceThresh, "cohThresh", 0.8,
+        "Coherence threshold in overlapping bursts.")
+
+    c.Float64Var(&s1.FractionThresh, "fracThresh", 0.01,
+        "Fraction of coherent pixels in overlapping bursts.")
+
+    c.Float64Var(&s1.PhaseStdevThresh, "stdThresh", 0.8,
+        "Maximum allowed phase standard deviation.")
+    
+    c.StringVar(&s1.Mli, "mli", "", "Output? MLI metadata file.")
+}
 
 func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
     var ferr = merr.Make("S1CoregOpt.Coreg")

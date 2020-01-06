@@ -10,7 +10,6 @@ import (
     "io/ioutil"
     "strconv"
     "strings"
-    "reflect"
     "flag"
     "errors"
 )
@@ -95,23 +94,23 @@ func (e EmptyStringError) Unwrap() error {
     return e.err
 }
 
-func MapKeys(dict interface{}) (ret []string) {
-    val := reflect.ValueOf(dict)
-    kind := val.Kind()
+//func MapKeys(dict interface{}) (ret []string) {
+    //val := reflect.ValueOf(dict)
+    //kind := val.Kind()
     
-    if kind != reflect.Map {
-        log.Fatalf("expected a map not an '%s'", kind)
-    }
+    //if kind != reflect.Map {
+        //log.Fatalf("expected a map not an '%s'", kind)
+    //}
     
-    keys := val.MapKeys()
-    ret = make([]string, len(keys))
+    //keys := val.MapKeys()
+    //ret = make([]string, len(keys))
 
-    for ii, key := range keys {
-        ret[ii] = key.String()
-    }
+    //for ii, key := range keys {
+        //ret[ii] = key.String()
+    //}
     
-    return
-}
+    //return
+//}
 
 
 var tmp = Tmp{}
@@ -211,11 +210,7 @@ func (c *Cli) AddAction(name, desc string, act Action) {
     }
 }
 
-func (c *Cli) StringVar(name, usage string, p *string) {
-    c.FlagSet.StringVar(p, name, *p, usage) 
-} 
-
-func (c *Cli) VarFlag(name, usage string, dec Decodable) {
+func (c *Cli) VarFlag(dec Decodable, name, usage string) {
     str := c.FlagSet.String(name, "", usage)
     
     c.decodables[str] = dec
