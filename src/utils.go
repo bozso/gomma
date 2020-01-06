@@ -2,6 +2,7 @@ package gamma
 
 import (
     "fmt"
+    "path/filepath"
     "log"
     "os"
     "io"
@@ -94,24 +95,6 @@ func (e EmptyStringError) Unwrap() error {
     return e.err
 }
 
-//func MapKeys(dict interface{}) (ret []string) {
-    //val := reflect.ValueOf(dict)
-    //kind := val.Kind()
-    
-    //if kind != reflect.Map {
-        //log.Fatalf("expected a map not an '%s'", kind)
-    //}
-    
-    //keys := val.MapKeys()
-    //ret = make([]string, len(keys))
-
-    //for ii, key := range keys {
-        //ret[ii] = key.String()
-    //}
-    
-    //return
-//}
-
 
 var tmp = Tmp{}
 
@@ -126,7 +109,7 @@ func Exist(s string) (ret bool, err error) {
         if os.IsNotExist(err) {
             return false, nil
         }
-        return false, err
+        return false, merr.Make("Exist").Wrap(err)
     }
     return true, nil
 }
@@ -640,11 +623,78 @@ func (e FileOpenError) Unwrap() error {
     return e.err
 }
 
-func Mkdir(name string) (err error) {
-    if err = os.MkdirAll(name, os.ModePerm); err != nil {
-        err = fmt.Errorf("failed to create directory '%s': %w", name,
-            err)
+type Path struct {
+    s string
+}
+
+func (p Path) String() string {
+    return p.s
+}
+
+func (p Path) Abs() (pp Path, err error) {
+    ferr := merr.Make("Path.Abs")
+    
+    pp.s, err = filepath.Abs(p.s)
+    
+    if err != nil {
+        err = ferr.Wrap(err)
     }
+    return
+}
+
+func (p Path) Len() int {
+    return len(p.s)
+}
+
+type File struct {
+    Path
+}
+
+func (v *File) Decode(s string) (err error) {
+    b, ferr := false, merr.Make("File.Decode")
+    
+    if len(s) == 0 {
+        return ferr.Fmt("expected non empty filepath")
+    }
+    
+    b, err = Exist(s)
+    
+    if err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    if !b {
+        return ferr.Fmt("path '%s' does not exist", s)
+    }
+    
+    v.s = s
+    return nil
+}
+
+type Files []*File
+
+func (f Files) Decode(s string) (err error) {
+    ferr := merr.Make("Files.Decode")
+    
+    split := strings.Split(s, ",")
+    
+    f = make(Files, len(split))
+    
+    for ii, fpath := range f {
+        if err = f.Decode(split[ii]); err != nil {
+            return ferr.Wrap(err)
+        }
+    }
+    return nil
+}
+
+func Mkdir(name string) (err error) {
+    var ferr = merr.Make("Mkdir")
+    
+    if err = os.MkdirAll(name, os.ModePerm); err != nil {
+        err = ferr.WrapFmt(err, "failed to create directory '%s'", name)
+    }
+    
     return
 }
 

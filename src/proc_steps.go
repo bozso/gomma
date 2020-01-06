@@ -71,7 +71,7 @@ func (g *GeneralOpt) SetCli(c *Cli) {
 
 type dataSelect struct {
     GeneralOpt
-    DataFiles  []string `cli:"d,data" usage:"List of datafiles to process"`
+    DataFiles  Files `cli:"d,data" usage:"List of datafiles to process"`
     DateStart  string   `cli:"b,start" usage:"Start of date range"`
     DateStop   string   `cli:"e,stop" usage:"End of date range"`
     LowerLeft  LatLon   `cli:"ll,lowerLeft" usage:"Rectangle coordinates"`
@@ -82,7 +82,8 @@ type dataSelect struct {
 func (d *dataSelect) SetCli(c *Cli) {
     d.GeneralOpt.SetCli(c)
     
-    d.DataFiles.SetCli(c)
+    c.VarFlag(&d.DataFiles, "datafiles",
+        "Comma separated filpaths to Sentinel-1 data.")
     
     c.StringVar(&d.DateStart, "start", "", "Start of date range.")
     c.StringVar(&d.DateStop, "stop", "", "End of date range.")
@@ -169,7 +170,7 @@ func (sel dataSelect) Run() (err error) {
     defer sel.OutFile.Close()
     
     for _, zip := range dataFiles {
-        if s1zip, IWs, err = parseS1(zip, sel.Pol, sel.CachePath);
+        if s1zip, IWs, err = parseS1(zip.String(), sel.Pol, sel.CachePath);
            err != nil {
             return Handle(err,
                 "failed to import S1Zip data from '%s'", zip)

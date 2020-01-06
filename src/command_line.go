@@ -102,7 +102,7 @@ func (m *move) SetCli(c *Cli) {
 }
 
 func (m move) Run() (err error) {
-    var ferr = merr.Make("moveFn")
+    var ferr = merr.Make("move.Run")
 
     path := m.Meta
     
@@ -130,7 +130,8 @@ func (m move) Run() (err error) {
 }
 
 type create struct {
-    Dat, Par, Ftype, Ext string
+    Dat, Par File
+    Ftype, Ext string
     MetaFile
     DType
 }
@@ -139,8 +140,8 @@ func (cr *create) SetCli(c *Cli) {
     cr.MetaFile.SetCli(c)
     cr.DType.SetCli(c)
     
-    c.StringVar(&cr.Dat, "dat", "", "Datafile path")
-    c.StringVar(&cr.Par, "par", "", "Parameterfile path")
+    c.VarFlag(&cr.Dat, "dat", "Datafile path")
+    c.VarFlag(&cr.Par, "par", "Parameterfile path")
     c.StringVar(&cr.Ftype, "ftype", "", "Filetype.")
     c.StringVar(&cr.Ext, "ext", "par", "Extension of parameterfile.")
 }
@@ -148,20 +149,20 @@ func (cr *create) SetCli(c *Cli) {
 func (c create) Run() (err error) {
     var ferr = merr.Make("create.Run")
     
-    var dat string
-    if dat, err = filepath.Abs(c.Dat); err != nil {
+    var dat Path
+    if dat, err = c.Dat.Abs(); err != nil {
         return ferr.Wrap(err)
     }
     
-    par := c.Par
-    if len(par) > 0 {
-        if par, err = filepath.Abs(par); err != nil {
+    var par Path
+    if par.Len() > 0 {
+        if par, err = c.Par.Abs(); err != nil {
             return ferr.Wrap(err)
         }
     }
     
-    var datf DatParFile
-    if datf, err = NewDatParFile(dat, par, c.Ext, c.DType); err != nil {
+    datf, err := NewDatParFile(dat.String(), par.String(), c.Ext, c.DType)
+    if err != nil {
         return ferr.Wrap(err)
     }
     
