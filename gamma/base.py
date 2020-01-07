@@ -117,16 +117,28 @@ class Project(object):
 
 class DataFile(dict):
     __slots__ = ("metafile",)
-
+    
+    datfile_ext = "dat"
+    parfile_ext = "par"
+    
     def __init__(self, path):
         self.metafile = path
         with open(path, "r") as f:
             self.update(json.load(f))
     
     @classmethod
-    def make(cls, meta, dat=None, par="", ext=None, dtype="Unknown"):
+    def new(cls, meta, **kwargs):
+        
+    
+    @classmethod
+    def from_files(cls, meta, **kwargs):
+        dat, par = kwargs.get("dat"), par.get("par")
+        
         if dat is None:
-            dat = utils.tmp_file() + ".dat"
+            dat = "%s.%s" % (utils.tmp_file(), self.datfile_ext)
+        
+        if par is None:
+            par = "%s.%s" % (dat, self.parfile_ext)
         
         gamma.subcmd("make", meta=meta, dat=dat, par=par, parExt=ext,
             dtype=dtype)
@@ -152,6 +164,8 @@ class DataFile(dict):
 
     
 class SLC(DataFile):
+    datfile_ext = "slc"
+    
     def SplitInterferometry(self):
         pass
 

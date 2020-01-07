@@ -188,15 +188,21 @@ func (c create) Run() (err error) {
 
 type geoCode struct {
     Lookup `cli:"*l,lookup" usage:"Lookup table file"`
-    Infile   DatFile `cli:"*infile" usage:"Input datafile"`
-    Outfile  File `cli:"*out" usage:"Output datafile"`
-    Mode     string `cli:"mode" usage:"Geocode direction; from or to radar cordinates"`
-    Shape    string `cli:"s,shape" usage:"Shape of the output file"`
+    InFile   DatFile `cli:"*infile" usage:"Input datafile"`
+    OutFile  File `cli:"*out" usage:"Output datafile"`
+    Mode     string `cli:"mode" usage:""`
     CodeOpt
 }
 
 func (g *geoCode) SetCli(c *Cli) {
-    g.Lookup
+    c.VarFlag(&g.Lookup, "lookup", "Lookup table file.")
+    
+    c.VarFlag(&g.InFile, "infile", "Input datafile to geocode.")
+    c.VarFlag(&g.OutFile, "outfile", "Geocoded output datafile.")
+    c.StringVar(&g.Mode, "mode", "",
+        "Geocoding direction; from or to radar cordinates.")
+    
+    g.CodeOpt.SetCli(c)
 }
 
 func (c geoCode) Run() (err error) {
