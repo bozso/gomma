@@ -336,7 +336,7 @@ func (ifg IFG) CheckQuality() (b bool, err error) {
         qual = ifg.Quality
     )
     
-    var file FileReader
+    var file Reader
     if file, err = NewReader(qual); err != nil {
         err = ferr.Wrap(err)
         return

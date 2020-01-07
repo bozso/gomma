@@ -52,16 +52,16 @@ func loadS1(reader io.Reader, pol string) (s1 S1Zips, err error) {
 
 type GeneralOpt struct {
     //DataPath   string     `cli:"" usage:""`
-    OutputDir  string      `cli:"out" usage:"Output directory"`
-    Pol        string      `cli:"p,pol" usage:"Polarisation used" dft:"vv"`
-    MasterDate string      `cli:"m,master" usage:"Master date"`
-    CachePath  string      `cli:"cache" usage:"Cache path" json:"CACHE_PATH"`
-    Looks      RngAzi      `cli:"l,looks" usage:""`
-    //InFile     clix.Reader `cli:"i,infile" usage:"Input file"`   
-    //OutFile    clix.Writer `cli:"o,outfile" usage:"Output file"`   
+    OutputDir, Pol, MasterDate, CachePath  string
+    Looks      RngAzi
+    InFile     Reader
+    OutFile    Writer
 }
 
 func (g *GeneralOpt) SetCli(c *Cli) {
+    g.InFile.SetCli(c, "infile", "Input file.")
+    g.OutFile.SetCli(c, "outfile", "Input file.")
+    
     c.StringVar(&g.OutputDir, "out", ".", "Output directory")
     c.StringVar(&g.Pol, "pol", "vv", "POlarisation used.")
     c.StringVar(&g.MasterDate, "masterDate", "", "")
@@ -93,6 +93,8 @@ func (d *dataSelect) SetCli(c *Cli) {
 }
 
 func (sel dataSelect) Run() (err error) {
+    var ferr = merr.Make("dataSelect.Run")
+    
     dataFiles := sel.DataFiles
     if len(dataFiles) == 0 {
         return fmt.Errorf("At least one datafile must be specified!")
@@ -166,8 +168,8 @@ func (sel dataSelect) Run() (err error) {
         }
     )
     
-    writer := bufio.NewWriter(&sel.OutFile)
-    defer sel.OutFile.Close()
+    writer := sel.OutFile
+    defer writer.Close()
     
     for _, zip := range dataFiles {
         if s1zip, IWs, err = parseS1(zip.String(), sel.Pol, sel.CachePath);
@@ -177,10 +179,12 @@ func (sel dataSelect) Run() (err error) {
         }
         
         if IWs.contains(aoi) && checker(s1zip) {
-            if _, err = writer.WriteString(s1zip.Path); err != nil {
-                return
-            }
+            writer.WriteString(s1zip.Path)
         }
+    }
+    
+    if err = writer.Wrap(); err != nil {
+        return ferr.Wrap(err)
     }
     
     return nil

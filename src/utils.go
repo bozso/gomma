@@ -330,14 +330,14 @@ const (
     FileReadErr Werror = "failed to read file '%s'"
 )
 
-type FileReader struct {
+type Reader struct {
     *bufio.Scanner
     *os.File
 }
 
-func NewReader(path string) (f FileReader, err error) {
+func NewReader(path string) (f Reader, err error) {
     if f.File, err = os.Open(path); err != nil {
-        err = FileOpenErr.Wrap(err, path)
+        err = merr.Make("NewReader").Wrap(err)
         return
     }
 
@@ -346,14 +346,20 @@ func NewReader(path string) (f FileReader, err error) {
     return f, nil
 }
 
-func (f *FileReader) Decode(s string) (err error) {
+func (f *Reader) SetCli(c *Cli, name, usage string) {
+    const defDesc = "By default it reads from standard input."
+    
+    c.VarFlag(f, name, fmt.Sprintf("%s %s", usage, defDesc))
+}
+
+func (f *Reader) Decode(s string) (err error) {
     var r io.Reader
-    if s == "-" {
+    
+    if len(s) == 0 {
         r = os.Stdin
     } else {
         if f.File, err = os.Open(s); err != nil {
-            err = FileOpenErr.Wrap(err, s)
-            return
+            return merr.Make("Reader.Decode").Wrap(err)
         }
         r = f.File
     }
@@ -361,6 +367,87 @@ func (f *FileReader) Decode(s string) (err error) {
     f.Scanner = bufio.NewScanner(r)
     return nil
 }
+
+type Writer struct {
+    *bufio.Writer
+    *os.File
+    err error
+}
+
+func NewWriter(wr io.Writer) (w Writer) {
+    w.Writer = bufio.NewWriter(wr)
+    return
+}
+
+func (w *Writer) SetCli(c *Cli, name, usage string) {
+    const defDesc = "By default it writes to standard output."
+    
+    c.VarFlag(w, name, fmt.Sprintf("%s %s", usage, defDesc))
+}
+
+func (w *Writer) Decode(s string) (err error) {
+    if len(s) == 0 {
+        w.Writer = bufio.NewWriter(os.Stdout)
+    } else {
+        if w.File, err = os.Create(s); err != nil {
+            return merr.Make("Writer.Decode").Wrap(err)
+        }
+        w.Writer = bufio.NewWriter(w.File)
+    }
+    
+    
+    return nil    
+}
+
+func (w *Writer) Wrap() error {
+    if w.err == nil {
+        return nil
+    }
+
+    if w.File != nil { 
+        return fmt.Errorf("error while writing to file '%s': %w",
+            w.File.Name(), w.err)
+    } else {
+        return fmt.Errorf("error while writing: %w", w.err)
+    }
+}
+
+func (w *Writer) Close() {
+    if w.File != nil {
+        w.File.Close()
+    }
+    w.Writer.Flush()
+}
+
+func NewWriterFile(name string) (w Writer) {
+    w.File, w.err = os.Create(name)
+    w.Writer = bufio.NewWriter(w.File)
+    
+    return
+}
+
+func (w *Writer) Write(b []byte) (n int) {
+    if w.err != nil {
+        return 0
+    }
+    
+    n, w.err = w.Writer.Write(b)
+    return
+}
+
+func (w *Writer) WriteString(s string) (n int) {
+    if w.err != nil {
+        return 0
+    }
+    
+    n, w.err = w.Writer.WriteString(s)
+    return
+}
+
+func (w *Writer) WriteFmt(tpl string, args ...interface{}) int {
+    return w.WriteString(fmt.Sprintf(tpl, args...))
+}
+
 
 func ReadFile(path string) (b []byte, err error) {
     var f *os.File
@@ -397,7 +484,7 @@ func FromString(params, sep string) Params {
 
 func (self *Params) Param(name string) (ret string, err error) {
     if self.contents == nil {
-        var reader FileReader
+        var reader Reader
         if reader, err = NewReader(self.Par); err != nil {
             return
         }
@@ -526,65 +613,6 @@ func RemoveTmp() {
     }
 }
 
-type Writer struct {
-    *bufio.Writer
-    *os.File
-    err error
-}
-
-func NewWriter(wr io.Writer) (w Writer) {
-    w.Writer = bufio.NewWriter(wr)
-    return
-}
-
-func (w *Writer) Wrap() error {
-    if w.err == nil {
-        return nil
-    }
-
-    if w.File != nil { 
-        return fmt.Errorf("error while writing to file '%s': %w",
-            w.File.Name(), w.err)
-    } else {
-        return fmt.Errorf("error while writing: %w", w.err)
-    }
-}
-
-func (w *Writer) Close() {
-    if w.File != nil {
-        w.File.Close()
-    }
-    w.Writer.Flush()
-}
-
-func NewWriterFile(name string) (w Writer) {
-    w.File, w.err = os.Create(name)
-    w.Writer = bufio.NewWriter(w.File)
-    
-    return
-}
-
-func (w *Writer) Write(b []byte) (n int) {
-    if w.err != nil {
-        return
-    }
-    
-    n, w.err = w.Writer.Write(b)
-    return
-}
-
-func (w *Writer) WriteString(s string) (n int) {
-    if w.err != nil {
-        return 0
-    }
-    
-    n, w.err = w.Writer.WriteString(s)
-    return
-}
-
-func (w *Writer) WriteFmt(tpl string, args ...interface{}) int {
-    return w.WriteString(fmt.Sprintf(tpl, args...))
-}
 
 func Wrap(err1 error, err2 error) error {
     return fmt.Errorf("%w: %w", err1, err2)
@@ -671,6 +699,15 @@ func (v *File) Decode(s string) (err error) {
     return nil
 }
 
+func (f File) Reader() (r Reader, err error) {
+    var ferr = merr.Make("File.Reader")
+    
+    if r, err = NewReader(f.String()); err != nil {
+        err = ferr.Wrap(err)
+    }
+    return
+}
+
 type Files []*File
 
 func (f Files) Decode(s string) (err error) {
@@ -681,7 +718,7 @@ func (f Files) Decode(s string) (err error) {
     f = make(Files, len(split))
     
     for ii, fpath := range f {
-        if err = f.Decode(split[ii]); err != nil {
+        if err = fpath.Decode(split[ii]); err != nil {
             return ferr.Wrap(err)
         }
     }
@@ -717,24 +754,15 @@ type (
         ctx    string
         err    error
     }
-    
-    opErrorFactory struct {
-        module ModuleName
-    }
 )
 
-
-func NewModuleErr(mod ModuleName) opErrorFactory {
-    return opErrorFactory{mod}
-}
-
-func (o opErrorFactory) Make(fn FnName) OpError {
-    return OpError{module: o.module, fn:fn}
+func (m ModuleName) Make(fn FnName) OpError {
+    return OpError{module: m, fn:fn}
 }
 
 func (e OpError) Error() (s string) {
-    s = fmt.Sprintf("%s/%s", e.module, e.fn)
-    s = fmt.Sprintf("\n  %s", Color(s, Error))
+    s = fmt.Sprintf("\n  %s/%s", e.module, e.fn)
+    //s = fmt.Sprintf("\n  %s", Color(s, Error))
     
     if ctx := e.ctx; len(ctx) > 0 {
         s = fmt.Sprintf("%s: %s", s, ctx)

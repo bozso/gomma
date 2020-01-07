@@ -34,6 +34,10 @@ func (c *Cli) SetupGammaCli() {
     c.AddAction("coreg",
         "Coregister two Sentinel-1 SAR images.",
         &coreg{})    
+
+    c.AddAction("select",
+        "Select Sentinel-1 SAR zipfiles for processing.",
+        &dataSelect{})    
 }
 
 type MetaFile struct {
@@ -424,6 +428,7 @@ type Plotter struct {
     Infile string `pos:"0"`
     PlotMode string `name:"mode"`
 }
+
 /*
 func raster(args Args) (err error) {
     var ferr = merr.Make("raster")
@@ -506,7 +511,7 @@ func (m JSONMap) String(name string) (ret string, err error) {
     return ret, nil
 }
 
-func (m JSONMap) Int(name string) (ret int, err error) {
+func (m JSONMap) Int(name string) (i int, err error) {
     var ferr = merr.Make("JSONMap.Int")
     
     tmp, ok := m[name]
@@ -518,17 +523,11 @@ func (m JSONMap) Int(name string) (ret int, err error) {
     
     switch v := tmp.(type) {
     case int:
-        return int(v), nil
     case int8:
-        return int(v), nil
     case int16:
-        return int(v), nil
     case int32:
-        return int(v), nil
     case int64:
-        return int(v), nil
     case float32:
-        return int(v), nil
     case float64:
         return int(v), nil
     default:
@@ -536,4 +535,5 @@ func (m JSONMap) Int(name string) (ret int, err error) {
             "failed to convert '%s' of type '%T' to int", tmp, tmp)
         return
     }
+    return
 }

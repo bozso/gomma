@@ -9,7 +9,7 @@ import (
     //"os"
 )
 
-var merr = NewModuleErr("gamma")
+const merr = ModuleName("gamma")
 
 type (
     Slice []string

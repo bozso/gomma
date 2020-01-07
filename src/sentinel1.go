@@ -209,7 +209,7 @@ func FromTabfile(tab string) (s1 S1SLC, err error) {
     
     log.Printf("Parsing tabfile: '%s'.\n", tab)
     
-    var file FileReader
+    var file Reader
     if file, err = NewReader(tab); err != nil {
         err = ferr.Wrap(FileOpenErr.Wrap(err, tab))
         return
