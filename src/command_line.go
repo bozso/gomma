@@ -186,6 +186,61 @@ func (c create) Run() (err error) {
 }
 
 
+type geoCode struct {
+    Lookup `cli:"*l,lookup" usage:"Lookup table file"`
+    Infile   DatFile `cli:"*infile" usage:"Input datafile"`
+    Outfile  File `cli:"*out" usage:"Output datafile"`
+    Mode     string `cli:"mode" usage:"Geocode direction; from or to radar cordinates"`
+    Shape    string `cli:"s,shape" usage:"Shape of the output file"`
+    CodeOpt
+}
+
+func (g *geoCode) SetCli(c *Cli) {
+    g.Lookup
+}
+
+func (c geoCode) Run() (err error) {
+    var ferr = merr.Make("geoCode.Run")
+    
+    shape := c.Shape
+    
+    if len(shape) > 0 {
+        var dat DatFile
+        if err = Load(shape, &dat); err != nil {
+            return
+        }
+        
+        c.Rng = dat.Rng()
+        c.Azi = dat.Azi()
+    }
+    
+    l, dat := c.Lookup, c.InFile
+    
+    mode := strings.ToUpper(c.Mode)
+    
+    var out DatFile
+    switch mode {
+    case "TORADAR", "RADAR":
+        if out, err = l.geo2radar(dat, c.CodeOpt); err != nil {
+            return ferr.Wrap(err)
+        }
+    case "TOGEO", "GEO":
+        if out, err = l.radar2geo(dat, c.CodeOpt); err != nil {
+            return ferr.Wrap(err)
+        }
+    default:
+        err = UnrecognizedMode{name: "geocoding", got: mode}
+        return ferr.Wrap(err)
+    }
+    
+    if err = Save(c.Outfile, &out); err != nil {
+        return ferr.Wrap(err)
+    }
+    
+    return nil
+}
+
+
 type coreg struct {
     Master, Slave, Ref string 
     S1CoregOpt
@@ -241,6 +296,7 @@ func (c coreg) Run() (err error) {
     
     return nil
 }
+
 /*
 
 var SplitIFG = &cli.Command{
@@ -357,70 +413,6 @@ var GeoCode = &cli.Command{
     Fn: geoCodeFn,
 }
 
-type geoCode struct {
-    Lookup   string `cli:"*l,lookup" usage:"Lookup table file"`
-    Infile   string `cli:"*infile" usage:"Input datafile"`
-    Outfile  string `cli:"*out" usage:"Output datafile"`
-    Mode     string `cli:"mode" usage:"Geocode direction; from or to radar cordinates"`
-    Shape    string `cli:"s,shape" usage:"Shape of the output file"`
-    CodeOpt
-}
-
-
-func geoCodeFn(ctx *cli.Context) (err error) {
-    var ferr = merr.Make("geoCodeFn")
-    
-    c := ctx.Argv().(*geoCode)
-    
-    shape := c.Shape
-    
-    if len(shape) > 0 {
-        var dat DatFile
-        if err = Load(shape, &dat); err != nil {
-            return
-        }
-        
-        c.Rng = dat.Rng()
-        c.Azi = dat.Azi()
-    }
-    
-    var l Lookup
-    if err = Load(c.Lookup, &l); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    var dat DatFile
-    if err = Load(c.Infile, &dat); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    mode := strings.ToUpper(c.Mode)
-    
-    var out DatFile
-    switch mode {
-    case "TORADAR", "RADAR":
-        if out, err = l.geo2radar(dat, c.CodeOpt); err != nil {
-            return ferr.Wrap(err)
-        }
-    case "TOGEO", "GEO":
-        if out, err = l.radar2geo(dat, c.CodeOpt); err != nil {
-            return ferr.Wrap(err)
-        }
-    default:
-        err = UnrecognizedMode{name: "geocoding", got: mode}
-        return ferr.Wrap(err)
-    }
-    
-    if out, err = out.Move("."); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if err = Save(c.Outfile, &out); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
-}
 */
 
 type Plotter struct {

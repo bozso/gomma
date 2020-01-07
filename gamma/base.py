@@ -27,11 +27,11 @@ class Enforcer(object):
         print(type(self.exc))
         if not cond:
             raise self.exc(*args, **kwargs)
-
-
-@ft.lru_cache()
-def enforcer(exc):
-    return Enforcer(exc)
+    
+    
+    @ft.lru_cache()
+    def make(cls, exc):
+        return cls(exc)
 
 
 class Command(object):
@@ -80,7 +80,7 @@ class Command(object):
         return proc
     
     def subcmd(self, cmd, *args, **kwargs):
-        err = enforce(TypeError)
+        err = Enforcer.make(TypeError)
         
         err(self.subcommands is not None, 
             "This command line executable does not support subcommands"
@@ -100,13 +100,16 @@ cmds = {"select", "import", "batch", "move", "make", "stat", "like"}
 gamma = Command(exe, subcommands=cmds, prefix="-")
 
 class Project(object):
+    default_options = {}
+    
     def __init__(self, *args, **kwargs):
         self.general = kwargs
-    
+        
     def select(self, path, *args, **kwargs):
-        datas = ["-d" + path for path in iglob(pjoin(path, "*.zip"))]
+        datas = ','.join(iglob(pth.join(path, "*.zip")))
+        
         gamma.subcmd("select", " ".join(datas),
-            *args, **self.general, **kwargs)
+            *args, **self.general, **kwargs, dataFiles=datas)
     
     def data_import(self, *args, **kwargs):
         gamma.subcmd("import", *args, **self.general, **kwargs)
@@ -121,11 +124,11 @@ class DataFile(dict):
             self.update(json.load(f))
     
     @classmethod
-    def make(cls, meta, dat=None, par=None, ext=None, dtype="Unknown"):
+    def make(cls, meta, dat=None, par="", ext=None, dtype="Unknown"):
         if dat is None:
             dat = utils.tmp_file() + ".dat"
         
-        gamma.make(meta=meta, dat=dat, par=par, parExt=ext,
+        gamma.subcmd("make", meta=meta, dat=dat, par=par, parExt=ext,
             dtype=dtype)
         
         return cls(meta)
@@ -135,16 +138,16 @@ class DataFile(dict):
             name = utils.tmp_file()
         
         kwargs["in"] = self.metafile
-        gamma.like(out=name, **kwargs)
+        gamma.subcmd("like", out=name, **kwargs)
         
         return DataFile(name)
     
     def move(self, dirPath):
-        gamma.move(meta=self.meta, out=dirPath)
+        gamma.subcmd("move", meta=self.meta, out=dirPath)
         self.meta = path.join(dirPath, self.meta)
     
     def stat(self, **kwargs):
-        return gamma.stat(self.metafile, **kwargs)
+        return gamma.subcmd("stat", self.metafile, **kwargs)
     
 
     
@@ -162,14 +165,14 @@ class Lookup(DataFile):
         kwargs["outfile"] = outfile
         kwargs["lookup"] = self.metafile
 
-        gamma.geocode(**kwargs)
+        gamma.subcmd("geocode", **kwargs)
     
     def radar2geo(self, **kwargs):
         kwargs["mode"] = "togeo"
         
-        return self.geocode(**kwargs)
+        return self.subcmd("geocode", **kwargs)
 
     def geo2radar(self, **kwargs):
         kwargs["mode"] = "toradar"
         
-        return self.geocode(**kwargs)
+        return self.subcmd("geocode", **kwargs)

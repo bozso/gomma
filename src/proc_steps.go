@@ -82,7 +82,7 @@ type dataSelect struct {
 func (d *dataSelect) SetCli(c *Cli) {
     d.GeneralOpt.SetCli(c)
     
-    c.VarFlag(&d.DataFiles, "datafiles",
+    c.VarFlag(&d.DataFiles, "dataFiles",
         "Comma separated filpaths to Sentinel-1 data.")
     
     c.StringVar(&d.DateStart, "start", "", "Start of date range.")

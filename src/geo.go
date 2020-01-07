@@ -12,6 +12,10 @@ type DEM struct {
     DatParFile
 }
 
+func (d *DEM) Decode(s string) (err error) {
+    return Load(s, d)
+}
+
 func TmpDEM() (ret DEM, err error) {
     ret.DatParFile, err = TmpDatParFile("dem", "par", Float)
     return
@@ -19,6 +23,10 @@ func TmpDEM() (ret DEM, err error) {
 
 type Lookup struct {
     DatFile
+}
+
+func (l *Lookup) Decode(s string) (err error) {
+    return Load(s, l)
 }
 
 func NewDEM(dat, par string) (d DEM, err error) {
@@ -429,6 +437,9 @@ type Hgt struct {
     DatFile
 }
 
+func (h *Hgt) Decode(s string) (err error) {
+    return Load(s, h)
+}
 
 func (h Hgt) Raster(opt RasArgs) (err error) {
     var ferr = merr.Make("Hgt.Raster")
