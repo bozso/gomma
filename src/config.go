@@ -127,7 +127,7 @@ var (
 )
 
 
-func (mm *IMinmax) Decode(s string) (err error) {
+func (mm *IMinmax) Set(s string) (err error) {
     var ferr = merr.Make("IMinmax.Decode")
     
     if len(s) == 0 {
@@ -146,7 +146,11 @@ func (mm *IMinmax) Decode(s string) (err error) {
     return nil
 }
 
-func (ll *LatLon) Decode(s string) (err error) {
+func (ll LatLon) String() string {
+    return fmt.Sprintf("%f,%f", ll.Lon, ll.Lat)
+}
+
+func (ll *LatLon) Set(s string) (err error) {
     var ferr = merr.Make("LatLon.Decode")
 
     if len(s) == 0 {

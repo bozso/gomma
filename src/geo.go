@@ -13,7 +13,7 @@ type DEM struct {
 }
 
 func (d *DEM) Decode(s string) (err error) {
-    return Load(s, d)
+    return LoadJson(s, d)
 }
 
 func TmpDEM() (ret DEM, err error) {
@@ -26,7 +26,7 @@ type Lookup struct {
 }
 
 func (l *Lookup) Decode(s string) (err error) {
-    return Load(s, l)
+    return LoadJson(s, l)
 }
 
 func NewDEM(dat, par string) (d DEM, err error) {
@@ -42,8 +42,8 @@ func NewDEM(dat, par string) (d DEM, err error) {
 
 func (d DEM) NewLookup(path string) (l Lookup) {
     l.Dat = path
-    l.URngAzi = d.URngAzi
-    l.DType =  FloatCpx
+    l.Ra = d.Ra
+    l.DType = FloatCpx
     return
 }
 
@@ -101,21 +101,7 @@ func (l Lookup) Raster(opt RasArgs) (err error) {
     return nil
 }
 
-type (
-    InterpolationMode int
-    
-    CodeOpt struct {
-        RngAzi
-        Nlines       int               `cli:"nlines" dft:"0"`
-        Npoints      int               `cli:"n,npoint" dft:"4"`
-        Oversamp     float64           `cli:"o,oversamp" dft:"2.0"`
-        MaxRad       float64           `cli:"m,maxRadious" dft:"0.0"`
-        InterpolMode InterpolationMode `cli:"int,interpol dft:"NearestNeighbour"`
-        FlipInput    bool              `cli:"flipIn"`
-        FlipOutput   bool              `cli:"flipOut"`
-        Order        int               `cli:"r,order" dft:"5"`
-    }
-)
+type InterpolationMode int
 
 const (
     NearestNeighbour InterpolationMode = iota
@@ -198,6 +184,22 @@ func (i InterpolationMode) String() string {
     }
 }
 
+type CodeOpt struct {
+    RngAzi
+    Nlines       int               `cli:"nlines" dft:"0"`
+    Npoints      int               `cli:"n,npoint" dft:"4"`
+    Oversamp     float64           `cli:"o,oversamp" dft:"2.0"`
+    MaxRad       float64           `cli:"m,maxRadious" dft:"0.0"`
+    InterpolMode InterpolationMode `cli:"int,interpol dft:"NearestNeighbour"`
+    FlipInput    bool              `cli:"flipIn"`
+    FlipOutput   bool              `cli:"flipOut"`
+    Order        int               `cli:"r,order" dft:"5"`
+}
+
+func (co *CodeOpt) SetCli(c *Cli) {
+    //c.Var()
+    
+}
 
 func (opt *CodeOpt) Parse() (lrIn int, lrOut int) {
     lrIn, lrOut = 1, 1
@@ -229,16 +231,17 @@ func (opt *CodeOpt) Parse() (lrIn int, lrOut int) {
     return lrIn, lrOut
 }
 
+
+
 var g2r = Gamma.Must("geocode")
 
-func (l Lookup) geo2radar(infile IDatFile, opt CodeOpt) (d DatFile, err error) {
+func (l Lookup) geo2radar(in, out IDatFile, opt CodeOpt) (err error) {
     var ferr = merr.Make("Lookup.geo2radar")
     
     lrIn, lrOut := opt.Parse()
     
     if err = opt.RngAzi.Check(); err != nil {
-        err = ferr.Wrap(err)
-        return
+        return ferr.Wrap(err)
     }
     
     intm := opt.InterpolMode
@@ -256,66 +259,52 @@ func (l Lookup) geo2radar(infile IDatFile, opt CodeOpt) (d DatFile, err error) {
     case Gauss:
         interp = 4
     default:
-        err = ferr.Wrap(ModeError{name: "interpolation option", got: intm})
-        return
+        return ferr.Wrap(ModeError{name: "interpolation option", got: intm})
     }
     
-    dt, dtype := 0, infile.Dtype()
+    dt, dtype := 0, in.Dtype()
     
     switch dtype {
-        case Float:
-            dt = 0
-        case FloatCpx:
-            dt = 1
-        case Raster:
-            dt = 2
-        case UChar:
-            dt = 3
-        case Short:
-            dt = 4
-        case ShortCpx:
-            dt = 5
-        case Double:
-            dt = 6
-        default:
-            err = ferr.Wrap(WrongTypeError{DType: dtype, kind: "geo2radar"})
-            return
+    case Float:
+        dt = 0
+    case FloatCpx:
+        dt = 1
+    case Raster:
+        dt = 2
+    case UChar:
+        dt = 3
+    case Short:
+        dt = 4
+    case ShortCpx:
+        dt = 5
+    case Double:
+        dt = 6
+    default:
+        return ferr.Wrap(WrongTypeError{DType: dtype, kind: "geo2radar"})
     }
     
     
-    if d, err = TmpDatFile("dat", dtype); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    
-    //log.Fatalf("%#v\n", opt)
-    
-    d.rng = opt.Rng
-    d.azi = opt.Azi
-    
-    _, err = g2r(l.Dat, infile.Datfile(), infile.Rng(),
-                 d.Dat, d.rng,
+    _, err = g2r(l.Dat, in.Datfile(), in.Rng(),
+                 out.Datfile(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Oversamp,
                  opt.MaxRad, opt.Npoints)
     
     if err != nil {
-        err = ferr.Wrap(err)
-        return
+        return ferr.Wrap(err)
     }
     
-    return d, nil
+    return nil
 }
 
 var r2g = Gamma.Must("geocode_back")
 
-func (l Lookup) radar2geo(infile IDatFile, opt CodeOpt) (d DatFile, err error) {
+func (l Lookup) radar2geo(in, out IDatFile, opt CodeOpt) (err error) {
     var ferr = merr.Make("Lookup.radar2geo")
+
     lrIn, lrOut := opt.Parse()
     
     if err = opt.RngAzi.Check(); err != nil {
-        err = ferr.Wrap(err)
-        return
+        return ferr.Wrap(err)
     }
     
     intm := opt.InterpolMode
@@ -343,50 +332,40 @@ func (l Lookup) radar2geo(infile IDatFile, opt CodeOpt) (d DatFile, err error) {
         case LanczosSqrt:
             interp = 7
         default:
-            err = ferr.Wrap(ModeError{name: "interpolation option", got: intm})
-            return
+            return ferr.Wrap(ModeError{name: "interpolation option", got: intm})
         }
     }
     
     
-    dt, dtype := 0, infile.Dtype()
+    dt, dtype := 0, in.Dtype()
     
     switch dtype {
-        case Float:
-            dt = 0
-        case FloatCpx:
-            dt = 1
-        case Raster:
-            dt = 2
-        case UChar:
-            dt = 3
-        case Short:
-            dt = 4
-        case Double:
-            dt = 5
-        default:
-            err = ferr.Wrap(WrongTypeError{DType: dtype, kind: "radar2geo"})
-            return
-    }
-    
-    if d, err = TmpDatFile("dat", dtype); err != nil {
-        err = ferr.Wrap(err)
+    case Float:
+        dt = 0
+    case FloatCpx:
+        dt = 1
+    case Raster:
+        dt = 2
+    case UChar:
+        dt = 3
+    case Short:
+        dt = 4
+    case Double:
+        dt = 5
+    default:
+        err = ferr.Wrap(WrongTypeError{DType: dtype, kind: "radar2geo"})
         return
     }
     
-    d.rng = opt.Rng
-    d.azi = opt.Azi
-    
-    _, err = r2g(infile.Datfile(), infile.Rng(), l.Dat,
-                 d.Dat, d.rng,
+    _, err = r2g(in.Datfile(), in.Rng(), l.Dat,
+                 out.Datfile(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Order)
     
     if err != nil {
-        err = ferr.Wrap(err)
-        return
+        return ferr.Wrap(err)
     }
     
-    return d, nil
+    return nil
 }
 
 var coord2sarpix = Gamma.Must("coord_to_sarpix")
@@ -438,7 +417,7 @@ type Hgt struct {
 }
 
 func (h *Hgt) Decode(s string) (err error) {
-    return Load(s, h)
+    return LoadJson(s, h)
 }
 
 func (h Hgt) Raster(opt RasArgs) (err error) {
@@ -568,14 +547,14 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         log.Println("DEM already imported.")
     }
     
-    mra := mli.URngAzi
+    mra := mli.Ra
     offsetWin := g.OffsetWindows
     
     Patch := RngAzi{
-        Rng: int(float64(mra.rng) / float64(offsetWin.Rng) +
+        Rng: int(float64(mra.Rng) / float64(offsetWin.Rng) +
              float64(overlap.Rng) / 2),
         
-        Azi: int(float64(mra.azi) / float64(offsetWin.Azi) +
+        Azi: int(float64(mra.Azi) / float64(offsetWin.Azi) +
              float64(overlap.Azi) / 2),
     }
     
@@ -715,7 +694,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         log.Println("Initial lookup table already created.")
     }
     
-    dra := dem.URngAzi
+    dra := dem.Ra
     
     _, err = pixelArea(mli.Par, dem.Par, dem.Dat, lookup.Dat, lsMap.Dat,
                        inc.Dat, sigma0.Dat, gamma0.Dat, g.AreaFactor)
@@ -775,7 +754,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
 
             // update previous lookup table
             // TODO: magic number 1
-            _, err = gcMapFine(lookupOld, dra.rng, geo.DiffPar,
+            _, err = gcMapFine(lookupOld, dra.Rng, geo.DiffPar,
                                lookup.Dat, 1)
             
             if err != nil {
@@ -795,13 +774,13 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     }
     
     
-    toSave := []Serialize{
+    toSave := []IDatFile{
         &dem, &demOrig, &lookup, &sigma0, &gamma0, &lsMap, &simSar, &zenith,
         &orient, &inc, &pix, &proj,
     }
     
     for _, s := range toSave {
-        if err = Save("", s); err != nil {
+        if err = SaveJson(s.Datfile() + ".json", s); err != nil {
             return ferr.Wrap(err)
         }
     }

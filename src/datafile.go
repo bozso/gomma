@@ -4,7 +4,6 @@ import (
     "fmt"
     "time"
     "os"
-    "encoding/json"
     "path/filepath"
     "strings"
     "strconv"
@@ -49,10 +48,10 @@ const (
 )
 
 func (d *DType) SetCli(c *Cli) {
-    c.VarFlag(d, "dtype", "Datatype of datafile.")
+    c.Var(d, "dtype", "Datatype of datafile.")
 }
 
-func (d *DType) Decode(s string) error {
+func (d *DType) Set(s string) error {
     in := strings.ToUpper(s)
     
     switch in {
@@ -103,7 +102,7 @@ func (d DType) String() string {
 }
 
 func NewGammaParam(path string) Params {
-    return Params{Par: path, Sep: ":", contents: nil}
+    return Params{Par: path, Sep: ":"}
 }
 
 const (
@@ -113,23 +112,31 @@ const (
 type (
     DatFile struct {
         Dat string `name:"dat"`
-        RngAzi     `json:"range_azimuth"`
+        Ra  RngAzi `json:"range_azimuth"`
         DType      `json:"dtype"`
     }
 )
 
+func (d DatFile) Rng() int {
+    return d.Ra.Rng
+}
+
+func (d DatFile) Azi() int {
+    return d.Ra.Azi
+}
+
 func (d DatFile) TypeCheck(ftype, expect string, dtypes... DType) (err error) {
-    b, d := false, d.DType
+    b, D := false, d.DType
     
     for _, dt := range dtypes {
-        if d == dt {
+        if D == dt {
             b = true
             break
         }
     }
     
     if !b {
-        err = TypeMismatchError{ftype:ftype, expected:expect, DType:d}
+        err = TypeMismatchError{ftype:ftype, expected:expect, DType:D}
         return
     }
     
@@ -178,7 +185,7 @@ func (d DatFile) Like(name string, dtype DType) (ret DatFile, err error) {
         return
     }
     
-    ret.URngAzi = d.URngAzi
+    ret.Ra = d.Ra
     return ret, nil
 }
 
@@ -202,7 +209,7 @@ func (d DatFile) Move(dir string) (dm DatFile, err error) {
         return
     }
     
-    dm.URngAzi, dm.DType = d.URngAzi, d.DType
+    dm.Ra, dm.DType = d.Ra, d.DType
     
     return dm, nil
 }
@@ -320,11 +327,11 @@ func TmpDatParFile(ext string, parExt string, dt DType) (ret DatParFile, err err
 func (d *DatParFile) Parse() (err error) {
     var ferr = merr.Make("DatParFile.Parse")
     
-    if d.rng, err = d.ParseRng(); err != nil {
+    if d.Ra.Rng, err = d.ParseRng(); err != nil {
         return ferr.Wrap(err)
     }
     
-    if d.azi, err = d.ParseAzi(); err != nil {
+    if d.Ra.Azi, err = d.ParseAzi(); err != nil {
         return ferr.Wrap(err)
     }
     
@@ -368,24 +375,6 @@ func (d DatParFile) Exist() (b bool, err error) {
     }
     
     return de && pe, nil
-}
-
-func (d *DatParFile) FromJson(m JSONMap) (err error) {
-    var ferr = merr.Make("DatParFile.FromJson")
-    
-    if err = d.DatFile.FromJson(m); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    if d.Par, err = m.String("parameterfile"); err != nil {
-        err = ferr.WrapFmt(err, "failed to retreive paramfile")
-        return
-    }
-
-    d.Sep = ":"
-    
-    return nil    
 }
 
 const (
@@ -444,7 +433,7 @@ func (d DatParFile) ParseDtype() (dt DType, err error) {
         return
     }
     
-    dt.Decode(s)
+    dt.Set(s)
     
     if dt == Unknown {
         err = ferr.Wrap(fmt.Errorf("failed to determine data type based on '%s'",
@@ -687,7 +676,11 @@ type RngAzi struct {
     Azi int `json:"azi" name:"azi" default:"0"`
 }
 
-func (ra *RngAzi) Decode(s string) (err error) {
+func (ra RngAzi) String() string {
+    return fmt.Sprintf("%d,%d", ra.Rng, ra.Azi)
+}
+
+func (ra *RngAzi) Set(s string) (err error) {
     var ferr = merr.Make("RngAzi.Decode")
     
     if len(s) == 0 {
@@ -773,10 +766,10 @@ func (e WrongTypeError) Unwrap() error {
     return e.Err
 }
 
-func (d *DatFile) Decode(s string) (err error) {
+func (d *DatFile) Set(s string) (err error) {
     return LoadJson(s, d)
 }
 
-func (d *DatParFile) Decode(s string) (err error) {
+func (d *DatParFile) Set(s string) (err error) {
     return LoadJson(s, d)
 }

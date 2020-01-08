@@ -4,6 +4,7 @@ import (
     "errors"
     "fmt"
     "path/filepath"
+    "strings"
 )
 
 type (
@@ -56,9 +57,9 @@ type like struct {
 }
 
 func (l *like) SetCli(c* Cli) {
-    c.VarFlag(&l.indat, "in", "Reference metadata file")
+    c.Var(&l.indat, "in", "Reference metadata file")
     c.StringVar(&l.out, "out", "", "Output metadata file")
-    c.VarFlag(&l.Dtype, "dtype", "Output file datatype")
+    c.Var(&l.Dtype, "dtype", "Output file datatype")
     c.StringVar(&l.ext, "ext", "dat", "Extension of datafile")
 }
 
@@ -84,11 +85,11 @@ func (l like) Run() (err error) {
     
     outdat := DatFile{
         Dat: fmt.Sprintf("%s.%s", out, l.ext),
-        URngAzi: indat.URngAzi,
+        Ra: indat.Ra,
         DType: dtype,
     }
     
-    if err = Save(out, &outdat); err != nil {
+    if err = SaveJson(out, &outdat); err != nil {
         return ferr.Wrap(err)
     }
     
@@ -111,7 +112,7 @@ func (m move) Run() (err error) {
     path := m.Meta
     
     var dat DatParFile
-    if err = Load(path, &dat); err != nil {
+    if err = LoadJson(path, &dat); err != nil {
         return ferr.WrapFmt(err,
             "failed to parse json metadatafile '%s'", path) 
     }
@@ -144,8 +145,8 @@ func (cr *create) SetCli(c *Cli) {
     cr.MetaFile.SetCli(c)
     cr.DType.SetCli(c)
     
-    c.VarFlag(&cr.Dat, "dat", "Datafile path")
-    c.VarFlag(&cr.Par, "par", "Parameterfile path")
+    c.Var(&cr.Dat, "dat", "Datafile path")
+    c.Var(&cr.Par, "par", "Parameterfile path")
     c.StringVar(&cr.Ftype, "ftype", "", "Filetype.")
     c.StringVar(&cr.Ext, "ext", "par", "Extension of parameterfile.")
 }
@@ -178,7 +179,7 @@ func (c create) Run() (err error) {
         return ferr.Wrap(err)
     }
     
-    if err = Save(c.Meta, &datf); err != nil {
+    if err = SaveJson(c.Meta, &datf); err != nil {
         return ferr.Wrap(err)
     }
     
@@ -187,18 +188,17 @@ func (c create) Run() (err error) {
 
 
 type geoCode struct {
-    Lookup `cli:"*l,lookup" usage:"Lookup table file"`
-    InFile   DatFile `cli:"*infile" usage:"Input datafile"`
-    OutFile  File `cli:"*out" usage:"Output datafile"`
-    Mode     string `cli:"mode" usage:""`
+    InFile, OutFile DatFile
+    Mode            string
+    Lookup
     CodeOpt
 }
 
 func (g *geoCode) SetCli(c *Cli) {
-    c.VarFlag(&g.Lookup, "lookup", "Lookup table file.")
+    c.Var(&g.Lookup, "lookup", "Lookup table file.")
     
-    c.VarFlag(&g.InFile, "infile", "Input datafile to geocode.")
-    c.VarFlag(&g.OutFile, "outfile", "Geocoded output datafile.")
+    c.Var(&g.InFile, "infile", "Input datafile to geocode.")
+    c.Var(&g.OutFile, "outfile", "Geocoded output datafile.")
     c.StringVar(&g.Mode, "mode", "",
         "Geocoding direction; from or to radar cordinates.")
     
@@ -208,38 +208,21 @@ func (g *geoCode) SetCli(c *Cli) {
 func (c geoCode) Run() (err error) {
     var ferr = merr.Make("geoCode.Run")
     
-    shape := c.Shape
-    
-    if len(shape) > 0 {
-        var dat DatFile
-        if err = Load(shape, &dat); err != nil {
-            return
-        }
-        
-        c.Rng = dat.Rng()
-        c.Azi = dat.Azi()
-    }
-    
     l, dat := c.Lookup, c.InFile
     
     mode := strings.ToUpper(c.Mode)
     
-    var out DatFile
     switch mode {
     case "TORADAR", "RADAR":
-        if out, err = l.geo2radar(dat, c.CodeOpt); err != nil {
+        if err = l.geo2radar(c.InFile, c.OutFile, c.CodeOpt); err != nil {
             return ferr.Wrap(err)
         }
     case "TOGEO", "GEO":
-        if out, err = l.radar2geo(dat, c.CodeOpt); err != nil {
+        if err = l.radar2geo(c.InFile, c.OutFile, c.CodeOpt); err != nil {
             return ferr.Wrap(err)
         }
     default:
         err = UnrecognizedMode{name: "geocoding", got: mode}
-        return ferr.Wrap(err)
-    }
-    
-    if err = Save(c.Outfile, &out); err != nil {
         return ferr.Wrap(err)
     }
     
@@ -293,7 +276,7 @@ func (c coreg) Run() (err error) {
         return ferr.Wrap(err)
     }
     
-    if err = Save("", &out.Ifg); err != nil {
+    if err = SaveJson("", &out.Ifg); err != nil {
         return ferr.Wrap(err)
     }
     

@@ -222,7 +222,7 @@ func (ifg IFG) ToReal(mode CpxToReal, name string) (d DatFile, err error) {
         return
     }
     
-    d.URngAzi = ifg.URngAzi
+    d.Ra = ifg.Ra
     
     Mode := 0
     

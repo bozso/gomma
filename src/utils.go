@@ -12,7 +12,6 @@ import (
     "strconv"
     "strings"
     "flag"
-    "errors"
 )
 
 type (
@@ -136,10 +135,6 @@ func (e ModeError) Unwrap() error {
 }
 
 type (
-    Decodable interface {
-        Decode(string) error
-    }
-    
     Action interface {
         SetCli(*Cli)
         Run() error
@@ -155,7 +150,6 @@ type (
     Cli struct {
         desc string
         *flag.FlagSet
-        decodables map[*string]Decodable
         subcommands
     }
 )
@@ -174,7 +168,6 @@ func (c subcommands) Keys() []string {
 func NewCli(name, desc string) (c Cli) {
     c.desc = desc
     c.FlagSet = flag.NewFlagSet(name, flag.ContinueOnError)
-    c.decodables = make(map[*string]Decodable)
     c.subcommands = make(map[string]subcommand)
     
     return c
@@ -185,12 +178,6 @@ func (c *Cli) AddAction(name, desc string, act Action) {
         action: act,
         cli: NewCli(name, desc),
     }
-}
-
-func (c *Cli) VarFlag(dec Decodable, name, usage string) {
-    str := c.FlagSet.String(name, "", usage)
-    
-    c.decodables[str] = dec
 }
 
 func (c Cli) HasSubcommands() bool {
@@ -205,27 +192,6 @@ func (c Cli) Usage() {
     if c.HasSubcommands() {
         fmt.Printf("\nAvailable subcommands: %s\n", c.subcommands.Keys())
     }
-}
-
-func (c Cli) Parse(args []string) (err error) {
-    err = c.FlagSet.Parse(args)
-    
-    if errors.Is(err, flag.ErrHelp) {
-        //c.Usage()
-        os.Exit(0)
-    }
-    
-    if err != nil {
-        return
-    }
-    
-    for key, val := range c.decodables {
-        if err = val.Decode(*key); err != nil {
-            return
-        }
-    }
-    
-    return nil
 }
 
 func (c Cli) Run(args []string) (err error) {
@@ -343,10 +309,14 @@ func NewReader(path string) (f Reader, err error) {
 func (f *Reader) SetCli(c *Cli, name, usage string) {
     const defDesc = "By default it reads from standard input."
     
-    c.VarFlag(f, name, fmt.Sprintf("%s %s", usage, defDesc))
+    c.Var(f, name, fmt.Sprintf("%s %s", usage, defDesc))
 }
 
-func (f *Reader) Decode(s string) (err error) {
+func (f Reader) String() string {
+    return ""
+}
+
+func (f *Reader) Set(s string) (err error) {
     var r io.Reader
     
     if len(s) == 0 {
@@ -376,10 +346,14 @@ func NewWriter(wr io.Writer) (w Writer) {
 func (w *Writer) SetCli(c *Cli, name, usage string) {
     const defDesc = "By default it writes to standard output."
     
-    c.VarFlag(w, name, fmt.Sprintf("%s %s", usage, defDesc))
+    c.Var(w, name, fmt.Sprintf("%s %s", usage, defDesc))
 }
 
-func (w *Writer) Decode(s string) (err error) {
+func (w Writer) String() string {
+    return ""
+}
+
+func (w *Writer) Set(s string) (err error) {
     if len(s) == 0 {
         w.Writer = bufio.NewWriter(os.Stdout)
     } else {
@@ -475,16 +449,16 @@ func (p ParameterError) Unwrap() error {
 type Params struct {
     Par string `json:"paramfile"`
     Sep string `json:"separator"`
-    contents []string
+    Var []string
 }
 
 
 func FromString(params, sep string) Params {
-    return Params{Par: "", Sep: sep, contents: strings.Split(params, "\n")}
+    return Params{Par: "", Sep: sep, Var: strings.Split(params, "\n")}
 }
 
 func (self *Params) Param(name string) (ret string, err error) {
-    if self.contents == nil {
+    if self.Var == nil {
         var reader Reader
         if reader, err = NewReader(self.Par); err != nil {
             return
@@ -499,7 +473,7 @@ func (self *Params) Param(name string) (ret string, err error) {
             }
         }
     } else {
-        for _, line := range self.contents {
+        for _, line := range self.Var {
             if strings.Contains(line, name) {
                 return strings.Trim(strings.Split(line, self.Sep)[1], " "), nil
             }
@@ -679,7 +653,7 @@ type File struct {
     Path
 }
 
-func (v *File) Decode(s string) (err error) {
+func (v *File) Set(s string) (err error) {
     b, ferr := false, merr.Make("File.Decode")
     
     if len(s) == 0 {
@@ -711,7 +685,16 @@ func (f File) Reader() (r Reader, err error) {
 
 type Files []*File
 
-func (f Files) Decode(s string) (err error) {
+func (f Files) String() string {
+    if f != nil {
+        // TODO: list something sensible
+        return ""
+    }
+    
+    return ""
+}
+
+func (f Files) Set(s string) (err error) {
     ferr := merr.Make("Files.Decode")
     
     split := strings.Split(s, ",")
@@ -719,7 +702,7 @@ func (f Files) Decode(s string) (err error) {
     f = make(Files, len(split))
     
     for ii, fpath := range f {
-        if err = fpath.Decode(split[ii]); err != nil {
+        if err = fpath.Set(split[ii]); err != nil {
             return ferr.Wrap(err)
         }
     }

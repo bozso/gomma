@@ -66,7 +66,7 @@ func (g *GeneralOpt) SetCli(c *Cli) {
     c.StringVar(&g.Pol, "pol", "vv", "POlarisation used.")
     c.StringVar(&g.MasterDate, "masterDate", "", "")
     c.StringVar(&g.CachePath, "cachePath", "", "Cache path.")
-    c.VarFlag(&g.Looks, "looks", "Range, azimuth looks.")
+    c.Var(&g.Looks, "looks", "Range, azimuth looks.")
 }
 
 type dataSelect struct {
@@ -82,13 +82,13 @@ type dataSelect struct {
 func (d *dataSelect) SetCli(c *Cli) {
     d.GeneralOpt.SetCli(c)
     
-    c.VarFlag(&d.DataFiles, "dataFiles",
+    c.Var(&d.DataFiles, "dataFiles",
         "Comma separated filpaths to Sentinel-1 data.")
     
     c.StringVar(&d.DateStart, "start", "", "Start of date range.")
     c.StringVar(&d.DateStop, "stop", "", "End of date range.")
-    c.VarFlag(&d.LowerLeft, "lowerLeft", "Rectangle coordinates.")
-    c.VarFlag(&d.UpperRight, "upperRight", "Rectangle coordinates.")
+    c.Var(&d.LowerLeft, "lowerLeft", "Rectangle coordinates.")
+    c.Var(&d.UpperRight, "upperRight", "Rectangle coordinates.")
     c.BoolVar(&d.CheckZips, "checkZips", false, "Check zipfile integrity.")
 }
 

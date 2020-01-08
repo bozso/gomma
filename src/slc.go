@@ -170,16 +170,16 @@ func (m MLI) Raster(opt RasArgs) error {
 }
 
 
-func (slc *SLC) Decode(s string) (err error) {
-    if err = Load(s, slc); err != nil {
+func (slc *SLC) Set(s string) (err error) {
+    if err = LoadJson(s, slc); err != nil {
         return
     }
     
     return slc.TypeCheck("SLC", "complex", FloatCpx, ShortCpx)
 }
 
-func (m *MLI) Decode(s string) (err error) {
-    if err = Load(s, m); err != nil {
+func (m *MLI) Set(s string) (err error) {
+    if err = LoadJson(s, m); err != nil {
         return
     }
     

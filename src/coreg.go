@@ -45,7 +45,7 @@ func (s1 *S1CoregOpt) SetCli(c *Cli) {
     c.StringVar(&s1.Poly1, "poly1", "", "Polynom 1")
     c.StringVar(&s1.Poly2, "poly2", "", "Polynom 2")
     
-    c.VarFlag(&s1.Looks, "looks", "Number of looks.")
+    c.Var(&s1.Looks, "looks", "Number of looks.")
     
     c.BoolVar(&s1.Clean, "clean", false, "Cleanup temporary files.")
     c.BoolVar(&s1.UseInter, "useInter", false, "Use intermediate files.")
