@@ -15,20 +15,12 @@ type (
     }
     
     S1CoregOpt struct {
-        Tab, ID          string
-        IfgPath          string  `cli:"i,ifg" usage:"Output interferogram metafile"`
-        RslcPath         string  `cli:"r,rslc" usage:"Output RSLC metafile"`
-        OutDir           string  `cli:"o,outdir" usage:"Output directory"`
-        Hgt              string  `cli:"h,hgt" usage:""`
-        Poly1            string  `cli:"p1,poly1" usage:""`
-        Poly2            string  `cli:"p2,poly2" usage:""`
-        Looks            RngAzi  `cli:"l,looks" usage:""`
-        Clean            bool    `cli:"c,clean" usage:""`
-        UseInter         bool    `cli:"u,useInter" usage:""`
-        CoherenceThresh  float64 `cli:"c,coh"    dft:"0.8"`
-        FractionThresh   float64 `cli:"f,frac"   dft:"0.01"`
-        PhaseStdevThresh float64 `cli:"p,phase"  dft:"0.8"`
-        Mli              string  `cli:"mli"`
+        Tab, ID, IfgPath, RslcPath      string
+        OutDir, Hgt, Poly1, Poly2, Mli  string
+        CoherenceThresh, FractionThresh float64
+        PhaseStdevThresh                float64
+        Clean, UseInter                 bool  
+        Looks                           RngAzi
     }
 )
 

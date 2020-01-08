@@ -2,7 +2,6 @@ package gamma
 
 
 import (
-    "fmt"
     "log"
     "io"
     "bufio"    
@@ -97,7 +96,7 @@ func (sel dataSelect) Run() (err error) {
     
     dataFiles := sel.DataFiles
     if len(dataFiles) == 0 {
-        return fmt.Errorf("At least one datafile must be specified!")
+        return ferr.Fmt("At least one datafile must be specified!")
     }
     
     var startCheck, stopCheck checkerFun
@@ -111,8 +110,7 @@ func (sel dataSelect) Run() (err error) {
         _dateStart, err := ParseDate(DShort, dateStart)
         
         if err != nil {
-            return Handle(err, "failed to parse date '%s' in short format",
-                dateStart)
+            return ferr.Wrap(err)
         }
         
         startCheck = func(s1zip *S1Zip) bool {
@@ -124,8 +122,7 @@ func (sel dataSelect) Run() (err error) {
         _dateStop, err := ParseDate(DShort, dateStop)
         
         if err != nil {
-            return Handle(err, "failed to parse date '%s' in short format",
-                dateStop)
+            return ferr.Wrap(err)
         }
         
         stopCheck = func(s1zip *S1Zip) bool {
@@ -172,10 +169,10 @@ func (sel dataSelect) Run() (err error) {
     defer writer.Close()
     
     for _, zip := range dataFiles {
-        if s1zip, IWs, err = parseS1(zip.String(), sel.Pol, sel.CachePath);
-           err != nil {
-            return Handle(err,
-                "failed to import S1Zip data from '%s'", zip)
+        s1zip, IWs, err = parseS1(zip.String(), sel.Pol, sel.CachePath)
+        
+        if err != nil {
+            return ferr.Wrap(err)
         }
         
         if IWs.contains(aoi) && checker(s1zip) {

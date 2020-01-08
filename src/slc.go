@@ -37,23 +37,19 @@ func (opt *MLIOpt) Parse() {
     opt.Looks.Default()
 }
 
-func (s SLC) MakeMLI(opt MLIOpt) (ret MLI, err error) {
+func (s SLC) MLI(out MLI, opt MLIOpt) (err error) {
     opt.Parse()
     
-    if ret, err = TmpMLI(); err != nil {
-        return
-    }
-    
-    _, err = multiLook(s.Dat, s.Par, ret.Dat, ret.Par,
+    _, err = multiLook(s.Dat, s.Par, out.Dat, out.Par,
                        opt.Looks.Rng, opt.Looks.Azi,
                        opt.Subset.RngOffset, opt.Subset.RngWidth,
                        opt.ScaleExp.Scale, opt.ScaleExp.Exp)
     
     if err != nil {
-        return
+        return merr.Make("SLC.MLI").Wrap(err)
     }
     
-    return ret, nil
+    return nil
 }
 
 type (

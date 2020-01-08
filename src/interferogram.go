@@ -122,7 +122,7 @@ func (i *IFG) Decode(s string) (err error) {
     return nil
 }
 
-func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ifg IFG, err error) {
+func FromSLC(slc1, slc2, ref *SLC, out IFG, opt IfgOpt) (err error) {
     var ferr = merr.Make("FromSLC")
     inter := 0
     
@@ -135,11 +135,11 @@ func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ifg IFG, err error) {
     par1, par2 := slc1.Par, slc2.Par
     
     // TODO: check arguments!
-    _, err = createOffset(par1, par2, ifg.Par, opt.algo, rng, azi, inter)
+    _, err = createOffset(par1, par2, out.Par, opt.algo, rng, azi, inter)
     
     if err != nil {
-        err = ferr.WrapFmt(err, "failed to create offset table")
-        return
+        return ferr.WrapFmt(err, "failed to create offset table")
+        
     }
     
     slcRefPar := "-"
@@ -148,37 +148,29 @@ func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ifg IFG, err error) {
         slcRefPar = ref.Par
     }
     
-    if ifg, err = TmpIFG(); err != nil {
-        err = ferr.Wrap(err)
-        return 
-    }
-    
-    _, err = phaseSimOrb(par1, par2, ifg.Par, opt.hgt, ifg.SimUnwrap,
+    _, err = phaseSimOrb(par1, par2, out.Par, opt.hgt, out.SimUnwrap,
         slcRefPar, nil, nil, 1)
     
     if err != nil {
-        err = ferr.Wrap(err)
-        return 
+        return ferr.Wrap(err)
     }
 
     dat1, dat2 := slc1.Dat, slc2.Dat
-    _, err = slcDiffIntf(dat1, dat2, par1, par2, ifg.Par,
-        ifg.SimUnwrap, ifg.DiffPar, rng, azi, 0, 0)
+    _, err = slcDiffIntf(dat1, dat2, par1, par2, out.Par,
+        out.SimUnwrap, out.DiffPar, rng, azi, 0, 0)
     
     if err != nil {
-        err = ferr.Wrap(err)
-        return 
+        return ferr.Wrap(err)
     }
     
-    if err = ifg.Parse(); err != nil {
-        err = ferr.Wrap(err)
-        return 
+    if err = out.Parse(); err != nil {
+        return ferr.Wrap(err)
     }
     
     // TODO: Check date difference order
-    ifg.DeltaT = slc1.Time.Sub(slc2.Time)
+    out.DeltaT = slc1.Time.Sub(slc2.Time)
     
-    return
+    return nil
 }
 
 const (

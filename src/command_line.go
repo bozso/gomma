@@ -7,11 +7,6 @@ import (
     "strings"
 )
 
-type (
-    JSONMap map[string]interface{}
-    
-)
-
 var ParseError = errors.New("failed to parse command line arguments")
 
 const (
@@ -135,8 +130,8 @@ func (m move) Run() (err error) {
 }
 
 type create struct {
-    Dat, Par File
-    Ftype, Ext string
+    Dat             File
+    Ftype, Ext, Par string
     MetaFile
     DType
 }
@@ -145,8 +140,8 @@ func (cr *create) SetCli(c *Cli) {
     cr.MetaFile.SetCli(c)
     cr.DType.SetCli(c)
     
-    c.Var(&cr.Dat, "dat", "Datafile path")
-    c.Var(&cr.Par, "par", "Parameterfile path")
+    c.Var(&cr.Dat, "dat", "Datafile path.")
+    c.StringVar(&cr.Par, "par", "", "Parameterfile path.")
     c.StringVar(&cr.Ftype, "ftype", "", "Filetype.")
     c.StringVar(&cr.Ext, "ext", "par", "Extension of parameterfile.")
 }
@@ -159,14 +154,15 @@ func (c create) Run() (err error) {
         return ferr.Wrap(err)
     }
     
-    var par Path
-    if par.Len() > 0 {
-        if par, err = c.Par.Abs(); err != nil {
+    par := c.Par
+    
+    if len(par) > 0 {
+        if par, err = filepath.Abs(par); err != nil {
             return ferr.Wrap(err)
         }
     }
     
-    datf, err := NewDatParFile(dat.String(), par.String(), c.Ext, c.DType)
+    datf, err := NewDatParFile(dat.String(), par, c.Ext, c.DType)
     if err != nil {
         return ferr.Wrap(err)
     }
@@ -208,21 +204,18 @@ func (g *geoCode) SetCli(c *Cli) {
 func (c geoCode) Run() (err error) {
     var ferr = merr.Make("geoCode.Run")
     
-    l, dat := c.Lookup, c.InFile
-    
     mode := strings.ToUpper(c.Mode)
     
     switch mode {
     case "TORADAR", "RADAR":
-        if err = l.geo2radar(c.InFile, c.OutFile, c.CodeOpt); err != nil {
-            return ferr.Wrap(err)
-        }
+        err = c.Lookup.geo2radar(c.InFile, c.OutFile, c.CodeOpt)
     case "TOGEO", "GEO":
-        if err = l.radar2geo(c.InFile, c.OutFile, c.CodeOpt); err != nil {
-            return ferr.Wrap(err)
-        }
+        err = c.Lookup.radar2geo(c.InFile, c.OutFile, c.CodeOpt)
     default:
         err = UnrecognizedMode{name: "geocoding", got: mode}
+    }
+    
+    if err != nil {
         return ferr.Wrap(err)
     }
     
@@ -466,55 +459,4 @@ var PlotCmdFiles = map[string]Slice{
     "SLC": Slice{"slc", "rslc"},
     "mph": Slice{"sbi", "sm", "diff", "lookup", "lt"},
     "hgt": Slice{"hgt", "rdc"},
-}
-
-const (
-    KeyErr Werror = "key '%s' is not present in '%s'"
-    TypeErr Werror = "unexpected type %T for '%s', expected %s"
-)
-
-func (m JSONMap) String(name string) (ret string, err error) {
-    var ferr = merr.Make("JSONMap.String")
-    tmp, ok := m[name]
-    
-    if !ok {
-        err = ferr.Wrap(KeyErr.Make(name, m))
-        return
-    }
-    
-    ret, ok = tmp.(string)
-    
-    if !ok {
-        err = ferr.Wrap(TypeErr.Make(tmp, name, "string"))
-        return
-    }
-    
-    return ret, nil
-}
-
-func (m JSONMap) Int(name string) (i int, err error) {
-    var ferr = merr.Make("JSONMap.Int")
-    
-    tmp, ok := m[name]
-    
-    if !ok {
-        err = ferr.Wrap(KeyErr.Wrap(err, name, m))
-        return
-    }
-    
-    switch v := tmp.(type) {
-    case int:
-    case int8:
-    case int16:
-    case int32:
-    case int64:
-    case float32:
-    case float64:
-        return int(v), nil
-    default:
-        err = ferr.WrapFmt(err,
-            "failed to convert '%s' of type '%T' to int", tmp, tmp)
-        return
-    }
-    return
 }

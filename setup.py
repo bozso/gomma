@@ -4,18 +4,24 @@ import glob
 
 #import argparse as ap
 
+
+flags = "-ldflags '-s -w'"
+
+
 root = pth.dirname(pth.abspath(__file__))
 
 def generate_ninja():
     src = glob.glob(pth.join(root, "src", "*.go"))
     main = pth.join(root, "bin", "gamma")
     
+    cmd = "go build %s -o ${out} ${in}"
+    
     for path in {"src", "bin"}:
         n = ut.Ninja.in_path(path)
-        n.rule("go", "go build ${in}", "Build executable.")
+        n.rule("go", cmd % flags, "Build executable.")
         n.newline()
     
-        n.build(main, "go", main + ".go")
+        n.build(main, "go", main + ".go", implicit=src)
         n.newline()
     
     #n = Ninja.in_path("bin")

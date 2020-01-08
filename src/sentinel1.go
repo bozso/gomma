@@ -299,7 +299,7 @@ type MosaicOpts struct {
 
 var mosaic = Gamma.Must("SLC_mosaic_S1_TOPS")
 
-func (s1 S1SLC) Mosaic(opts MosaicOpts) (slc SLC, err error) {
+func (s1 S1SLC) Mosaic(out SLC, opts MosaicOpts) (err error) {
     ferr := merr.Make("S1SLC.Mosaic")
     
     opts.Looks.Default()
@@ -316,20 +316,14 @@ func (s1 S1SLC) Mosaic(opts MosaicOpts) (slc SLC, err error) {
         ref = opts.RefTab
     }
     
-    if slc, err = TmpSLC(); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-
-    _, err = mosaic(s1.Tab, slc.Dat, slc.Par, opts.Looks.Rng,
+    _, err = mosaic(s1.Tab, out.Dat, out.Par, opts.Looks.Rng,
         opts.Looks.Azi, bflg, ref)
     
     if err != nil {
-        err = ferr.WrapFmt(err, "failed to mosaic '%s'", s1.Tab)
-        return
+        return ferr.WrapFmt(err, "failed to mosaic '%s'", s1.Tab)
     }
     
-    return slc, nil
+    return nil
 }
 
 var derampRef = Gamma.Must("S1_deramp_TOPS_reference")
@@ -672,14 +666,10 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
     return ret, nil
 }
 
-func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
+func (s1 *S1Zip) MLI(mode, pol string, out *MLI, opt *MLIOpt) (err error) {
     ferr := merr.Make("S1Zip.MLI")
+
     //path := filepath.Join(s1.Root, mode)
-    
-    if ret, err = TmpMLI(); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
 
     //dat := fp.Join(path, fmt.Sprintf("%s.%s", pol, mode))
     //par := dat + ".par"
@@ -704,19 +694,16 @@ func (s1 *S1Zip) MLI(mode, pol string, opt *MLIOpt) (ret MLI, err error) {
     //}
     
     slc, err := s1.SLC(pol)
-    
     if err != nil {
-        err = StructCreateError.Wrap(err, "S1SLC")
-        return
+        return ferr.Wrap(err)
     }
     
-    err = slc.MLI(&ret, opt)
-    
+    err = slc.MLI(out, opt)
     if err != nil {
-        return ret, ferr.Wrap(err)
+        return ferr.Wrap(err)
     }
     
-    return ret, nil
+    return nil
 }
 
 func (s1 *S1Zip) tabName(mode, pol string) string {

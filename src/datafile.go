@@ -676,6 +676,8 @@ type RngAzi struct {
     Azi int `json:"azi" name:"azi" default:"0"`
 }
 
+var defRA = RngAzi{Rng:1, Azi:1}
+
 func (ra RngAzi) String() string {
     return fmt.Sprintf("%d,%d", ra.Rng, ra.Azi)
 }
