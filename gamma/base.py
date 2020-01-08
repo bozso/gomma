@@ -115,44 +115,42 @@ class Project(object):
         gamma.subcmd("import", *args, **self.general, **kwargs)
     
 
-class DataFile(dict):
+class DatFile(object):
     __slots__ = ("metafile",)
     
     datfile_ext = "dat"
     parfile_ext = "par"
     
-    def __init__(self, path):
+    def __init__(self):
         self.metafile = path
-        with open(path, "r") as f:
-            self.update(json.load(f))
     
     @classmethod
-    def new(cls, meta, **kwargs):
+    def new(cls, **kwargs):
+        meta, dat = kwargs.pop("meta", None), kwargs.pop("dat", None)
         
-    
-    @classmethod
-    def from_files(cls, meta, **kwargs):
-        dat, par = kwargs.get("dat"), par.get("par")
+        if meta is None and dat is None:
+            tmp = util.tmp_file()
+        
+        if meta is None:
+            meta = "%s.json" % tmp
         
         if dat is None:
-            dat = "%s.%s" % (utils.tmp_file(), self.datfile_ext)
+            dat = "%s.%s" % (tmp, self.datfile_ext)
         
-        if par is None:
-            par = "%s.%s" % (dat, self.parfile_ext)
-        
-        gamma.subcmd("make", meta=meta, dat=dat, par=par, parExt=ext,
-            dtype=dtype)
+        with open(meta, "w") as f:
+            json.dump({"dat" : dat}, f)
         
         return cls(meta)
-    
-    def like(self, name=None, **kwargs):
-        if name is None:
-            name = utils.tmp_file()
         
-        kwargs["in"] = self.metafile
+    @classmethod
+    def like(cls, other, name=None, **kwargs):
+        if name is None:
+            name = utils.tmp_file(ext="json")
+        
+        kwargs["in"] = other.metafile
         gamma.subcmd("like", out=name, **kwargs)
         
-        return DataFile(name)
+        return cls(**kwargs)
     
     def move(self, dirPath):
         gamma.subcmd("move", meta=self.meta, out=dirPath)
@@ -162,14 +160,25 @@ class DataFile(dict):
         return gamma.subcmd("stat", self.metafile, **kwargs)
     
 
+class DatParFile(DatFile):
+
+    @classmethod
+    def from_files(cls, dat: str, **kwargs):
+        meta = kwargs.pop("meta", None)
+        
+        if meta is None:
+            meta = util.tmp_file(ext="json")
+        
+        gamma.subcmd("make", meta=meta, dat=dat, **kwargs)
     
-class SLC(DataFile):
+    
+class SLC(DatFile):
     datfile_ext = "slc"
     
     def SplitInterferometry(self):
         pass
 
-class Lookup(DataFile):
+class Lookup(DatFile):
     def geocode(self, mode, infile, outfile=None, like=None, **kwargs):
         kwargs["infile"] = infile
         
