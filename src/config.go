@@ -6,8 +6,6 @@ import (
     "os"
     "log"
     "strings"
-    //ref "reflect"
-    //conv "strconv"
 )
 
 type (
@@ -73,8 +71,6 @@ const (
 )
 
 var (
-    //stepList = MapKeys(steps)
-
     defaultConfig = Config{
         General: GeneralOpt{
             Pol: "vv",
@@ -130,15 +126,6 @@ var (
     }
 )
 
-func (ra *RngAzi) Default() {
-    if ra.Rng == 0 {
-        ra.Rng = 1
-    }
-    
-    if ra.Azi == 0 {
-        ra.Azi = 1
-    }
-}
 
 func (mm *IMinmax) Decode(s string) (err error) {
     var ferr = merr.Make("IMinmax.Decode")

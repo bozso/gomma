@@ -6,7 +6,6 @@ import (
     "path"
     "strings"
     "path/filepath"
-    //"os"
 )
 
 const merr = ModuleName("gamma")
@@ -44,15 +43,6 @@ var (
     //}
 
     Pols = [4]string{"vv", "hh", "hv", "vh"}
-    
-    // TODO: deprecate this
-    DataTypes = map[string]int{
-        "FCOMPLEX":  0,
-        "SCOMPLEX":  1,
-        "FLOAT":     0,
-        "SHORT_INT": 1,
-        "DOUBLE":    2,
-    }
     
     // TODO: get settings path from environment variable
     Settings = loadSettings("/home/istvan/progs/gamma/bin/settings.json")

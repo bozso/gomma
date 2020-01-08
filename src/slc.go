@@ -5,7 +5,7 @@ import (
 )
 
 type SLC struct {
-    DatParFile
+    DatParFile `json:"DatParFile"`
 }
 
 func NewSLC(dat, par string) (ret SLC, err error) {
@@ -13,22 +13,6 @@ func NewSLC(dat, par string) (ret SLC, err error) {
     return
 }
 
-func TmpSLC() (ret SLC, err error) {
-    ret.DatParFile, err = TmpDatParFile("slc", "par", FloatCpx)
-    return
-}
-
-func (s *SLC) FromJson(m JSONMap) (err error) {
-    if err = s.DatParFile.FromJson(m); err != nil {
-        return
-    }
-    
-    if s.DType != ShortCpx && s.DType != FloatCpx {
-        err = TypeMismatchError{ftype:"SLC", expected:"complex", DType:s.DType}
-        return
-    }
-    return nil
-}
 
 var multiLook = Gamma.Must("multi_look")
 
@@ -172,31 +156,13 @@ func (s SLC) Raster(opt RasArgs) error {
 }
 
 type MLI struct {
-    DatParFile
+    DatParFile `json:"DatParFile"`
 }
 
 func NewMLI(dat, par string) (ret MLI, err error) {
     ret.DatParFile, err = NewDatParFile(dat, par, "par", Float)
     return
 }
-
-func TmpMLI() (ret MLI, err error) {
-    ret.DatParFile, err = TmpDatParFile("mli", "par", FloatCpx)
-    return
-}
-
-func (M *MLI) FromJson(m JSONMap) (err error) {
-    if err = M.DatParFile.FromJson(m); err != nil {
-        return
-    }
-    
-    if M.DType != Float {
-        err = TypeMismatchError{ftype:"MLI", expected:"float", DType:M.DType}
-        return
-    }
-    return nil
-}
-
 
 func (m MLI) Raster(opt RasArgs) error {
     opt.Mode = Power
@@ -205,9 +171,17 @@ func (m MLI) Raster(opt RasArgs) error {
 
 
 func (slc *SLC) Decode(s string) (err error) {
-    return Load(s, slc)
+    if err = Load(s, slc); err != nil {
+        return
+    }
+    
+    return slc.TypeCheck("SLC", "complex", FloatCpx, ShortCpx)
 }
 
 func (m *MLI) Decode(s string) (err error) {
-    return Load(s, m)
+    if err = Load(s, m); err != nil {
+        return
+    }
+    
+    return m.TypeCheck("MLI", "float", Float)
 }

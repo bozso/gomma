@@ -19,12 +19,6 @@ type (
     CmdFun     func(args ...interface{}) (string, error)
     Joiner     func(args ...string) string
 
-    Params struct {
-        Par string `json:"paramfile" name:"par"`
-        Sep string `json:"separator" name:"sep" default:":"`
-        contents []string
-    }
-
     Tmp struct {
         files []string
     }
@@ -466,7 +460,7 @@ func ReadFile(path string) (b []byte, err error) {
 
 type ParameterError struct {
     path, par string
-    Err error
+    err error
 }
 
 func (p ParameterError) Error() string {
@@ -475,8 +469,15 @@ func (p ParameterError) Error() string {
 }
 
 func (p ParameterError) Unwrap() error {
-    return p.Err
+    return p.err
 }
+
+type Params struct {
+    Par string `json:"paramfile"`
+    Sep string `json:"separator"`
+    contents []string
+}
+
 
 func FromString(params, sep string) Params {
     return Params{Par: "", Sep: sep, contents: strings.Split(params, "\n")}

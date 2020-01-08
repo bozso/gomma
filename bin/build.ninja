@@ -1,0 +1,7 @@
+rule go
+  command = go build ${in}
+  description = Build executable.
+
+build /home/istvan/progs/gamma/bin/gamma: go $
+    /home/istvan/progs/gamma/bin/gamma.go
+

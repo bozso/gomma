@@ -13,7 +13,7 @@ type (
     CpxToReal  int
     
     Coherence struct {
-        DatFile
+        DatFile `json:"DatFile"`
     }
         
     IfgOpt struct {
@@ -51,7 +51,7 @@ var (
 )
 
 type IFG struct {
-    DatParFile
+    DatParFile              `json:"DatParFile"`
     DiffPar   Params        `json:"diffparfile"`
     Quality   string        `json:"quality"`
     SimUnwrap string        `json:"simulated_unwrapped"`
@@ -72,27 +72,6 @@ func NewIFG(dat, off, diffpar string) (ifg IFG, err error) {
     }
     
     ifg.DiffPar = NewGammaParam(diffpar)
-    
-    return
-}
-
-func TmpIFG() (ret IFG, err error) {
-    if ret.DatParFile, err = TmpDatParFile("diff", "off", FloatCpx); err != nil {
-        return
-    }
-    
-    ret.DiffPar = Params{Par: ret.Dat + ".par", Sep: ":"}
-    ret.SimUnwrap = ret.Dat + ".sim_unw"
-    
-    return ret, nil
-}
-
-func (ifg IFG) jsonMap() (js JSONMap) {
-    js = ifg.DatParFile.jsonMap()
-    
-    js["quality"] = ifg.Quality
-    js["diffparfile"] = ifg.DiffPar
-    js["simulated_unwrapped"] = ifg.SimUnwrap
     
     return
 }
@@ -129,39 +108,20 @@ func (i IFG) Move(dir string) (im IFG, err error) {
     return
 }
 
-func (i *IFG) FromJson(m JSONMap) (err error) {
-    var ferr = merr.Make("IFG.FromJson")
+func (i *IFG) Decode(s string) (err error) {
+    var ferr = merr.Make("IFG.Decode")
     
-    if err = i.DatParFile.FromJson(m); err != nil {
+    if err = LoadJson(s, i); err != nil {
         return ferr.Wrap(err)
     }
     
-    if i.DType != FloatCpx {
-        err = TypeMismatchError{ftype:"IFG", expected:"complex",
-            DType:i.DType}
+    if err = i.TypeCheck("IFG", "complex", ShortCpx, FloatCpx); err != nil {
         return ferr.Wrap(err)
-    }
-    
-    if i.Quality, err = m.String("quality"); err != nil {
-        err = ferr.WrapFmt(err, "failed to retreive quality file")
-        return
-    }
-    
-    if i.DiffPar.Par, err = m.String("diffparfile"); err != nil {
-        err = ferr.WrapFmt(err, "failed to diffparfile")
-        return
-    }
-    i.DiffPar.Sep = ":"
-    
-    
-    if i.SimUnwrap, err = m.String("simulated_unwrapped"); err != nil {
-        err = ferr.WrapFmt(err, "failed to simulated unwrapped datafile")
-        return
     }
     
     return nil
 }
-    
+
 func FromSLC(slc1, slc2, ref *SLC, opt IfgOpt) (ifg IFG, err error) {
     var ferr = merr.Make("FromSLC")
     inter := 0

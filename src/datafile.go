@@ -11,12 +11,6 @@ import (
 )
 
 type (    
-    Serialize interface {
-        jsonMap() JSONMap
-        jsonName() string
-        FromJson(JSONMap) error        
-    }
-    
     IDatFile interface {
         Datfile() string
         Rng() int
@@ -117,17 +111,31 @@ const (
 )
 
 type (
-    URngAzi struct {
-        rng int `name:"rng" default:"0"`
-        azi int `name:"azi" default:"0"`
-    }
-    
     DatFile struct {
         Dat string `name:"dat"`
-        URngAzi
-        DType
+        RngAzi     `json:"range_azimuth"`
+        DType      `json:"dtype"`
     }
 )
+
+func (d DatFile) TypeCheck(ftype, expect string, dtypes... DType) (err error) {
+    b, d := false, d.DType
+    
+    for _, dt := range dtypes {
+        if d == dt {
+            b = true
+            break
+        }
+    }
+    
+    if !b {
+        err = TypeMismatchError{ftype:ftype, expected:expect, DType:d}
+        return
+    }
+    
+    return nil
+}
+
 
 func NewDatFile(path string, dt DType) (d DatFile, err error) {
     var ferr = merr.Make("NewDatFile")
@@ -178,54 +186,12 @@ func (d DatFile) Datfile() string {
     return d.Dat
 }
 
-func (d DatFile) Rng() int {
-    return d.rng
-}
-
-func (d DatFile) Azi() int {
-    return d.azi
-}
-
 func (d DatFile) Dtype() DType {
     return d.DType
 }
 
 func (d DatFile) jsonName() string {
     return d.Dat + ".json"
-}
-
-func (d DatFile) jsonMap() JSONMap {
-    return JSONMap{
-        "datafile": d.Dat,
-        "range_samples": d.rng,
-        "azimuth_lines": d.azi,
-        "dtype": d.DType.String(),
-    }
-}
-
-func (d *DatFile) FromJson(m JSONMap) (err error) {
-    var ferr = merr.Make("DatFile.FromJson")
-    
-    if d.Dat, err = m.String("datafile"); err != nil {
-        return ferr.WrapFmt(err, "failed to retreive datafile")
-    }
-    
-    var dt string
-    if dt, err = m.String("dtype"); err != nil {
-        return ferr.WrapFmt(err, "failed to retreive dtype")
-    }
-    
-    d.Decode(dt)
-    
-    if d.rng, err = m.Int("range_samples"); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if d.azi, err = m.Int("azimuth_lines"); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
 }
 
 func (d DatFile) Move(dir string) (dm DatFile, err error) {
@@ -311,10 +277,10 @@ func SameShape(one IDatFile, two IDatFile) (err error) {
     
     return nil
 }
-    
+
 type DatParFile struct {
-    DatFile
-    Params
+    DatFile   `json:"DatFile"`
+    Params    `json:"Params"`
     time.Time `json:"-"`
 }
 
@@ -402,13 +368,6 @@ func (d DatParFile) Exist() (b bool, err error) {
     }
     
     return de && pe, nil
-}
-
-func (d DatParFile) jsonMap() JSONMap {
-    ret := d.DatFile.jsonMap()
-    ret["parameterfile"] = d.Par
-    
-    return ret
 }
 
 func (d *DatParFile) FromJson(m JSONMap) (err error) {
@@ -617,6 +576,7 @@ func ID(one IDatParFile, two IDatParFile, format dateFormat) string {
     //return nil
 //}
 
+
 // TODO: implement proper selection of plot command
 //func (d DatFile) Raster(opt RasArgs) (err error) {
     //err = opt.Parse(d)
@@ -709,59 +669,10 @@ func Move(path string, dir string) (s string, err error) {
     return dst, nil
 }
 
-func (d *DatFile) Decode(s string) (err error) {
-    return Load(s, d)
-}
-
-func (d *DatParFile) Decode(s string) (err error) {
-    return Load(s, d)
-}
-
-
-func Save(path string, d Serialize) (err error) {
-    var ferr = merr.Make("Save")
-    
-    if len(path) == 0 {
-        if path, err = filepath.Abs(d.jsonName()); err != nil {
-            return ferr.Wrap(err)
-        }
-    }
-    
-    if err = SaveJson(path, d.jsonMap()); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
-}
-
-func Load(path string, d Serialize) (err error) {
-    var ferr = merr.Make("Load")
-    
-    data, err := ReadFile(path)
-    if err != nil {
-        return ferr.WrapFmt(err, "failed to read file '%s'", path)
-        
-    }
-    
-    m := make(JSONMap)
-    
-    if err = json.Unmarshal(data, &m); err != nil {
-        return ferr.WrapFmt(err, "failed to parse json data %s'", data)
-        
-    }
-    
-    if err = d.FromJson(m); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil 
-}
-
 type ZeroDimError struct {
     dim string
     Err error
 }
-
 
 func (e ZeroDimError) Error() string {
     return fmt.Sprintf("expected %s to be non zero", e.dim)
@@ -809,6 +720,15 @@ func (ra RngAzi) Check() (err error) {
     return nil
 }
 
+func (ra *RngAzi) Default() {
+    if ra.Rng == 0 {
+        ra.Rng = 1
+    }
+    
+    if ra.Azi == 0 {
+        ra.Azi = 1
+    }
+}
 
 type TypeMismatchError struct {
     ftype, expected string
@@ -851,4 +771,12 @@ func (e WrongTypeError) Error() string {
 
 func (e WrongTypeError) Unwrap() error {
     return e.Err
+}
+
+func (d *DatFile) Decode(s string) (err error) {
+    return LoadJson(s, d)
+}
+
+func (d *DatParFile) Decode(s string) (err error) {
+    return LoadJson(s, d)
 }
