@@ -1,4 +1,4 @@
-package gamma
+package sentinel1
 
 import (
     "fmt"
@@ -8,6 +8,8 @@ import (
     "time"
     "path/filepath"
     "strings"
+    
+    "../common"
 )
 
 const (
@@ -56,10 +58,9 @@ type (
 )
 
 var (
-    burstCorner CmdFun
-
     burstCorners = Gamma.selectFun("ScanSAR_burst_corners",
         "SLC_burst_corners")
+
     calibPath = filepath.Join("annotation", "calibration")
 
     fmtNeeded = [nTemplate]bool{
@@ -81,14 +82,16 @@ func NewS1Zip(zipPath, pol string) (s1 *S1Zip, err error) {
     const rexTemplate = "%s-iw%%d-slc-%%s-.*"
 
     zipBase := filepath.Base(zipPath)
-    s1 = &S1Zip{Path: zipPath, zipBase: zipBase, pol: pol}
+    s1.zipPath, s1.zipBase, s1.pol = zipPath, zipBase, pol
 
     s1.mission = strings.ToLower(zipBase[:3])
     s1.dateStr = zipBase[17:48]
 
     start, stop := zipBase[17:32], zipBase[33:48]
 
-    if s1.date, err = NewDate(DLong, start, stop); err != nil {
+    s1.date, err = NewDate(DLong, start, stop)
+    
+    if err != nil {
         err = ferr.WrapFmt(err,
             "Could not create new date from strings: '%s' '%s'", start, stop)
         return
@@ -99,8 +102,8 @@ func NewS1Zip(zipPath, pol string) (s1 *S1Zip, err error) {
     tpl := fmt.Sprintf(rexTemplate, s1.mission)
 
     s1.Templates = templates{
-        tiff:      filepath.Join(safe, "measurement", tpl+".tiff"),
-        annot:     filepath.Join(safe, "annotation", tpl+".xml"),
+        tiff:      filepath.Join(safe, "measurement", tpl + ".tiff"),
+        annot:     filepath.Join(safe, "annotation", tpl + ".xml"),
         calib:     filepath.Join(safe, calibPath, fmt.Sprintf("calibration-%s.xml", tpl)),
         noise:     filepath.Join(safe, calibPath, fmt.Sprintf("noise-%s.xml", tpl)),
         preview:   filepath.Join(safe, "preview", "product-preview.html"),
@@ -120,7 +123,7 @@ func NewS1Zip(zipPath, pol string) (s1 *S1Zip, err error) {
     return s1, nil
 }
 
-func (s1 *S1Zip) Info(dst string) (iws IWInfos, err error) {
+func (s1 S1Zip) Info(dst string) (iws IWInfos, err error) {
     ferr := merr.Make("S1Zip.Info")
     
     var ext = s1.newExtractor(dst)
@@ -148,303 +151,6 @@ func (s1 *S1Zip) Info(dst string) (iws IWInfos, err error) {
 
     }
     return iws, nil
-}
-
-const maxIW = 3
-
-type(  
-    S1IW struct {
-        DatParFile
-        TOPS_par Params
-    }
-
-    IWs [maxIW]S1IW
-)
-
-func NewIW(dat, par, TOPS_par string) (iw S1IW) {
-    iw.Dat = dat
-    
-    if len(par) == 0 {
-        par = dat + ".par"
-    }
-    
-    iw.Params = Params{Par: par, Sep: ":"}
-    
-    if len(TOPS_par) == 0 {
-        TOPS_par = dat + ".TOPS_par"
-    }
-
-    iw.TOPS_par = Params{Par: TOPS_par, Sep: ":"}
-
-    return
-}
-
-func (iw S1IW) Move(dir string) (miw S1IW, err error) {
-    ferr := merr.Make("S1IW.Move")
-    
-    if miw.DatParFile, err = iw.DatParFile.Move(dir); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    miw.TOPS_par.Par, err = Move(iw.TOPS_par.Par, dir)
-    
-    return miw, nil
-}
-
-
-const (
-    ParseTabErr Werror = "failed to parse tabfile '%s'"
-)
-
-type S1SLC struct {
-    nIW int
-    Tab string
-    time.Time
-    IWs
-}
-
-func FromTabfile(tab string) (s1 S1SLC, err error) {
-    ferr := merr.Make("FromTabfile")
-    
-    log.Printf("Parsing tabfile: '%s'.\n", tab)
-    
-    var file Reader
-    if file, err = NewReader(tab); err != nil {
-        err = ferr.Wrap(FileOpenErr.Wrap(err, tab))
-        return
-    }
-    defer file.Close()
-
-    s1.nIW = 0
-    
-    for file.Scan() {
-        line := file.Text()
-        split := strings.Split(line, " ")
-        
-        log.Printf("Parsing IW%d\n", s1.nIW + 1)
-        
-        s1.IWs[s1.nIW] = NewIW(split[0], split[1], split[2])
-        s1.nIW++
-    }
-    
-    s1.Tab = tab
-    
-    if s1.Time, err = s1.IWs[0].ParseDate(); err != nil {
-        err = ferr.WrapFmt(err, "failed to retreive date for '%s'", tab)
-    }
-    
-    return
-}
-
-
-func (s1 S1SLC) jsonName() string {
-    return s1.Tab + ".json"
-}
-
-func (s1 S1SLC) Move(dir string) (ms1 S1SLC, err error) {
-    ferr := merr.Make("S1SLC.Move")
-    
-    newtab := filepath.Join(dir, filepath.Base(s1.Tab))
-    
-    var file *os.File
-    if file, err = os.Create(newtab); err != nil {
-        err = ferr.Wrap(FileOpenErr.Wrap(err, newtab))
-        return
-    }
-    defer file.Close()
-    
-    for ii := 0; ii < s1.nIW; ii++ {
-        if ms1.IWs[ii], err = s1.IWs[ii].Move(dir); err != nil {
-            return
-        }
-        
-        IW := ms1.IWs[ii]
-        
-        line := fmt.Sprintf("%s %s %s\n", IW.Dat, IW.Par, IW.TOPS_par.Par)
-        
-        if _, err = file.WriteString(line); err != nil {
-            err = ferr.Wrap(FileWriteErr.Wrap(err, newtab))
-            return 
-        }
-    }
-    
-    ms1.Tab, ms1.nIW, ms1.Time = newtab, s1.nIW, s1.Time
-    
-    return ms1, nil
-}
-
-func (s1 S1SLC) Exist() (b bool, err error) {
-    ferr := merr.Make("S1SLC.Exist")
-    
-    for _, iw := range s1.IWs {
-        if b, err = iw.Exist(); err != nil {
-            err = ferr.WrapFmt(err,
-                "failed to determine whether IW datafile exists")
-            return
-        }
-
-        if !b {
-            return
-        }
-    }
-    return true, nil
-}
-
-type MosaicOpts struct {
-    Looks RngAzi
-    BurstWindowFlag bool
-    RefTab string
-}
-
-var mosaic = Gamma.Must("SLC_mosaic_S1_TOPS")
-
-func (s1 S1SLC) Mosaic(out SLC, opts MosaicOpts) (err error) {
-    ferr := merr.Make("S1SLC.Mosaic")
-    
-    opts.Looks.Default()
-    
-    bflg := 0
-    
-    if opts.BurstWindowFlag {
-        bflg = 1
-    }
-    
-    ref := "-"
-    
-    if len(opts.RefTab) == 0 {
-        ref = opts.RefTab
-    }
-    
-    _, err = mosaic(s1.Tab, out.Dat, out.Par, opts.Looks.Rng,
-        opts.Looks.Azi, bflg, ref)
-    
-    if err != nil {
-        return ferr.WrapFmt(err, "failed to mosaic '%s'", s1.Tab)
-    }
-    
-    return nil
-}
-
-var derampRef = Gamma.Must("S1_deramp_TOPS_reference")
-
-func (s1 S1SLC) DerampRef() (ds1 S1SLC, err error) {
-    ferr := merr.Make("S1SLC.DerampRef")
-    
-    tab := s1.Tab
-    
-    if _, err = derampRef(tab); err != nil {
-        err = ferr.WrapFmt(err, "failed to deramp reference S1SLC '%s'", tab)
-        return
-    }
-    
-    tab += ".deramp"
-    
-    if ds1, err = FromTabfile(tab); err != nil {
-        err = ferr.WrapFmt(err, "failed to import S1SLC from tab '%s'", tab)
-        return
-    }
-    
-    return ds1, nil
-}
-
-var derampSlave = Gamma.Must("S1_deramp_TOPS_slave")
-
-func (s1 S1SLC) DerampSlave(ref *S1SLC, looks RngAzi, keep bool) (ret S1SLC, err error) {
-    ferr := merr.Make("S1SLC.DerampSlave")
-    
-    looks.Default()
-    
-    reftab, tab, id := ref.Tab, s1.Tab, s1.Format(DateShort)
-    
-    clean := 1
-    
-    if keep {
-        clean = 0
-    }
-    
-    _, err = derampSlave(tab, id, reftab, looks.Rng, looks.Azi, clean)
-    
-    if err != nil {
-        err = ferr.WrapFmt(err,
-            "failed to deramp slave S1SLC '%s', reference: '%s'", tab, reftab)
-        return
-    }
-    
-    tab += ".deramp"
-    
-    if ret, err = FromTabfile(tab); err != nil {
-        err = ferr.WrapFmt(err, "failed to import S1SLC from tab '%s'", tab)
-        return
-    }
-    
-    return ret, nil
-}
-
-func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
-    ferr := merr.Make("S1SLC.RSLC")
-    
-    tab := strings.ReplaceAll(filepath.Base(s1.Tab), "SLC_tab", "RSLC_tab")
-    tab = filepath.Join(outDir, tab)
-
-    file, err := os.Create(tab)
-
-    if err != nil {
-        err = ferr.Wrap(FileCreateErr.Wrap(err, tab))
-        return
-    }
-    
-    defer file.Close()
-
-    for ii := 0; ii < s1.nIW; ii++ {
-        IW := s1.IWs[ii]
-        
-        dat := filepath.Join(outDir, strings.ReplaceAll(filepath.Base(IW.Dat), "slc", "rslc"))
-        par, TOPS_par := dat + ".par", dat + ".TOPS_par"
-        
-        ret.IWs[ii] = NewIW(dat, par, TOPS_par)
-        
-        //if err != nil {
-            //err = DataCreateErr.Wrap(err, "IW")
-            ////err = Handle(err, "failed to create new IW")
-            //return
-        //}
-        
-        line := fmt.Sprintf("%s %s %s\n", dat, par, TOPS_par)
-
-        _, err = file.WriteString(line)
-
-        if err != nil {
-            err = ferr.Wrap(FileWriteErr.Wrap(err, tab))
-            return
-        }
-    }
-
-    ret.Tab, ret.nIW = tab, s1.nIW
-
-    return ret, nil
-}
-
-var MLIFun = Gamma.selectFun("multi_look_ScanSAR", "multi_S1_TOPS")
-
-func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
-    ferr := merr.Make("S1SLC.MLI")
-    opt.Parse()
-    
-    wflag := 0
-    
-    if opt.windowFlag {
-        wflag = 1
-    }
-    
-    _, err := MLIFun(s1.Tab, mli.Dat, mli.Par, opt.Looks.Rng, opt.Looks.Azi,
-                     wflag, opt.refTab)
-    
-    if err != nil {
-        return ferr.Wrap(StructCreateError.Wrap(err, "MLI"))
-    }
-    
-    return nil
 }
 
 func makePoint(info Params, max bool) (ret Point, err error) {
@@ -618,7 +324,7 @@ func IWAbsDiff(one, two IWInfos) (float64, error) {
     return math.Sqrt(sum), nil
 }
 
-func (s1 *S1Zip) Names(mode, pol string) (dat, par string) {
+func (s1 S1Zip) Names(mode, pol string) (dat, par string) {
     path := filepath.Join(s1.Root, mode)
     
     dat = filepath.Join(path, fmt.Sprintf("%s.%s", pol, mode))
@@ -627,7 +333,7 @@ func (s1 *S1Zip) Names(mode, pol string) (dat, par string) {
     return
 }
 
-func (s1 *S1Zip) SLCNames(mode, pol string, ii int) (dat, par, TOPS string) {
+func (s1 S1Zip) SLCNames(mode, pol string, ii int) (dat, par, TOPS string) {
     slcPath := filepath.Join(s1.Root, mode)
 
     dat = filepath.Join(slcPath, fmt.Sprintf("iw%d_%s.%s", ii, pol, mode))
@@ -637,7 +343,7 @@ func (s1 *S1Zip) SLCNames(mode, pol string, ii int) (dat, par, TOPS string) {
     return
 }
 
-func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
+func (s1 S1Zip) SLC(pol string) (ret S1SLC, err error) {
     ferr := merr.Make("S1Zip.SLC")
     
     const mode = "slc"
@@ -666,7 +372,7 @@ func (s1 *S1Zip) SLC(pol string) (ret S1SLC, err error) {
     return ret, nil
 }
 
-func (s1 *S1Zip) MLI(mode, pol string, out *MLI, opt *MLIOpt) (err error) {
+func (s1 S1Zip) MLI(mode, pol string, out *MLI, opt *MLIOpt) (err error) {
     ferr := merr.Make("S1Zip.MLI")
 
     //path := filepath.Join(s1.Root, mode)
@@ -706,7 +412,7 @@ func (s1 *S1Zip) MLI(mode, pol string, out *MLI, opt *MLIOpt) (err error) {
     return nil
 }
 
-func (s1 *S1Zip) tabName(mode, pol string) string {
+func (s1 S1Zip) tabName(mode, pol string) string {
     return filepath.Join(s1.Root, mode, fmt.Sprintf("%s.tab", pol))
 }
 
@@ -714,7 +420,7 @@ const (
     ExtractErr Werror = "failed to extract %s file from '%s'"
 )
 
-func (s1 *S1Zip) ImportSLC(dst string) (err error) {
+func (s1 S1Zip) ImportSLC(dst string) (err error) {
     ferr := merr.Make("S1Zip.ImportSLC")
     
     var _annot, _calib, _tiff, _noise string
@@ -769,7 +475,7 @@ func (s1 *S1Zip) ImportSLC(dst string) (err error) {
     return nil
 }
 
-func (s1 *S1Zip) Quicklook(dst string) (s string, err error) {
+func (s1 S1Zip) Quicklook(dst string) (s string, err error) {
     ferr := merr.Make("S1Zip.Quicklook")
     
     var ext = s1.newExtractor(dst)

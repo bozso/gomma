@@ -70,26 +70,18 @@ func (e WrongTypeError) Unwrap() error {
     return e.Err
 }
 
-type ZeroDimError struct {
-    dim string
-    Err error
-}
-
-func (e ZeroDimError) Error() string {
-    return fmt.Sprintf("expected %s to be non zero", e.dim)
-}
-
-func (e ZeroDimError) Unwrap() error {
-    return e.Err
-}
-
 type ShapeMismatchError struct {
     dat1, dat2, dim string
     n1, n2 int
+    err error
 }
 
 func (s ShapeMismatchError) Error() string {
     return fmt.Sprintf("expected datafile '%s' to have the same %s as " + 
                        "datafile '%s' (%d != %d)", s.dat1, s.dim, s.dat2, s.n1,
                        s.n2)
+}
+
+func (s ShapeMismatchError) Unwrap() error {
+    return s.err
 }

@@ -9,6 +9,7 @@ import (
     "strconv"
     
     "../utils"
+    "../common"
 )
 
 const merr = utils.ModuleName("gamma.datafile")
@@ -24,8 +25,8 @@ type (
 
     DatFile struct {
         Dat     string
-        Ra      RngAzi `json:"range_azimuth"`
-        DType          `json:"dtype"`
+        Ra      common.RngAzi
+        DType
         Params
     }
 )
@@ -115,9 +116,8 @@ func (df DatFile) ParseDtype(key string) (d DType, err error) {
     return d, nil
 }
 
-
 func (d DatFile) Like(name string, dtype DType) (ret DatFile, err error) {
-    var ferr = merr.Make("DatFile.Like")
+    ferr := merr.Make("DatFile.Like")
     
     if dtype == Unknown {
         dtype = d.DType
@@ -247,7 +247,7 @@ func (d DatFile) TimeStr(format dateFormat) string {
     return ""
 }
 
-func (d DatParFile) ParseDtype() (dt DType, err error) {
+func (d DatFile) ParseDtype() (dt DType, err error) {
     var (
         ferr = merr.Make("DatParFile.ParseDtype")
         s string
@@ -270,14 +270,13 @@ func (d DatParFile) ParseDtype() (dt DType, err error) {
 }
 
 
-func (d DatParFile) ParseDate() (t time.Time, err error) {
+func (d DatFile) ParseDate() (t time.Time, err error) {
     var ferr = merr.Make("DatParFile.ParseDate")
     
     dateStr, err := d.Param("date")
     
     if err != nil {
-        err = ferr.WrapFmt(err, "failed to retreive date from '%s'",
-            d.Par)
+        err = ferr.WrapFmt(err)
         return
     }
     
@@ -478,61 +477,6 @@ func Move(path string, dir string) (s string, err error) {
     }
     
     return dst, nil
-}
-
-
-type RngAzi struct {
-    Rng int `json:"rng" name:"rng" default:"0"`
-    Azi int `json:"azi" name:"azi" default:"0"`
-}
-
-var defRA = RngAzi{Rng:1, Azi:1}
-
-func (ra RngAzi) String() string {
-    return fmt.Sprintf("%d,%d", ra.Rng, ra.Azi)
-}
-
-func (ra *RngAzi) Set(s string) (err error) {
-    var ferr = merr.Make("RngAzi.Decode")
-    
-    if len(s) == 0 {
-        return ferr.Wrap(EmptyStringError{})
-    }
-    
-    split := NewSplitParser(s, ",")
-    
-    ra.Rng = split.Int(0)
-    ra.Azi = split.Int(1)
-    
-    if err := split.Wrap(); err != nil {
-        return ferr.Wrap(err) 
-    }
-    
-    return nil
-}
-
-func (ra RngAzi) Check() (err error) {
-    var ferr = merr.Make("RngAzi.Check")
-     
-    if ra.Rng == 0 {
-        return ferr.Wrap(ZeroDimError{dim: "range samples / columns"})
-    }
-    
-    if ra.Azi == 0 {
-        return ferr.Wrap(ZeroDimError{dim: "azimuth lines / rows"})
-    }
-    
-    return nil
-}
-
-func (ra *RngAzi) Default() {
-    if ra.Rng == 0 {
-        ra.Rng = 1
-    }
-    
-    if ra.Azi == 0 {
-        ra.Azi = 1
-    }
 }
 
 

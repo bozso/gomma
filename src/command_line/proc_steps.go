@@ -1,10 +1,12 @@
-package gamma
+package command_line
 
 
 import (
     "log"
     "io"
-    "bufio"    
+    "bufio"
+    
+    
 )
 
 type checkerFun func(*S1Zip) bool

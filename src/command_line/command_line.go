@@ -1,4 +1,4 @@
-package gamma
+package command_line
 
 import (
     "errors"
@@ -6,13 +6,12 @@ import (
     "path/filepath"
     "strings"
     
-    "./utils"
-    "./datafile"
+    "../utils"
+    "../datafile"
 )
 
-var ParseError = errors.New("failed to parse command line arguments")
-
 const (
+    ParseError utils.CWerror = "failed to parse command line arguments"
     ParseErr utils.CWerror = "failed to parse command line arguments"
 )
 

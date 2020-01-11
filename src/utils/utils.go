@@ -19,10 +19,6 @@ const merr = ModuleName("gamma.utils")
 type (
     CmdFun     func(args ...interface{}) (string, error)
     Joiner     func(args ...string) string
-
-    Tmp struct {
-        files []string
-    }
 )
 
 type ColorCode int
@@ -66,33 +62,6 @@ func Color(s string, color ColorCode) string {
     return fmt.Sprintf(format, s)
 }
 
-const (
-    ParseIntErr Werror = "failed to parse '%s' into an integer"
-    ParseFloatErr Werror = "failed to parse '%s' into an float"
-)
-
-type EmptyStringError struct {
-    variable string
-    err      error
-}
-
-func (e EmptyStringError) Error() (s string) {
-    s = "expected non empty string"
-    
-    if v := e.variable; len(v) > 0 {
-        s = fmt.Sprintf("%s for '%s'", s, v)
-    }
-    
-    return
-}
-
-func (e EmptyStringError) Unwrap() error {
-    return e.err
-}
-
-
-var tmp = Tmp{}
-
 func Empty(s string) bool {
     return len(s) == 0
 }
@@ -107,33 +76,6 @@ func Exist(s string) (ret bool, err error) {
         return false, merr.Make("Exist").Wrap(err)
     }
     return true, nil
-}
-
-type UnrecognizedMode struct {
-    name, got string
-    err error
-}
-
-func (e UnrecognizedMode) Error() string {
-    return fmt.Sprintf("unrecognized mode '%s' for %s", e.got, e.name)
-}
-
-func (e UnrecognizedMode) Unwrap() error {
-    return e.err
-}
-
-type ModeError struct {
-    name string
-    got fmt.Stringer
-    err error
-}
-
-func (e ModeError) Error() string {
-    return fmt.Sprintf("unrecognized mode '%s' for %s", e.got.String(), e.name)
-}
-
-func (e ModeError) Unwrap() error {
-    return e.err
 }
 
 type (
@@ -245,12 +187,6 @@ func Fatal(err error, format string, args ...interface{}) {
     }
 }
 
-const (
-    CmdErr Werror = "execution of command '%s' failed"
-    ExeErr Werror = `Command '%s %s' failed!
-    Output of command is: %v`
-)
-
 func MakeCmd(cmd string) CmdFun {
     return func(args ...interface{}) (string, error) {
         arg := make([]string, len(args))
@@ -276,11 +212,6 @@ func MakeCmd(cmd string) CmdFun {
         return result, nil
     }
 }
-
-const (
-    FileOpenErr Werror = "failed to open file '%s'"
-    FileReadErr Werror = "failed to read file '%s'"
-)
 
 type Reader struct {
     *bufio.Scanner
@@ -424,27 +355,6 @@ func ReadFile(path string) (b []byte, err error) {
     return
 }
 
-type OutOfBoundError struct {
-    idx, length int
-    err error
-}
-
-func (o OutOfBoundError) Error() string {
-    return fmt.Sprintf("idx '%d' is out of bounds of length '%d'",
-        o.idx, o.length)
-}
-
-func (o OutOfBoundError) Unwrap() error {
-    return o.err
-}
-
-func IsOutOfBounds(idx, length int) error {
-    if idx >= length {
-        return OutOfBoundError{idx:idx, length:length}
-    }
-    return nil
-}
-
 type SplitParser struct {
     split []string
     len int
@@ -514,38 +424,7 @@ func (sp SplitParser) Float(idx int) (f float64, err error) {
     return
 }
 
-type Werror string
-type CWerror string
 
-func (e Werror) Wrap(err error, args ...interface{}) error {
-    str := fmt.Sprintf(string(e), args...)
-    return fmt.Errorf("%s: %w", str, err)
-}
-
-func (e Werror) Make(args ...interface{}) error {
-    return fmt.Errorf(string(e), args...)
-}
-
-func (e CWerror) Wrap(err error) error {
-    return fmt.Errorf("%s: %w", string(e), err)
-}
-
-func (e CWerror) Make() error {
-    return fmt.Errorf(string(e))
-}
-
-type FileOpenError struct {
-    path string
-    err error
-}
-
-func (e FileOpenError) Error() string {
-    return fmt.Sprintf("failed to open file '%s'", e.path)
-}
-
-func (e FileOpenError) Unwrap() error {
-    return e.err
-}
 
 type Path struct {
     s string
@@ -639,15 +518,6 @@ func Mkdir(name string) (err error) {
     
     return
 }
-
-const (
-    DirCreateErr Werror = "failed to create directory '%s'"
-    FileExistErr Werror = "failed to determine wether '%s' exist"
-    FileWriteErr Werror = "failed to write to file '%s'"
-    FileCreateErr Werror = "failed to create file '%s'"
-    MoveErr Werror = "failed to move '%s' to '%s'"
-    EmptyStringErr Werror = "expected %s to be a non empty string"
-)
 
 type ( 
     ModuleName string

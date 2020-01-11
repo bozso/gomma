@@ -4,9 +4,6 @@ rule go
 
 build /home/istvan/progs/gamma/bin/gamma: go $
     /home/istvan/progs/gamma/bin/gamma.go | $
-    /home/istvan/progs/gamma/src/proc_steps.go $
-    /home/istvan/progs/gamma/src/sentinel1.go $
-    /home/istvan/progs/gamma/src/command_line.go $
     /home/istvan/progs/gamma/src/geo.go /home/istvan/progs/gamma/src/slc.go $
     /home/istvan/progs/gamma/src/date.go $
     /home/istvan/progs/gamma/src/common.go $
@@ -17,9 +14,17 @@ build /home/istvan/progs/gamma/bin/gamma: go $
     /home/istvan/progs/gamma/src/gamma_test.go $
     /home/istvan/progs/gamma/src/coreg.go $
     /home/istvan/progs/gamma/src/extract.go $
+    /home/istvan/progs/gamma/src/common/common.go $
     /home/istvan/progs/gamma/src/utils/utils.go $
+    /home/istvan/progs/gamma/src/utils/errors.go $
     /home/istvan/progs/gamma/src/datafile/dtype.go $
     /home/istvan/progs/gamma/src/datafile/datafile.go $
     /home/istvan/progs/gamma/src/datafile/params.go $
-    /home/istvan/progs/gamma/src/datafile/errors.go
+    /home/istvan/progs/gamma/src/datafile/errors.go $
+    /home/istvan/progs/gamma/src/command_line/proc_steps.go $
+    /home/istvan/progs/gamma/src/command_line/command_line.go $
+    /home/istvan/progs/gamma/src/sentinel1/iw.go $
+    /home/istvan/progs/gamma/src/sentinel1/slc.go $
+    /home/istvan/progs/gamma/src/sentinel1/errors.go $
+    /home/istvan/progs/gamma/src/sentinel1/zip.go
 

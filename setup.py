@@ -21,6 +21,9 @@ def generate_ninja():
         for elem in {
             "datafile",
             "utils",
+            "command_line",
+            "common",
+            "sentinel1"
         }
     }
     

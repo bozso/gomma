@@ -5,24 +5,22 @@ import (
     "fmt"
     "os"
     "path/filepath"
+    
+    "./datafile"
 )
 
 
 type DEM struct {
-    DatParFile
+    datafile.DatFile
 }
 
 func (d *DEM) Decode(s string) (err error) {
     return LoadJson(s, d)
 }
 
-func TmpDEM() (ret DEM, err error) {
-    ret.DatParFile, err = TmpDatParFile("dem", "par", Float)
-    return
-}
 
 type Lookup struct {
-    DatFile
+    datafile.DatFile
 }
 
 func (l *Lookup) Decode(s string) (err error) {
@@ -47,15 +45,6 @@ func (d DEM) NewLookup(path string) (l Lookup) {
     return
 }
 
-func (d DEM) TmpLookup() (l Lookup, err error) {
-    var path string
-    if path, err = TmpFile(""); err != nil {
-        return
-    }
-    
-    return d.NewLookup(path), nil
-}
-
 func (dem DEM) ParseRng() (i int, err error) {
     var ferr = merr.Make("DEM.ParseRng")
     
@@ -63,7 +52,7 @@ func (dem DEM) ParseRng() (i int, err error) {
         err = ferr.Wrap(err)
     }
     
-    return i, nil
+    return
 }
 
 func (dem DEM) ParseAzi() (i int, err error) {
@@ -73,7 +62,7 @@ func (dem DEM) ParseAzi() (i int, err error) {
         err = ferr.Wrap(err)
     }
     
-    return i, nil
+    return
 }
 
 func (d DEM) Raster(opt RasArgs) (err error) {

@@ -65,7 +65,7 @@ func (p Params) Param(name string) (s string, err error) {
     return s, nil
 }
 
-func (p Params) Splitter(name string) (sp SplitParser, err error) {
+func (p Params) Splitter(name string) (sp utils.SplitParser, err error) {
     ferr := merr.Make("Params.Splitter")
     
     s, err := p.Param(name)
