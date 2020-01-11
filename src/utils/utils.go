@@ -1,4 +1,4 @@
-package gamma
+package utils
 
 import (
     "fmt"
@@ -13,6 +13,8 @@ import (
     "strings"
     "flag"
 )
+
+const merr = ModuleName("gamma.utils")
 
 type (
     CmdFun     func(args ...interface{}) (string, error)
@@ -243,16 +245,6 @@ func Fatal(err error, format string, args ...interface{}) {
     }
 }
 
-func Handle(err error, format string, args ...interface{}) error {
-    str := fmt.Sprintf(format, args...)
-
-    if err == nil {
-        return fmt.Errorf("%s", str)
-    } else {
-        return fmt.Errorf("%s: %w", str, err)
-    }
-}
-
 const (
     CmdErr Werror = "execution of command '%s' failed"
     ExeErr Werror = `Command '%s %s' failed!
@@ -432,165 +424,94 @@ func ReadFile(path string) (b []byte, err error) {
     return
 }
 
-type ParameterError struct {
-    path, par string
+type OutOfBoundError struct {
+    idx, length int
     err error
 }
 
-func (p ParameterError) Error() string {
-    return fmt.Sprintf("failed to retreive parameter '%s' from file '%s'",
-        p.par, p.path)
+func (o OutOfBoundError) Error() string {
+    return fmt.Sprintf("idx '%d' is out of bounds of length '%d'",
+        o.idx, o.length)
 }
 
-func (p ParameterError) Unwrap() error {
-    return p.err
+func (o OutOfBoundError) Unwrap() error {
+    return o.err
 }
 
-type Params struct {
-    Par string `json:"paramfile"`
-    Sep string `json:"separator"`
-    Var []string
-}
-
-
-func FromString(params, sep string) Params {
-    return Params{Par: "", Sep: sep, Var: strings.Split(params, "\n")}
-}
-
-func (self *Params) Param(name string) (ret string, err error) {
-    if self.Var == nil {
-        var reader Reader
-        if reader, err = NewReader(self.Par); err != nil {
-            return
-        }
-        defer reader.Close()
-
-        for reader.Scan() {
-            line := reader.Text()
-            
-            if strings.Contains(line, name) {
-                return strings.Trim(strings.Split(line, self.Sep)[1], " "), nil
-            }
-        }
-    } else {
-        for _, line := range self.Var {
-            if strings.Contains(line, name) {
-                return strings.Trim(strings.Split(line, self.Sep)[1], " "), nil
-            }
-        }
+func IsOutOfBounds(idx, length int) error {
+    if idx >= length {
+        return OutOfBoundError{idx:idx, length:length}
     }
-
-    err = ParameterError{path: self.Par, par: name}
-    return
-}
-
-func (self Params) Int(name string, idx int) (i int, err error) {
-    var data string
-    if data, err = self.Param(name); err != nil {
-        return
-    }
-    
-    data = strings.Split(data, " ")[idx]
-    
-    if i, err = strconv.Atoi(data); err != nil {
-        err = ParseIntErr.Wrap(err, data)
-    }
-
-    return
-}
-
-func (self Params) Float(name string, idx int) (f float64, err error) {
-    var data string
-    if data, err = self.Param(name); err != nil {
-        return
-    }
-    
-    data = strings.Split(data, " ")[idx]
-
-    if f, err = strconv.ParseFloat(data, 64); err != nil {
-        err = ParseFloatErr.Wrap(err, data)
-    }
-
-    return
+    return nil
 }
 
 type SplitParser struct {
-    s string
     split []string
-    err error
+    len int
 }
 
-func NewSplitParser(s, sep string) (sp SplitParser) {
-    sp.s, sp.err = s, nil
+func NewSplitParser(s, sep string) (sp SplitParser, err error) {
     sp.split = strings.Split(s, sep)
+    sp.len = len(sp.split)
     
-    if len(sp.split) == 0 {
-        sp.err = fmt.Errorf("could no be split into " +
-            "multiple parts with separator '%s'", sep)
+    if sp.len == 0 {
+        err = merr.Make("NewSplitParser").Fmt(
+            "string '%s' could no be split into " +
+            "multiple parts with separator '%s'", s, sep)
     }
+    
     return
 }
 
-func (sp SplitParser) Wrap() error {
-    if sp.err != nil {
-        sp.err = fmt.Errorf("failed to parse string '%s': %w",
-            sp.s, sp.err) 
-    }
-    return sp.err
+func (sp SplitParser) Len() int {
+    return sp.len
 }
 
-func (sp *SplitParser) Int(idx int) (i int) {
-    if sp.err != nil {
+func (sp SplitParser) Idx(idx int) (s string, err error) {
+    if length := sp.len; idx >= length {
+        err = OutOfBoundError{idx: idx, length: length}
         return
     }
     
-    i, sp.err = strconv.Atoi(sp.split[idx])
-    return
+    return sp.split[idx], nil
 }
 
-func (sp *SplitParser) Float(idx, prec int) (f float64) {
-    if sp.err != nil {
-        return
-    }
+func (sp SplitParser) Int(idx int) (i int, err error) {
+    ferr := merr.Make("SplitParser.Int")
     
-    f, sp.err = strconv.ParseFloat(sp.split[idx], prec)
-    return
-}
-
-func TmpFile(ext string) (ret string, err error) {
-    var file *os.File
-    if len(ext) > 0 {
-        file, err = ioutil.TempFile("", "*." + ext)
-    } else {
-        file, err = ioutil.TempFile("", "*")
-    }
-
+    s, err := sp.Idx(idx)
+    
     if err != nil {
-        err = Handle(err, "failed to create a temporary file")
+        err = ferr.Wrap(err)
         return
     }
-
-    defer file.Close()
-
-    name := file.Name()
-
-    tmp.files = append(tmp.files, name)
-
-    return name, nil
-}
-
-func RemoveTmp() {
-    log.Printf("Removing temporary files...\n")
-    for _, file := range tmp.files {
-        if err := os.Remove(file); err != nil {
-            log.Printf("Failed to remove temporary file '%s': %s\n", file, err)
-        }
+    
+    i, err = strconv.Atoi(s)
+    
+    if err != nil {
+        err = ferr.Wrap(err)
     }
+    
+    return
 }
 
-
-func Wrap(err1 error, err2 error) error {
-    return fmt.Errorf("%w: %w", err1, err2)
+func (sp SplitParser) Float(idx int) (f float64, err error) {
+    ferr := merr.Make("SplitParser.Float")
+    
+    s, err := sp.Idx(idx)
+    
+    if err != nil {
+        err = ferr.Wrap(err)
+        return
+    }
+    
+    f, err = strconv.ParseFloat(s, 64)
+    
+    if err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return
 }
 
 type Werror string

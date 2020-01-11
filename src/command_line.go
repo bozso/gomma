@@ -5,16 +5,19 @@ import (
     "fmt"
     "path/filepath"
     "strings"
+    
+    "./utils"
+    "./datafile"
 )
 
 var ParseError = errors.New("failed to parse command line arguments")
 
 const (
-    ParseErr CWerror = "failed to parse command line arguments"
+    ParseErr utils.CWerror = "failed to parse command line arguments"
 )
 
 
-func (c *Cli) SetupGammaCli() {
+func (c *utils.Cli) SetupGammaCli() {
     c.AddAction("like",
         "Initialize Gamma datafile with given datatype and shape.",
         &like{})
@@ -40,15 +43,15 @@ type MetaFile struct {
     Meta string
 }
 
-func (m *MetaFile) SetCli(c *Cli) {
+func (m *MetaFile) SetCli(c *utils.Cli) {
     c.StringVar(&m.Meta, "meta", "", "Metadata json file")
 }
 
 
 type like struct {
-    indat DatFile
+    indat datafile.DatFile
     in, out, ext string 
-    Dtype        DType
+    Dtype        datafile.DType
 }
 
 func (l *like) SetCli(c* Cli) {

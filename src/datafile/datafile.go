@@ -1,4 +1,4 @@
-package gamma
+package datafile
 
 import (
     "fmt"
@@ -7,7 +7,11 @@ import (
     "path/filepath"
     "strings"
     "strconv"
+    
+    "../utils"
 )
+
+const merr = utils.ModuleName("gamma.datafile")
 
 type (    
     IDatFile interface {
@@ -16,104 +20,13 @@ type (
         Azi() int
         Dtype() DType
         //Move(string) (DatFile, error)
-        Raster(opt RasArgs) error
     }
-    
-    IDatParFile interface {
-        IDatFile
-        ParseRng() (int, error)
-        ParseAzi() (int, error)
-        ParseDate() (time.Time, error)
-        ParseFmt() (string, error)
-        TimeStr(dateFormat) string
-        
-        // TODO: implement this
-        // ParseDType() (DType, error)
-    }
-    
-    DType int
-)
 
-
-const (
-    Float DType = iota
-    Double
-    ShortCpx
-    FloatCpx
-    Raster
-    UChar
-    Short
-    Unknown
-    Any
-)
-
-func (d *DType) SetCli(c *Cli) {
-    c.Var(d, "dtype", "Datatype of datafile.")
-}
-
-func (d *DType) Set(s string) error {
-    in := strings.ToUpper(s)
-    
-    switch in {
-    case "FLOAT":
-        *d = Float
-    case "DOUBLE":
-        *d = Double
-    case "SCOMPLEX":
-        *d = ShortCpx
-    case "FCOMPLEX":
-        *d = FloatCpx
-    case "SUN", "RASTER", "BMP":
-        *d = Raster
-    case "UNSIGNED CHAR":
-        *d = UChar
-    case "SHORT":
-        *d = Short
-    case "ANY":
-        *d = Any
-    default:
-        *d = Unknown
-    }
-    
-    return nil
-}
-
-func (d DType) String() string {
-    switch d {
-    case Float:
-        return "FLOAT"
-    case Double:
-        return "DOUBLE"
-    case ShortCpx:
-        return "SCOMPLEX"
-    case FloatCpx:
-        return "FCOMPLEX"
-    case Raster:
-        return "RASTER"
-    case UChar:
-        return "UNSIGNED CHAR"
-    case Short:
-        return "SHORT"
-    case Any:
-        return "ANY"
-    default:
-        return "UNKNOWN"
-    }
-}
-
-func NewGammaParam(path string) Params {
-    return Params{Par: path, Sep: ":"}
-}
-
-const (
-    StructCreateError Werror = "failed to create %s Struct"
-)
-
-type (
     DatFile struct {
-        Dat string `name:"dat"`
-        Ra  RngAzi `json:"range_azimuth"`
-        DType      `json:"dtype"`
+        Dat     string
+        Ra      RngAzi `json:"range_azimuth"`
+        DType          `json:"dtype"`
+        Params
     }
 )
 
@@ -143,30 +56,65 @@ func (d DatFile) TypeCheck(ftype, expect string, dtypes... DType) (err error) {
     return nil
 }
 
-
-func NewDatFile(path string, dt DType) (d DatFile, err error) {
-    var ferr = merr.Make("NewDatFile")
+func FromFile(path, rng, azi, dtype string) (d DatFile, err error) {
+    ferr := merr.Make("NewDatFile")
     
-    if len(path) == 0 {
-        err = ferr.Wrap(EmptyStringError{variable:"datafile"})
+    d.Params, err = NewGammaParam(path)
+    if err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
-    return DatFile{Dat: path, DType: dt}, nil
-}
+    d.Ra.Rng, err = d.ParseRng(rng)
+    if err != nil {
+        err = ferr.Wrap(err)
+        return
+    }
 
-func TmpDatFile(ext string, dt DType) (ret DatFile, err error) {
-    var dat string
-    
-    if dat, err = TmpFile(ext); err != nil {
+    d.Ra.Azi, err = d.ParseAzi(azi)
+    if err != nil {
+        err = ferr.Wrap(err)
         return
     }
     
-    ret.Dat = dat
-    ret.DType = dt
+    d.DType, err = d.ParseDtype(dtype)
+    if err != nil {
+        err = ferr.Wrap(err)
+        return
+    }
     
-    return ret, nil
+    return
 }
+
+func (d DatFile) ParseRng(key string) (i int, err error) {
+    i, err = d.Int(key, 0)
+    if err != nil {
+        err = merr.Make("DatFile.ParseRng").Wrap(err)
+    }
+    return
+}
+
+func (d DatFile) ParseAzi(key string) (i int, err error) {
+    i, err = d.Int(key, 0)
+    if err != nil {
+        err = merr.Make("DatFile.ParseAzi").Wrap(err)
+    }
+    return
+}
+
+func (df DatFile) ParseDtype(key string) (d DType, err error) {
+    var ferr = merr.Make("DatParFile.ParseDtype")
+    
+    s, err := df.Param(key)
+    if err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    d.Set(s)
+    
+    return d, nil
+}
+
 
 func (d DatFile) Like(name string, dtype DType) (ret DatFile, err error) {
     var ferr = merr.Make("DatFile.Like")
@@ -197,9 +145,6 @@ func (d DatFile) Dtype() DType {
     return d.DType
 }
 
-func (d DatFile) jsonName() string {
-    return d.Dat + ".json"
-}
 
 func (d DatFile) Move(dir string) (dm DatFile, err error) {
     var ferr = merr.Make("DatFile.Move")
@@ -217,23 +162,12 @@ func (d DatFile) Move(dir string) (dm DatFile, err error) {
 func (d DatFile) Exist() (b bool, err error) {
     var ferr = merr.Make("DatFile.Exist")
     
-    if b, err = Exist(d.Dat); err != nil {
+    if b, err = utils.Exist(d.Dat); err != nil {
         err = ferr.Wrap(err)
         return
     }
     
     return b, nil
-}
-
-type ShapeMismatchError struct {
-    dat1, dat2, dim string
-    n1, n2 int
-}
-
-func (s ShapeMismatchError) Error() string {
-    return fmt.Sprintf("expected datafile '%s' to have the same %s as " + 
-                       "datafile '%s' (%d != %d)", s.dat1, s.dim, s.dat2, s.n1,
-                       s.n2)
 }
 
 func SameCols(one IDatFile, two IDatFile) (err error) {
@@ -285,104 +219,25 @@ func SameShape(one IDatFile, two IDatFile) (err error) {
     return nil
 }
 
-type DatParFile struct {
-    DatFile   `json:"DatFile"`
-    Params    `json:"Params"`
-    time.Time `json:"-"`
-}
+//func (d *DatFile) Parse() (err error) {
+    //var ferr = merr.Make("DatParFile.Parse")
+    
+    //if d.Ra.Rng, err = d.ParseRng(); err != nil {
+        //return ferr.Wrap(err)
+    //}
+    
+    //if d.Ra.Azi, err = d.ParseAzi(); err != nil {
+        //return ferr.Wrap(err)
+    //}
+    
+    //if d.Time, err = d.ParseDate(); err != nil {
+        //return ferr.Wrap(err)
+    //}
+    
+    //return nil
+//}
 
-func NewDatParFile(dat, par, ext string, dt DType) (d DatParFile, err error) {
-    var ferr = merr.Make("NewDatParFile")
-    
-    if d.DatFile, err = NewDatFile(dat, dt); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    if len(par) == 0 {
-        par = fmt.Sprintf("%s.%s", dat, ext)
-    }
-    
-    d.Par = par
-    d.Sep = ":"
-    
-    return d, nil
-}
-
-func TmpDatParFile(ext string, parExt string, dt DType) (ret DatParFile, err error) {
-    if ret.DatFile, err = TmpDatFile(ext, dt); err != nil {
-        return
-    }
-    
-    if len(parExt) == 0 {
-        parExt = "par"
-    }
-    
-    ret.Par = fmt.Sprintf("%s.%s", ret.Dat, parExt)
-    ret.Sep = ":"
-    
-    return ret, nil
-}
-
-func (d *DatParFile) Parse() (err error) {
-    var ferr = merr.Make("DatParFile.Parse")
-    
-    if d.Ra.Rng, err = d.ParseRng(); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if d.Ra.Azi, err = d.ParseAzi(); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if d.Time, err = d.ParseDate(); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
-}
-
-func (d DatParFile) Move(dir string) (dm DatParFile, err error) {
-    var ferr = merr.Make("DatParFile.Move")
-    
-    if dm.DatFile, err = d.DatFile.Move(dir); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    if dm.Par, err = Move(d.Par, dir); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    return dm, nil
-}
-
-func (d DatParFile) Exist() (b bool, err error) {
-    var (
-        ferr = merr.Make("DatParFile.Exist")
-        de, pe bool
-    )
-    
-    if de, err = d.DatFile.Exist(); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    if pe, err = Exist(d.Par); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    return de && pe, nil
-}
-
-const (
-    RngError Werror = "failed to retreive range samples from '%s'"
-    AziError Werror = "failed to retreive azimuth lines from '%s'"
-)
-
-func (d DatParFile) TimeStr(format dateFormat) string {
+func (d DatFile) TimeStr(format dateFormat) string {
     switch format {
     case DShort:
         return d.Time.Format(DateShort)
@@ -390,36 +245,6 @@ func (d DatParFile) TimeStr(format dateFormat) string {
         return d.Time.Format(DateLong)
     }
     return ""
-}
-
-func (d DatParFile) ParseRng() (i int, err error) {
-    var ferr = merr.Make("DatParFile.ParseRng")
-    
-    if i, err = d.Int("range_samples", 0); err != nil {
-        err = ferr.Wrap(err)
-    }
-    
-    return i, nil
-}
-
-func (d DatParFile) ParseAzi() (i int, err error) {
-    var ferr = merr.Make("DatParFile.ParseAzi")
-    
-    if i, err = d.Int("azimuth_lines", 0); err != nil {
-        err = ferr.Wrap(err)
-    }
-    
-    return i, nil
-}
-
-func (d DatParFile) ParseFmt() (s string, err error) {
-    var ferr = merr.Make("DatParFile.ParseFmt")
-    
-    if s, err = d.Param("image_format"); err != nil {
-        err = ferr.Wrap(err)
-    }
-    
-    return s, nil
 }
 
 func (d DatParFile) ParseDtype() (dt DType, err error) {
@@ -444,9 +269,6 @@ func (d DatParFile) ParseDtype() (dt DType, err error) {
     return dt, nil
 }
 
-const (
-    TimeParseErr Werror = "failed retreive %s from date string '%s'"
-)
 
 func (d DatParFile) ParseDate() (t time.Time, err error) {
     var ferr = merr.Make("DatParFile.ParseDate")
@@ -540,7 +362,7 @@ func (d DatParFile) ParseDate() (t time.Time, err error) {
     return t, nil
 }
 
-func ID(one IDatParFile, two IDatParFile, format dateFormat) string {
+func ID(one IDatFile, two IDatFile, format dateFormat) string {
     return fmt.Sprintf("%s_%s", one.TimeStr(format), two.TimeStr(format))
 }
 
@@ -658,18 +480,6 @@ func Move(path string, dir string) (s string, err error) {
     return dst, nil
 }
 
-type ZeroDimError struct {
-    dim string
-    Err error
-}
-
-func (e ZeroDimError) Error() string {
-    return fmt.Sprintf("expected %s to be non zero", e.dim)
-}
-
-func (e ZeroDimError) Unwrap() error {
-    return e.Err
-}
 
 type RngAzi struct {
     Rng int `json:"rng" name:"rng" default:"0"`
@@ -725,53 +535,7 @@ func (ra *RngAzi) Default() {
     }
 }
 
-type TypeMismatchError struct {
-    ftype, expected string
-    DType
-    Err error
-}
-
-func (e TypeMismatchError) Error() string {
-    return fmt.Sprintf("expected datatype '%s' for %s datafile, got '%s'",
-        e.expected, e.ftype, e.DType.String())
-}
-
-func (e TypeMismatchError) Unwrap() error {
-    return e.Err
-}
-
-type UnknownTypeError struct {
-    DType
-    Err error
-}
-
-func (e UnknownTypeError) Error() string {
-    return fmt.Sprintf("unrecognised type '%s', expected a valid datatype",
-        e.DType.String())
-}
-
-func (e UnknownTypeError) Unwrap() error {
-    return e.Err
-}
-
-type WrongTypeError struct {
-    DType
-    kind string
-    Err error
-}
-
-func (e WrongTypeError) Error() string {
-    return fmt.Sprintf("wrong datatype '%s' for %s", e.kind, e.DType.String())
-}
-
-func (e WrongTypeError) Unwrap() error {
-    return e.Err
-}
 
 func (d *DatFile) Set(s string) (err error) {
-    return LoadJson(s, d)
-}
-
-func (d *DatParFile) Set(s string) (err error) {
     return LoadJson(s, d)
 }

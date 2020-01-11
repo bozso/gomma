@@ -4,19 +4,22 @@ rule go
 
 build /home/istvan/progs/gamma/bin/gamma: go $
     /home/istvan/progs/gamma/bin/gamma.go | $
+    /home/istvan/progs/gamma/src/proc_steps.go $
+    /home/istvan/progs/gamma/src/sentinel1.go $
+    /home/istvan/progs/gamma/src/command_line.go $
+    /home/istvan/progs/gamma/src/geo.go /home/istvan/progs/gamma/src/slc.go $
+    /home/istvan/progs/gamma/src/date.go $
     /home/istvan/progs/gamma/src/common.go $
     /home/istvan/progs/gamma/src/interferogram.go $
-    /home/istvan/progs/gamma/src/sentinel1.go $
-    /home/istvan/progs/gamma/src/geo.go $
-    /home/istvan/progs/gamma/src/plot.go $
     /home/istvan/progs/gamma/src/config.go $
-    /home/istvan/progs/gamma/src/extract.go $
-    /home/istvan/progs/gamma/src/utils.go $
-    /home/istvan/progs/gamma/src/date.go $
-    /home/istvan/progs/gamma/src/datafile.go $
+    /home/istvan/progs/gamma/src/iono.go $
+    /home/istvan/progs/gamma/src/plot.go $
     /home/istvan/progs/gamma/src/gamma_test.go $
-    /home/istvan/progs/gamma/src/slc.go $
-    /home/istvan/progs/gamma/src/command_line.go $
-    /home/istvan/progs/gamma/src/proc_steps.go $
-    /home/istvan/progs/gamma/src/iono.go /home/istvan/progs/gamma/src/coreg.go
+    /home/istvan/progs/gamma/src/coreg.go $
+    /home/istvan/progs/gamma/src/extract.go $
+    /home/istvan/progs/gamma/src/utils/utils.go $
+    /home/istvan/progs/gamma/src/datafile/dtype.go $
+    /home/istvan/progs/gamma/src/datafile/datafile.go $
+    /home/istvan/progs/gamma/src/datafile/params.go $
+    /home/istvan/progs/gamma/src/datafile/errors.go
 

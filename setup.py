@@ -10,13 +10,30 @@ flags = "-ldflags '-s -w'"
 
 root = pth.dirname(pth.abspath(__file__))
 
+def sources(*args):
+    return glob.glob(pth.join(*args))
+
 def generate_ninja():
-    src = glob.glob(pth.join(root, "src", "*.go"))
+    src_path = pth.join(root, "src")
+    src = sources(src_path, "*.go")
+    
+    subdirs = {pth.join(src_path, elem)
+        for elem in {
+            "datafile",
+            "utils",
+        }
+    }
+    
+    for path in subdirs:
+        src += sources(src_path, path, "*.go")
+    
     main = pth.join(root, "bin", "gamma")
     
     cmd = "go build %s -o ${out} ${in}"
     
-    for path in {"src", "bin"}:
+    subdirs |= {src_path, "bin"}
+    
+    for path in subdirs:
         n = ut.Ninja.in_path(path)
         n.rule("go", cmd % flags, "Build executable.")
         n.newline()
