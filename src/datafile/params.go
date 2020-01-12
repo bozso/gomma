@@ -1,7 +1,11 @@
 package datafile
 
+// TODO: reimplement so it reads from file instead of reading from
+// map
 import (
-    "os"
+    "fmt"
+    "io"
+    "strings"
     
     "../utils"
 )
@@ -21,7 +25,7 @@ func NewParams(filePath, sep string) (p Params, err error) {
     reader, err := utils.NewReader(filePath)
     if err != nil {
         err = ferr.Wrap(err)
-        return err
+        return
     }
     defer reader.Close()
     
@@ -34,7 +38,7 @@ func NewParams(filePath, sep string) (p Params, err error) {
             continue
         }
         
-        split = strings.Split(line, sep)
+        split := strings.Split(line, sep)
         
         if len(split) < 2 {
             err = ferr.Fmt(
@@ -70,7 +74,8 @@ func (p Params) Splitter(name string) (sp utils.SplitParser, err error) {
     
     s, err := p.Param(name)
     if err != nil {
-        return ferr.Wrap(err)
+        err = ferr.Wrap(err)
+        return
     }
     
     sp, err = utils.NewSplitParser(s, " ")
@@ -117,24 +122,16 @@ func (p *Params) Set(key, value string) {
     p.params[key] = value
 }
 
-func (p Params) Save(path string) (err error) {
+func (p Params) Save(w io.StringWriter) (err error) {
     ferr := merr.Make("Params.Save")
-    
-    if len(path) == 0 {
-        path = p.filePath
-    }
-    
-    file, err := os.Create(path)
-    if err != nil {
-        return ferr.Wrap(err)
-    }
-    defer file.Close()
     
     sep := p.sep
     
     for key, val := range p.params {
-        _, err = file.WriteString(fmt.Sprintf("%s%s\t%s", key, sep, val))
+        s := fmt.Sprintf("%s%s\t%s", key, sep, val)
         
+        
+        _, err = w.WriteString(s)
         if err != nil {
             return ferr.Wrap(err)
         }

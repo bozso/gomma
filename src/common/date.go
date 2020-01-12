@@ -1,4 +1,4 @@
-package gamma
+package common
 
 import (
     //"fmt"
@@ -10,17 +10,16 @@ type (
         start, stop, center time.Time
     }
 
-    Date interface {
-        Start() time.Time
-        Stop() time.Time
-        Center() time.Time
+    Dater interface {
+        Date() time.Time
     }
+
     dateFormat int
 )
 
 const (
-    DateShort = "20060102"
-    DateLong  = "20060102T150405"
+    dateShort = "20060102"
+    dateLong  = "20060102T150405"
 
     DLong dateFormat = iota
     DShort
@@ -34,9 +33,9 @@ func ParseDate(format dateFormat, str string) (t time.Time, err error) {
 
     switch format {
     case DLong:
-        form = DateLong
+        form = dateLong
     case DShort:
-        form = DateShort
+        form = dateShort
     default:
         break
     }
@@ -50,17 +49,15 @@ func ParseDate(format dateFormat, str string) (t time.Time, err error) {
 }
 
 func NewDate(format dateFormat, start, stop string) (d date, err error) {
-    var (
-        ferr = merr.Make("NewDate")
-        _start, _stop time.Time
-    )
+    ferr := merr.Make("NewDate")
     
-    if _start, err = ParseDate(format, start); err != nil {
+    _start, err := ParseDate(format, start)
+    if err != nil {
         err = ferr.WrapFmt(err, "failed to parse date: '%s'", start)
         return
     }
 
-    _stop, err = ParseDate(format, stop)
+    _stop, err := ParseDate(format, stop)
     if err != nil {
         err = ferr.WrapFmt(err, "failed to parse date: '%s'", start)
         return
@@ -76,15 +73,15 @@ func NewDate(format dateFormat, start, stop string) (d date, err error) {
     return d, nil
 }
 
-func (d *date) Start() time.Time {
+func (d date) Start() time.Time {
     return d.start
 }
 
-func (d *date) Center() time.Time {
+func (d date) Center() time.Time {
     return d.center
 }
 
-func (d *date) Stop() time.Time {
+func (d date) Stop() time.Time {
     return d.stop
 }
 
@@ -92,17 +89,33 @@ func Before(one, two Date) bool {
     return one.Center().Before(two.Center())
 }
 
+func Format(t time.Time, format dateFormat) (s string) {
+    switch format {
+    case DShort:
+        s = t.Format(dateShort)
+    case DLong:
+        s = t.Format(dateLong)
+    }
+    
+    return
+}
+
 func date2str(date Date, format dateFormat) string {
     var layout string
 
     switch format {
     case DLong:
-        layout = DateLong
+        layout = dateLong
     case DShort:
-        layout = DateShort
+        layout = dateShort
     default:
         break
     }
 
     return date.Center().Format(layout)
+}
+
+func ID(one, two Dater, format dateFormat) string {
+    return fmt.Sprintf("%s_%s",
+        Format(one.Date() format), Format(two.Date() format))
 }

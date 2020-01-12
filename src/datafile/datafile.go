@@ -1,5 +1,7 @@
 package datafile
 
+// TODO: seperate field for storing rng, azi, DType values
+
 import (
     "fmt"
     "time"
@@ -7,6 +9,7 @@ import (
     "path/filepath"
     "strings"
     "strconv"
+    "time"
     
     "../utils"
     "../common"
@@ -26,10 +29,12 @@ type (
     DatFile struct {
         Dat     string
         Ra      common.RngAzi
+        Time time.Time
         DType
         Params
     }
 )
+
 
 func (d DatFile) Rng() int {
     return d.Ra.Rng
@@ -57,10 +62,22 @@ func (d DatFile) TypeCheck(ftype, expect string, dtypes... DType) (err error) {
     return nil
 }
 
+func New(rng, azi int, dtype DType) (d DatFile, err error) {
+    ferr := merr.Make("New")
+    
+    return
+}
+
 func FromFile(path, rng, azi, dtype string) (d DatFile, err error) {
-    ferr := merr.Make("NewDatFile")
+    ferr := merr.Make("FromFile")
     
     d.Params, err = NewGammaParam(path)
+    if err != nil {
+        err = ferr.Wrap(err)
+        return
+    }
+    
+    d.Dat, err = d.Param("datafile")
     if err != nil {
         err = ferr.Wrap(err)
         return
@@ -82,6 +99,46 @@ func FromFile(path, rng, azi, dtype string) (d DatFile, err error) {
     if err != nil {
         err = ferr.Wrap(err)
         return
+    }
+    
+    return
+}
+
+func (d DatFile) Save() (err error) {
+    ferr := merr.Make("DatFile.Save")
+    
+    file, err := os.Create(d.Params.filePath)
+    if err != nil {
+        err = ferr.Wrap(err)
+        return
+    }
+    defer file.Close()
+    
+    d.params["datafile"] = d.Dat
+    
+    err = d.Params.Save(file)
+    if err != nil {
+        err = ferr.Wrap(err)
+    }
+    
+    return
+}
+
+func (d DatFile) SaveDat() (err error) {
+    ferr := merr.Make("DatFile.Save")
+    
+    file, err := os.Open(d.Params.filePath)
+    if err != nil {
+        err = ferr.Wrap(err)
+        return
+    }
+    defer file.Close()
+    
+    s := fmt.Sprintf("datafile: %s", d.Dat)
+    
+    _, err = file.WriteString(s)
+    if err != nil {
+        err = ferr.Wrap(err)
     }
     
     return
@@ -237,46 +294,12 @@ func SameShape(one IDatFile, two IDatFile) (err error) {
     //return nil
 //}
 
-func (d DatFile) TimeStr(format dateFormat) string {
-    switch format {
-    case DShort:
-        return d.Time.Format(DateShort)
-    case DLong:
-        return d.Time.Format(DateLong)
-    }
-    return ""
-}
-
-func (d DatFile) ParseDtype() (dt DType, err error) {
-    var (
-        ferr = merr.Make("DatParFile.ParseDtype")
-        s string
-    )
-    
-    if s, err = d.Param("image_format"); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    dt.Set(s)
-    
-    if dt == Unknown {
-        err = ferr.Wrap(fmt.Errorf("failed to determine data type based on '%s'",
-            s))
-        return
-    }
-    
-    return dt, nil
-}
-
-
 func (d DatFile) ParseDate() (t time.Time, err error) {
     var ferr = merr.Make("DatParFile.ParseDate")
     
     dateStr, err := d.Param("date")
-    
     if err != nil {
-        err = ferr.WrapFmt(err)
+        err = ferr.Wrap(err)
         return
     }
     
@@ -318,7 +341,6 @@ func (d DatFile) ParseDate() (t time.Time, err error) {
         month = time.December
     }
     
-    
     day, err := strconv.Atoi(split[2])
         
     if err != nil {
@@ -359,10 +381,6 @@ func (d DatFile) ParseDate() (t time.Time, err error) {
     t = time.Date(year, month, day, hour, min, int(sec), 0, time.UTC)
     
     return t, nil
-}
-
-func ID(one IDatFile, two IDatFile, format dateFormat) string {
-    return fmt.Sprintf("%s_%s", one.TimeStr(format), two.TimeStr(format))
 }
 
 //func Display(dat DataFile, opt DisArgs) error {
@@ -472,7 +490,7 @@ func Move(path string, dir string) (s string, err error) {
     }
     
     if err = os.Rename(path, dst); err != nil {
-        err = ferr.Wrap(MoveErr.Wrap(err, path, dst))
+        err = ferr.Wrap(err)
         return
     }
     
