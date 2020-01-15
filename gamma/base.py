@@ -24,7 +24,6 @@ class Enforcer(object):
         self.exc = exc
     
     def __call__(self, cond, *args, **kwargs): 
-        print(type(self.exc))
         if not cond:
             raise self.exc(*args, **kwargs)
     
