@@ -13,6 +13,19 @@ const (
 )
 
 
+type KeyError struct {
+    key string
+    err error
+}
+
+func (k KeyError) Error() string {
+    return fmt.Sprintf("no such key: '%s'", k.key)
+}
+
+func (k KeyError) Unwrap() error {
+    return k.err
+}
+
 type ParameterError struct {
     path, par string
     err error

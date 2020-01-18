@@ -1,7 +1,7 @@
 package common
 
 import (
-    //"fmt"
+    "fmt"
     "time"
 )
 
@@ -85,10 +85,6 @@ func (d date) Stop() time.Time {
     return d.stop
 }
 
-func Before(one, two Date) bool {
-    return one.Center().Before(two.Center())
-}
-
 func Format(t time.Time, format dateFormat) (s string) {
     switch format {
     case DShort:
@@ -100,22 +96,7 @@ func Format(t time.Time, format dateFormat) (s string) {
     return
 }
 
-func date2str(date Date, format dateFormat) string {
-    var layout string
-
-    switch format {
-    case DLong:
-        layout = dateLong
-    case DShort:
-        layout = dateShort
-    default:
-        break
-    }
-
-    return date.Center().Format(layout)
-}
-
 func ID(one, two Dater, format dateFormat) string {
     return fmt.Sprintf("%s_%s",
-        Format(one.Date() format), Format(two.Date() format))
+        Format(one.Date(), format), Format(two.Date(), format))
 }

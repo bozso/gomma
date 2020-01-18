@@ -10,26 +10,16 @@ import (
     "../utils"
 )
 
-type (
-    parameters map[string]string
-    
-    Params struct {
-        filePath, sep string
-        params parameters
-    }
-)
+type params map[string]string
 
-func NewParams(filePath, sep string) (p Params, err error) {
-    ferr := merr.Make("NewParam")
-    
-    reader, err := utils.NewReader(filePath)
+func fromFile(path, sep string) (p params, err error) {
+    reader, err := utils.NewReader(path)
     if err != nil {
-        err = ferr.Wrap(err)
         return
     }
     defer reader.Close()
     
-    p.params = make(parameters)
+    p = make(params)
     
     for reader.Scan() {
         line := reader.Text()
@@ -41,103 +31,156 @@ func NewParams(filePath, sep string) (p Params, err error) {
         split := strings.Split(line, sep)
         
         if len(split) < 2 {
-            err = ferr.Fmt(
+            err = fmt.Errorf(
                 "line '%s' contains separator '%s' but either the " + 
                 "key or value is missing", line, sep)
             return
         }
         
-        p.params[split[0]] = strings.Trim(split[1], " ")
+        p[split[0]] = strings.Trim(split[1], " ")
     }
-    
-    p.sep = sep
     
     return p, nil
 }
 
-func (p Params) Param(name string) (s string, err error) {
-    s, ok := p.params[name]
+func (p params) Param(name string) (s string, err error) {
+    err = nil
+    s, ok := p[name]
     
     if !ok {
-        merr.Make("Params.Param").Wrap(
-            ParameterError{
-                path: p.filePath,
-                par: name,
-            })
+        err = KeyError{key:name}
     }
     
-    return s, nil
+    return
 }
 
-func (p Params) Splitter(name string) (sp utils.SplitParser, err error) {
-    ferr := merr.Make("Params.Splitter")
-    
+func (p params) Splitter(name string) (sp utils.SplitParser, err error) {
     s, err := p.Param(name)
     if err != nil {
-        err = ferr.Wrap(err)
         return
     }
     
     sp, err = utils.NewSplitParser(s, " ")
-    if err != nil {
-        err = ferr.Wrap(err)
-    }
-    
     return
 }
 
-func (p Params) Int(name string, idx int) (i int, err error) {
-    ferr := merr.Make("Params.Int")
-    
+func (p params) Int(name string, idx int) (i int, err error) {
     sp, err := p.Splitter(name)
     if err != nil {
-        err = ferr.Wrap(err)
+        return
     }
     
     i, err = sp.Int(idx)
-    if err != nil {
-        err = ferr.Wrap(err)
-    }
-
     return
 }
 
-func (p Params) Float(name string, idx int) (f float64, err error) {
-    ferr := merr.Make("Params.Float")
-    
+func (p params) Float(name string, idx int) (f float64, err error) {
     sp, err := p.Splitter(name)
     if err != nil {
-        err = ferr.Wrap(err)
+        return
     }
     
     f, err = sp.Float(idx)
-    if err != nil {
-        err = ferr.Wrap(err)
-    }
-
     return
 }
 
-func (p *Params) Set(key, value string) {
-    p.params[key] = value
-}
-
-func (p Params) Save(w io.StringWriter) (err error) {
-    ferr := merr.Make("Params.Save")
-    
-    sep := p.sep
-    
-    for key, val := range p.params {
+func (p params) Save(w io.StringWriter, sep string) (err error) {
+    for key, val := range p {
         s := fmt.Sprintf("%s%s\t%s", key, sep, val)
-        
         
         _, err = w.WriteString(s)
         if err != nil {
-            return ferr.Wrap(err)
+            return
         }
     }
-    
     return nil
+}
+
+type ParamReader struct {
+    path string
+    err error
+    params
+}
+
+func NewReader(path, sep string) (p ParamReader) {
+    p.params, p.err = fromFile(path, sep)
+    return
+}
+
+func (p *ParamReader) wrap(name string) {
+    p.err = utils.WrapFmt(p.err,
+            "failed to retreive paramter '%s' from file '%s'",
+            name, p.path) 
+}
+
+func (p *ParamReader) Param(name string) (s string) {
+    if p.err != nil {
+        return
+    }
+    
+    s, p.err = p.params.Param(name)
+    
+    if p.err != nil {
+        p.wrap(name)
+    }
+    
+    return
+}
+
+func (p *ParamReader) Int(name string, idx int) (ii int) {
+    if p.err != nil {
+        return
+    }
+    
+    ii, p.err = p.params.Int(name, idx)
+    
+    if p.err != nil {
+        p.wrap(name)
+    }
+    
+    return
+}
+
+func (p *ParamReader) Float(name string, idx int) (ff float64) {
+    if p.err != nil {
+        return
+    }
+    
+    ff, p.err = p.params.Float(name, idx)
+    
+    if p.err != nil {
+        p.wrap(name)
+    }
+    
+    return
+}
+
+func (p ParamReader) Wrap() (err error) {
+    err = p.err
+    
+    if err != nil {
+        err = utils.WrapFmt(err,
+            "failed while reading parameters from file '%s'", p.path)
+    }
+    
+    return err
+}
+
+type Params struct {
+    filePath, sep string
+    params
+}
+
+func NewParams(path, sep string) (p Params, err error) {
+    p.filePath, p.sep = path, sep
+    
+    p.params, err = fromFile(path, sep)
+    return
+}
+
+func (p Params) Save(w io.StringWriter) (err error) {
+    p.params.Save(w, p.sep)
+    return
 }
 
 func NewGammaParam(path string) (Params, error) {

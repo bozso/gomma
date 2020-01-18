@@ -3,8 +3,7 @@ package datafile
 // TODO: seperate field for storing rng, azi, DType values
 
 import (
-    "fmt"
-    "time"
+    //"fmt"
     "os"
     "path/filepath"
     "strings"
@@ -17,6 +16,14 @@ import (
 
 const merr = utils.ModuleName("gamma.datafile")
 
+const (
+    keyDatafile = "golang_meta_datafile"
+    keyRng = "golang_meta_rng"
+    keyAzi = "golang_meta_azi"
+    keyDtype = "golang_meta_dtype"
+    separator = ":"
+)
+
 type (    
     IDatFile interface {
         Datfile() string
@@ -25,23 +32,48 @@ type (
         Dtype() DType
         //Move(string) (DatFile, error)
     }
-
+    
     DatFile struct {
-        Dat     string
-        Ra      common.RngAzi
-        Time time.Time
+        Dat, Par string
+        ra       common.RngAzi
+        Time     time.Time
         DType
-        Params
     }
 )
 
 
+// TODO: implement
+func New(rng, azi int, dtype DType) (d DatFile, err error) {
+    return
+}
+
+func FromFile(path string) (d DatFile, err error) {
+    d.Par = path
+    
+    pr := NewReader(path, separator)
+    
+    d.Dat = pr.Param(keyDatafile)
+    
+    d.ra.Rng = pr.Int(keyRng, 0)
+    d.ra.Azi = pr.Int(keyAzi, 0)
+    
+    ds := pr.Param(keyDtype)
+    
+    if err = pr.Wrap(); err != nil {
+        return
+    }
+    
+    err = d.DType.Set(ds)
+    
+    return
+}
+
 func (d DatFile) Rng() int {
-    return d.Ra.Rng
+    return d.ra.Rng
 }
 
 func (d DatFile) Azi() int {
-    return d.Ra.Azi
+    return d.ra.Azi
 }
 
 func (d DatFile) TypeCheck(ftype, expect string, dtypes... DType) (err error) {
@@ -62,135 +94,53 @@ func (d DatFile) TypeCheck(ftype, expect string, dtypes... DType) (err error) {
     return nil
 }
 
-func New(rng, azi int, dtype DType) (d DatFile, err error) {
-    ferr := merr.Make("New")
-    
-    return
-}
-
-func FromFile(path, rng, azi, dtype string) (d DatFile, err error) {
-    ferr := merr.Make("FromFile")
-    
-    d.Params, err = NewGammaParam(path)
-    if err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    d.Dat, err = d.Param("datafile")
-    if err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    d.Ra.Rng, err = d.ParseRng(rng)
-    if err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-
-    d.Ra.Azi, err = d.ParseAzi(azi)
-    if err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    d.DType, err = d.ParseDtype(dtype)
-    if err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    return
-}
-
 func (d DatFile) Save() (err error) {
-    ferr := merr.Make("DatFile.Save")
+    path := d.Par
     
-    file, err := os.Create(d.Params.filePath)
+    exists, err := utils.Exist(path)
     if err != nil {
-        err = ferr.Wrap(err)
         return
     }
-    defer file.Close()
     
-    d.params["datafile"] = d.Dat
-    
-    err = d.Params.Save(file)
-    if err != nil {
-        err = ferr.Wrap(err)
+    var p params
+    if !exists {
+        p = make(params)
+    } else {
+        p, err = fromFile(path, separator)
+        if err != nil {
+            return
+        }
     }
     
-    return
-}
-
-func (d DatFile) SaveDat() (err error) {
-    ferr := merr.Make("DatFile.Save")
+    p[keyDatafile] = d.Dat
+    p[keyRng] = strconv.Itoa(d.ra.Rng)
+    p[keyAzi] = strconv.Itoa(d.ra.Azi)
+    p[keyDtype] = d.DType.String()
     
-    file, err := os.Open(d.Params.filePath)
+    w, err := os.Create(path)
     if err != nil {
-        err = ferr.Wrap(err)
         return
     }
-    defer file.Close()
+    defer w.Close()
     
-    s := fmt.Sprintf("datafile: %s", d.Dat)
-    
-    _, err = file.WriteString(s)
-    if err != nil {
-        err = ferr.Wrap(err)
-    }
-    
+    err = p.Save(w, separator)
     return
-}
-
-func (d DatFile) ParseRng(key string) (i int, err error) {
-    i, err = d.Int(key, 0)
-    if err != nil {
-        err = merr.Make("DatFile.ParseRng").Wrap(err)
-    }
-    return
-}
-
-func (d DatFile) ParseAzi(key string) (i int, err error) {
-    i, err = d.Int(key, 0)
-    if err != nil {
-        err = merr.Make("DatFile.ParseAzi").Wrap(err)
-    }
-    return
-}
-
-func (df DatFile) ParseDtype(key string) (d DType, err error) {
-    var ferr = merr.Make("DatParFile.ParseDtype")
-    
-    s, err := df.Param(key)
-    if err != nil {
-        err = ferr.Wrap(err)
-    }
-    
-    d.Set(s)
-    
-    return d, nil
 }
 
 func (d DatFile) Like(name string, dtype DType) (ret DatFile, err error) {
-    ferr := merr.Make("DatFile.Like")
-    
     if dtype == Unknown {
         dtype = d.DType
     }
     
     if name, err = filepath.Abs(name); err != nil {
-        err = ferr.Wrap(err)
         return
     }
     
-    if ret, err = NewDatFile(name, dtype); err != nil {
-        err = ferr.Wrap(err)
+    if ret, err = New(name, dtype); err != nil {
         return
     }
     
-    ret.Ra = d.Ra
+    ret.ra = d.ra
     return ret, nil
 }
 
@@ -211,7 +161,7 @@ func (d DatFile) Move(dir string) (dm DatFile, err error) {
         return
     }
     
-    dm.Ra, dm.DType = d.Ra, d.DType
+    dm.ra, dm.DType = d.ra, d.DType
     
     return dm, nil
 }
@@ -294,14 +244,8 @@ func SameShape(one IDatFile, two IDatFile) (err error) {
     //return nil
 //}
 
-func (d DatFile) ParseDate() (t time.Time, err error) {
-    var ferr = merr.Make("DatParFile.ParseDate")
-    
-    dateStr, err := d.Param("date")
-    if err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
+func ParseDate(dateStr string) (t time.Time, err error) {
+    ferr := merr.Make("ParseDate")
     
     split := strings.Fields(dateStr)
     
@@ -499,5 +443,6 @@ func Move(path string, dir string) (s string, err error) {
 
 
 func (d *DatFile) Set(s string) (err error) {
-    return LoadJson(s, d)
+    *d, err = FromFile(s)
+    return
 }

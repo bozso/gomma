@@ -27,7 +27,17 @@ type (
 
 func (e Werror) Wrap(err error, args ...interface{}) error {
     str := fmt.Sprintf(string(e), args...)
-    return fmt.Errorf("%s: %w", str, err)
+    return fmt.Errorf("%s\n%w", str, err)
+}
+
+func Wrap(err1, err2 error) error {
+    return fmt.Errorf("%w\n%w", err1, err2)
+}
+
+func WrapFmt(err error, msg string, args ...interface{}) error {
+    s := fmt.Sprintf(msg, args...)
+    
+    return fmt.Errorf("%s\n%w", s, err)
 }
 
 func (e Werror) Make(args ...interface{}) error {
@@ -40,6 +50,14 @@ func (e CWerror) Wrap(err error) error {
 
 func (e CWerror) Make() error {
     return fmt.Errorf(string(e))
+}
+
+type ErrorBase struct {
+    err error
+}
+
+func (e ErrorBase) Unwrap() error {
+    return e.err
 }
 
 type FileOpenError struct {
