@@ -41,9 +41,10 @@ type (
     }
 )
 
-
-// TODO: implement
-func New(rng, azi int, dtype DType) (d DatFile, err error) {
+func New(dat string, rng, azi int, dtype DType) (d DatFile) {
+    d.Dat, d.Par = dat, dat + ".par"
+    d.ra.Rng, d.ra.Azi, d.DType = rng, azi, dtype
+    
     return
 }
 
@@ -74,6 +75,14 @@ func (d DatFile) Rng() int {
 
 func (d DatFile) Azi() int {
     return d.ra.Azi
+}
+
+func (d DatFile) Datfile() string {
+    return d.Dat
+}
+
+func (d DatFile) Dtype() DType {
+    return d.DType
 }
 
 func (d DatFile) TypeCheck(ftype, expect string, dtypes... DType) (err error) {
@@ -127,29 +136,13 @@ func (d DatFile) Save() (err error) {
     return
 }
 
-func (d DatFile) Like(name string, dtype DType) (ret DatFile, err error) {
+func (d DatFile) WithShape(dat string, dtype DType) (df DatFile) {
     if dtype == Unknown {
         dtype = d.DType
     }
     
-    if name, err = filepath.Abs(name); err != nil {
-        return
-    }
-    
-    if ret, err = New(name, dtype); err != nil {
-        return
-    }
-    
-    ret.ra = d.ra
-    return ret, nil
-}
-
-func (d DatFile) Datfile() string {
-    return d.Dat
-}
-
-func (d DatFile) Dtype() DType {
-    return d.DType
+    df = New(dat, d.ra.Rng, d.ra.Azi, dtype)
+    return
 }
 
 
