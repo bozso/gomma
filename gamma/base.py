@@ -100,6 +100,60 @@ gamma = Command(exe, subcommands=cmds, prefix="-")
 
 class Project(object):
     default_options = {}
+
+    # defaultConfig = Config{
+        # General: GeneralOpt{
+            # Pol: "vv",
+            # OutputDir: ".",
+            # MasterDate: "",
+            # CachePath: "/mnt/storage_A/istvan/cache",
+            # Looks: RngAzi{
+                # Rng: 1,
+                # Azi: 1,
+            # },
+        # },
+
+        # PreSelect: PreSelectOpt{
+            # CheckZips:  false,
+        # },
+
+        # Geocoding: GeocodeOpt{
+            # DEMPath: "/mnt/storage_B/szucs_e/SRTMGL1/SRTM.vrt",
+            # Iter: 1,
+            # nPixel: 8,
+            # LanczosOrder: 5,
+            # NPoly: 1,
+            # MLIOversamp: 2,
+            # CCThresh: 0.1,
+            # BandwithFrac: 0.8,
+            # AreaFactor: 20.0,
+            # RngOversamp: 2.0,
+            # DEMOverlap: RngAzi{
+                # Rng: 100,
+                # Azi: 100,
+            # },
+            # DEMOverSampling: LatLon{
+                # Lat: 2.0,
+                # Lon: 2.0,
+            # },
+            # OffsetWindows: RngAzi{
+                # Rng: 500,
+                # Azi: 500,
+            # },
+        # },
+
+        # IFGSelect: IfgSelectOpt{
+            # Bperp:  Minmax{Min: 0.0, Max: 150.0},
+            # DeltaT: Minmax{Min: 0.0, Max: 15.0},
+        # },
+
+        # CalcCoherence: CoherenceOpt{
+            # WeightType:             "gaussian",
+            # Box:                    Minmax{Min: 3.0, Max: 9.0},
+            # SlopeCorrelationThresh: 0.4,
+            # SlopeWindow:            5,
+        # },
+    # }
     
     def __init__(self, *args, **kwargs):
         self.general = kwargs
@@ -114,7 +168,7 @@ class Project(object):
         gamma.subcmd("import", *args, **self.general, **kwargs)
     
 
-class DatFile(object):
+class DataFile(object):
     __slots__ = ("metafile",)
     
     datfile_ext = "dat"
@@ -157,27 +211,15 @@ class DatFile(object):
     
     def stat(self, **kwargs):
         return gamma.subcmd("stat", self.metafile, **kwargs)
-    
 
-class DatParFile(DatFile):
 
-    @classmethod
-    def from_files(cls, dat: str, **kwargs):
-        meta = kwargs.pop("meta", None)
-        
-        if meta is None:
-            meta = util.tmp_file(ext="json")
-        
-        gamma.subcmd("make", meta=meta, dat=dat, **kwargs)
-    
-    
-class SLC(DatFile):
+class SLC(DataFile):
     datfile_ext = "slc"
     
     def SplitInterferometry(self):
         pass
 
-class Lookup(DatFile):
+class Lookup(DataFile):
     def geocode(self, mode, infile, outfile=None, like=None, **kwargs):
         kwargs["infile"] = infile
         
@@ -192,9 +234,9 @@ class Lookup(DatFile):
     def radar2geo(self, **kwargs):
         kwargs["mode"] = "togeo"
         
-        return self.subcmd("geocode", **kwargs)
+        return gamma.subcmd("geocode", **kwargs)
 
     def geo2radar(self, **kwargs):
         kwargs["mode"] = "toradar"
         
-        return self.subcmd("geocode", **kwargs)
+        return gamma.subcmd("geocode", **kwargs)

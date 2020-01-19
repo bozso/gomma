@@ -23,6 +23,8 @@ def generate_ninja():
             "command_line",
             "common",
             "data",
+            "dem",
+            "geo",
             "interferogram",
             "plot",
             "sentinel1",

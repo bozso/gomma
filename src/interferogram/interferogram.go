@@ -1,16 +1,17 @@
 package interferogram
 
 import (
+    "../common"
     "../datafile"
     "../plot"
 )
 
 type File struct {
-    datafile.File           `json:"DatParFile"`
-    DiffPar   string        `json:"diffparfile"`
-    Quality   string        `json:"quality"`
-    SimUnwrap string        `json:"simulated_unwrapped"`
-    DeltaT    time.Duration `json:"-"`
+    data.File
+    DiffPar   string
+    Quality   string
+    SimUnwrap string
+    DeltaT    time.Duration
 }
 
 func New(dat, off, diffpar string) (ifg IFG, err error) {
@@ -76,6 +77,76 @@ func (i *File) Set(s string) (err error) {
     
     return nil
 }
+
+func (ifg File) CheckQuality() (b bool, err error) {
+    var (
+        ferr = merr.Make("IFG.CheckQuality")
+        qual = ifg.Quality
+    )
+    
+    var file Reader
+    if file, err = NewReader(qual); err != nil {
+        err = ferr.Wrap(err)
+        return
+    }
+    defer file.Close()
+    
+    offs := 0.0
+    var diff float64
+    for file.Scan() {
+        line := file.Text()
+        
+        if len(line) == 0 {
+            continue
+        }
+        
+        split := strings.Fields(line)
+        
+        if split[0] == "azimuth_pixel_offset" {
+            s := split[1]
+            diff, err = strconv.ParseFloat(s, 64)
+            
+            if err != nil {
+                err = ferr.WrapFmt(err,
+                    "failed to parse: '%s' into float64", s)
+                return
+            }
+            
+            offs += diff
+        }
+    }
+    
+    log.Printf("Sum of azimuth offsets in %s is %f pixel.\n", qual, offs)
+    
+    if offs > 0.0 || offs < 0.0 {
+        b = true
+    } else {
+        b = false
+    }
+    
+    return
+}
+type ( 
+    OffsetAlgo int
+
+    IfgOpt struct {
+        Looks RngAzi
+        interact bool
+        hgt string
+        algo OffsetAlgo
+    }
+)
+
+const (
+    IntensityCoherence OffsetAlgo = iota
+    FingeVisibility
+)
+
+var (
+    createOffset  = Gamma.Must("create_offset")
+    phaseSimOrb   = Gamma.Must("phase_sim_orb")
+    slcDiffIntf   = Gamma.Must("SLC_diff_intf")
+)
 
 func FromSLC(slc1, slc2, ref *base.SLC, out File, opt IfgOpt) (err error) {
     var ferr = merr.Make("FromSLC")
@@ -230,3 +301,55 @@ func (ifg File) azi() (i int, err error) {
     
     return 
 }
+
+type AdaptFiltOpt struct {
+    offset               common.RngAzi
+    alpha, step, frac    float64
+    FFTWindow, cohWindow int
+}
+
+var adf = Gamma.Must("adf")
+
+//func (ifg IFG) AdaptFilt(opt AdaptFiltOpt) (Ifg IFG, cc Coherence, err error) {
+    //step := float64(opt.FFTWindow) / 8.0
+    
+    //if opt.step > 0.0 {
+        //step = opt.step
+    //}
+    
+    //// TODO: figure out the name of the output files
+    //ret, err = NewIFG(self.Dat + ".filt", "", "", "", "")
+    
+    //if err != nil {
+        //err = Handle(err, "failed to create new interferogram struct")
+        //return
+    //}
+    
+    //cc, err = NewCoherence("", "")
+    
+    //if err != nil {
+        //err = Handle(err, "failed to create new dataFile struct")
+        //return
+    //}
+    
+    ///*
+    //if Empty(filt):
+        //filt = 
+    
+    //if empty(cc is None:
+        //cc = self.datfile + ".cc"
+    //*/
+    
+    //rng := self.Rng
+    
+    //_, err = adf(self.Dat, ret.Dat, cc.Dat, rng, opt.alpha, opt.FFTWindow,
+                 //opt.cohWindow, step, opt.offset.Azi, opt.offset.Rng,
+                 //opt.frac)
+    
+    //if err != nil {
+        //err = Handle(err, "adaptive filtering failed")
+        //return
+    //}
+    
+    //return ret, cc, nil
+//}

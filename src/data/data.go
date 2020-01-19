@@ -5,7 +5,6 @@ package data
 import (
     //"fmt"
     "os"
-    "path/filepath"
     "strings"
     "strconv"
     "time"
@@ -151,76 +150,67 @@ func (d File) WithShape(dat string, dtype DType) (df File) {
 
 
 func (d File) Move(dir string) (dm File, err error) {
-    var ferr = merr.Make("File.Move")
-    
-    if dm.Dat, err = Move(d.Dat, dir); err != nil {
-        err = ferr.Wrap(err)
+    dm.Dat, err = utils.Move(d.Dat, dir)
+    if err != nil {
+        return
+    }
+
+    dm.Par, err = utils.Move(d.Par, dir)
+    if err != nil {
         return
     }
     
     dm.ra, dm.DType = d.ra, d.DType
     
-    return dm, nil
+    return
 }
 
 func (d File) Exist() (b bool, err error) {
-    var ferr = merr.Make("File.Exist")
-    
-    if b, err = utils.Exist(d.Dat); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    return b, nil
+    b, err = utils.Exist(d.Dat)
+    return
 }
 
 func SameCols(one IFile, two IFile) (err error) {
-    var ferr = merr.Make("SameCols")
-    
     n1, n2 := one.Rng(), two.Rng()
     
     if n1 != n2 {
-        return ferr.Wrap(ShapeMismatchError{
+        return ShapeMismatchError{
             dat1: one.FilePath(),
             dat2: two.FilePath(),
             n1:n1,
             n2:n2,
             dim: "range samples / columns",
-        })
+        }
     }
     return nil
 }
 
 func SameRows(one IFile, two IFile) error {
-    var ferr = merr.Make("SameRows")
-    
     n1, n2 := one.Azi(), two.Azi()
     
     if n1 != n2 {
-        return ferr.Wrap(ShapeMismatchError{
+        return ShapeMismatchError{
             dat1: one.FilePath(),
             dat2: two.FilePath(),
             n1:n1,
             n2:n2,
             dim: "azimuth lines / rows",
-        })
+        }
     }
     
     return nil
 }
 
 func SameShape(one IFile, two IFile) (err error) {
-    var ferr = merr.Make("SameShape")
     
-    if err = SameCols(one, two); err != nil {
-        return ferr.Wrap(err)
+    err = SameCols(one, two)
+    if err != nil {
+        return
     }
 
-    if err = SameRows(one, two); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
+    err = SameRows(one, two)
+
+    return
 }
 
 //func (d *File) Parse() (err error) {
@@ -242,14 +232,12 @@ func SameShape(one IFile, two IFile) (err error) {
 //}
 
 func ParseDate(dateStr string) (t time.Time, err error) {
-    ferr := merr.Make("ParseDate")
-    
     split := strings.Fields(dateStr)
     
     year, err := strconv.Atoi(split[0])
     
     if err != nil {
-        err = ferr.Wrap(TimeParseErr.Wrap(err, "year", dateStr))
+        err = TimeParseErr.Wrap(err, "year", dateStr)
         return
     }
     
@@ -285,7 +273,7 @@ func ParseDate(dateStr string) (t time.Time, err error) {
     day, err := strconv.Atoi(split[2])
         
     if err != nil {
-        err = ferr.Wrap(TimeParseErr.Wrap(err, "day", dateStr))
+        err = TimeParseErr.Wrap(err, "day", dateStr)
         return
     }
     
@@ -299,21 +287,21 @@ func ParseDate(dateStr string) (t time.Time, err error) {
         hour, err = strconv.Atoi(split[3])
             
         if err != nil {
-            err = ferr.Wrap(TimeParseErr.Wrap(err, "hour", dateStr))
+            err = TimeParseErr.Wrap(err, "hour", dateStr)
             return
         }
         
         min, err = strconv.Atoi(split[4])
             
         if err != nil {
-            err = ferr.Wrap(TimeParseErr.Wrap(err, "minute", dateStr))
+            err = TimeParseErr.Wrap(err, "minute", dateStr)
             return
         }
         
         sec, err = strconv.ParseFloat(split[5], 64)
             
         if err != nil {
-            err = ferr.Wrap(TimeParseErr.Wrap(err, "seconds", dateStr))
+            err = TimeParseErr.Wrap(err, "seconds", dateStr)
             return
         }
     }        
@@ -323,84 +311,6 @@ func ParseDate(dateStr string) (t time.Time, err error) {
     
     return t, nil
 }
-
-//func Display(dat DataFile, opt DisArgs) error {
-    //err := opt.Parse(dat)
-    
-    //if err != nil {
-        //return Handle(err, "failed to parse display options")
-    //}
-    
-    //cmd := opt.Cmd
-    //fun := Gamma.Must("dis" + cmd)
-    
-    //if cmd == "SLC" {
-        //_, err := fun(opt.File, opt.Rng, opt.Start, opt.Nlines, opt.Scale,
-                      //opt.Exp)
-        
-        //if err != nil {
-            //return Handle(err, "failed to execute display command")
-        //}
-    //}
-    //return nil
-//}
-
-
-// TODO: implement proper selection of plot command
-//func (d File) Raster(opt RasArgs) (err error) {
-    //err = opt.Parse(d)
-    
-    //if err != nil {
-        //return Handle(err, "failed to parse display options")
-    //}
-    //
-    //cmd := opt.Cmd
-    //fun := Gamma.Must("ras" + cmd)
-    
-    //switch cmd {
-        //case "SLC":
-            //err = rasslc(opt)
-            
-            //if err != nil {
-                //return
-            //}
-            
-        //case "MLI":
-            //err = raspwr(opt)
-            
-            //if err != nil {
-                //return
-            //}
-        
-        //default:
-            //err = Handle(nil, "unrecognized command type '%s'", cmd)
-            //return
-    //}
-    
-    //if cmd == "SLC" {
-        //_, err = fun(opt.File, opt.Rng, opt.Start, opt.Nlines,
-            //opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
-            //opt.ImgFmt, opt.HeaderSize, opt.Raster)
-
-    //} else {
-        //if len(sec) == 0 {
-            //_, err = fun(opt.File, opt.Rng, opt.Start, opt.Nlines,
-                //opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
-                //opt.LR, opt.Raster, opt.ImgFmt, opt.HeaderSize)
-
-        //} else {
-            //_, err = fun(opt.File, sec, opt.Rng, opt.Start, opt.Nlines,
-                //opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
-                //opt.LR, opt.Raster, opt.ImgFmt, opt.HeaderSize, opt.Raster)
-        //}
-    //}
-    
-    //if err != nil {
-        //return Handle(err, "failed to create rasterfile '%s'", opt.Raster)
-    //}
-    //
-    //return nil
-//}
 
 type(
     Subset struct {
@@ -421,22 +331,6 @@ type(
     //}
 //}
 
-func Move(path string, dir string) (s string, err error) {
-    var ferr = merr.Make("Move")
-    
-    dst, err := filepath.Abs(filepath.Join(dir, filepath.Base(path)))
-    if err != nil {
-        err = ferr.WrapFmt(err, "failed to create absolute path")
-        return
-    }
-    
-    if err = os.Rename(path, dst); err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
-    
-    return dst, nil
-}
 
 
 func (d *File) Set(s string) (err error) {

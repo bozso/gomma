@@ -45,10 +45,7 @@ func FromTabfile(tab string) (s1 S1SLC, err error) {
     
     s1.Tab = tab
     
-    if s1.Time, err = s1.IWs[0].ParseDate(); err != nil {
-        err = ferr.WrapFmt(err, "failed to retreive date for '%s'", tab)
-    }
-    
+    s1.Time, err = s1.IWs[0].ParseDate()
     return
 }
 

@@ -14,6 +14,7 @@ type (
 )
 
 
+// TODO: these are Sentinel-1 specific, should be moved accordingly
 const (
     DateShort DateFormat = "20060102"
     DateLong  DateFormat = "20060102T150405"

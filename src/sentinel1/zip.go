@@ -181,7 +181,7 @@ func makePoint(info data.Params, max bool) (ret common.Point, err error) {
 type(
     IWInfo struct {
         nburst int
-        extent common.Rect
+        extent common.Rectangle
         bursts [nMaxBurst]float64
     }
     
@@ -264,13 +264,16 @@ func iwInfo(path string) (ret IWInfo, err error) {
         return
     }
 
-    return IWInfo{nburst: nburst, extent: Rect{Min: min, Max: max},
-        bursts: numbers}, nil
+    return IWInfo{
+        nburst: nburst,
+        extent: common.Rectangle{Min: min, Max: max},
+        bursts: numbers,
+    }, nil
 }
 
 func inIWs(p common.Point, IWs IWInfos) bool {
     for _, iw := range IWs {
-        if p.InRect(&iw.extent) {
+        if p.InRect(iw.extent) {
             return true
         }
     }
@@ -281,7 +284,7 @@ func (iw IWInfos) contains(aoi common.AOI) bool {
     sum := 0
 
     for _, point := range aoi {
-        if point.inIWs(iw) {
+        if inIWs(point, iw) {
             sum++
         }
     }
@@ -346,21 +349,16 @@ func (s1 S1Zip) SLCNames(mode, pol string, ii int) (dat, par, TOPS string) {
 }
 
 func (s1 S1Zip) SLC(pol string) (ret S1SLC, err error) {
-    ferr := merr.Make("S1Zip.SLC")
-    
     const mode = "slc"
     tab := s1.tabName(mode, pol)
 
-    var exist bool
-    exist, err = Exist(tab)
-
+    exist, err := utils.Exist(tab)
     if err != nil {
-        err = ferr.Wrap(err)
         return
     }
 
     if !exist {
-        err = ferr.WrapFmt(err, "tabfile '%s' does not exist", tab)
+        err = utils.WrapFmt(err, "tabfile '%s' does not exist", tab)
         return
     }
 

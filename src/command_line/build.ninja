@@ -4,33 +4,33 @@ rule go
 
 build /home/istvan/progs/gamma/bin/gamma: go $
     /home/istvan/progs/gamma/bin/gamma.go | $
-    /home/istvan/progs/gamma/src/geo.go $
-    /home/istvan/progs/gamma/src/interferogram.go $
-    /home/istvan/progs/gamma/src/config.go $
-    /home/istvan/progs/gamma/src/iono.go $
     /home/istvan/progs/gamma/src/gamma_test.go $
     /home/istvan/progs/gamma/src/coreg.go $
     /home/istvan/progs/gamma/src/extract.go $
+    /home/istvan/progs/gamma/src/interferogram/interferogram.go $
+    /home/istvan/progs/gamma/src/interferogram/coherence.go $
+    /home/istvan/progs/gamma/src/geo/geo.go $
     /home/istvan/progs/gamma/src/sentinel1/iw.go $
     /home/istvan/progs/gamma/src/sentinel1/slc.go $
     /home/istvan/progs/gamma/src/sentinel1/errors.go $
     /home/istvan/progs/gamma/src/sentinel1/zip.go $
-    /home/istvan/progs/gamma/src/command_line/proc_steps.go $
-    /home/istvan/progs/gamma/src/command_line/command_line.go $
     /home/istvan/progs/gamma/src/utils/utils.go $
     /home/istvan/progs/gamma/src/utils/errors.go $
     /home/istvan/progs/gamma/src/utils/cli.go $
+    /home/istvan/progs/gamma/src/command_line/proc_steps.go $
+    /home/istvan/progs/gamma/src/command_line/command_line.go $
     /home/istvan/progs/gamma/src/plot/raster.go $
     /home/istvan/progs/gamma/src/plot/plot.go $
     /home/istvan/progs/gamma/src/plot/display.go $
+    /home/istvan/progs/gamma/src/data/dtype.go $
+    /home/istvan/progs/gamma/src/data/params.go $
+    /home/istvan/progs/gamma/src/data/errors.go $
+    /home/istvan/progs/gamma/src/data/data.go $
     /home/istvan/progs/gamma/src/base/mli.go $
     /home/istvan/progs/gamma/src/base/slc.go $
     /home/istvan/progs/gamma/src/common/date.go $
     /home/istvan/progs/gamma/src/common/common.go $
     /home/istvan/progs/gamma/src/common/errors.go $
-    /home/istvan/progs/gamma/src/data/dtype.go $
-    /home/istvan/progs/gamma/src/data/params.go $
-    /home/istvan/progs/gamma/src/data/errors.go $
-    /home/istvan/progs/gamma/src/data/data.go $
-    /home/istvan/progs/gamma/src/interferogram/interferogram.go
+    /home/istvan/progs/gamma/src/dem/lookup.go $
+    /home/istvan/progs/gamma/src/dem/dem.go
 

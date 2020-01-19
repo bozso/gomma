@@ -65,23 +65,43 @@ func Empty(s string) bool {
     return len(s) == 0
 }
 
-func Exist(s string) (ret bool, err error) {
+func Exist(s string) (b bool, err error) {
+    b = false
     _, err = os.Stat(s)
 
-    if err != nil {
-        if os.IsNotExist(err) {
-            return false, nil
-        }
-        return false, merr.Make("Exist").Wrap(err)
+    if err == nil {
+        b = true
+        return
     }
-    return true, nil
+    
+    if os.IsNotExist(err) {
+        err = nil
+        return
+    }
+    
+    err = WrapFmt(err, "failed to check wether file '%s' exists", s)
+    return
 }
 
 func Fatal(err error, format string, args ...interface{}) {
     if err != nil {
         str := fmt.Sprintf(format, args...)
-        log.Fatalf("Error: %s\nError: %s", str, err)
+        log.Fatalf("Error: %s; %s", str, err)
     }
+}
+
+func Move(path string, dir string) (s string, err error) {
+    dst, err := filepath.Abs(filepath.Join(dir, filepath.Base(path)))
+    if err != nil {
+        err = WrapFmt(err, "failed to create absolute path")
+        return
+    }
+    
+    if err = os.Rename(path, dst); err != nil {
+        return
+    }
+    
+    return dst, nil
 }
 
 func MakeCmd(cmd string) CmdFun {

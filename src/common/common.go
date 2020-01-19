@@ -13,6 +13,8 @@ import (
     "../utils"
 )
 
+const DefaultCachePath = "/mnt/bozso_i/cache"
+
 type RngAzi struct {
     Rng int `json:"rng"`
     Azi int `json:"azi"`
@@ -104,7 +106,7 @@ type (
     
     AOI [4]Point
     
-    Rect struct {
+    Rectangle struct {
         Max, Min Point
     }
 )
@@ -193,9 +195,9 @@ func NoExt(p string) string {
 }
 
 
-func (self *Point) InRect(r *Rect) bool {
-    return (self.X < r.Max.X && self.X > r.Min.X &&
-            self.Y < r.Max.Y && self.Y > r.Min.Y)
+func (p Point) InRect(r Rectangle) bool {
+    return (p.X < r.Max.X && p.X > r.Min.X &&
+            p.Y < r.Max.Y && p.Y > r.Min.Y)
 }
 
 func isclose(num1, num2 float64) bool {
