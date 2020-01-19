@@ -1,14 +1,15 @@
 package sentinel1
 
 import (
-    "../datafile"
+    "../data"
+    "../utils"
 )
 
 const maxIW = 3
 
 type(  
     S1IW struct {
-        datafile.DatFile
+        data.File
         TOPS_par string
     }
 
@@ -36,12 +37,12 @@ func NewIW(dat, par, TOPS_par string) (iw S1IW) {
 func (iw S1IW) Move(dir string) (miw S1IW, err error) {
     ferr := merr.Make("S1IW.Move")
     
-    if miw.DatParFile, err = iw.DatParFile.Move(dir); err != nil {
+    if miw.File, err = iw.File.Move(dir); err != nil {
         err = ferr.Wrap(err)
         return
     }
     
-    miw.TOPS_par.Par, err = Move(iw.TOPS_par.Par, dir)
+    miw.TOPS_par, err = utils.Move(iw.TOPS_par, dir)
     
     return miw, nil
 }

@@ -1,8 +1,12 @@
 package sentinel1
 
 import (
+    "fmt"
+    "os"
     "log"
     "time"
+    "strings"
+    "path/filepath"
 
     "../utils"
     "../common"
@@ -23,7 +27,6 @@ func FromTabfile(tab string) (s1 S1SLC, err error) {
     
     file, err := utils.NewReader(tab)
     if err != nil {
-        err = ferr.Wrap(FileOpenErr.Wrap(err, tab))
         return
     }
     defer file.Close()
@@ -56,7 +59,7 @@ func (s1 S1SLC) Move(dir string) (ms1 S1SLC, err error) {
     
     var file *os.File
     if file, err = os.Create(newtab); err != nil {
-        err = ferr.Wrap(FileOpenErr.Wrap(err, newtab))
+        err = utils.FileOpenErr.Wrap(err, newtab)
         return
     }
     defer file.Close()
@@ -68,10 +71,10 @@ func (s1 S1SLC) Move(dir string) (ms1 S1SLC, err error) {
         
         IW := ms1.IWs[ii]
         
-        line := fmt.Sprintf("%s %s %s\n", IW.Dat, IW.Par, IW.TOPS_par.Par)
+        line := fmt.Sprintf("%s %s %s\n", IW.Dat, IW.Par, IW.TOPS_par)
         
         if _, err = file.WriteString(line); err != nil {
-            err = ferr.Wrap(FileWriteErr.Wrap(err, newtab))
+            err = utils.FileWriteErr.Wrap(err, newtab)
             return 
         }
     }
@@ -104,7 +107,7 @@ type MosaicOpts struct {
     RefTab string
 }
 
-var mosaic = Gamma.Must("SLC_mosaic_S1_TOPS")
+var mosaic = common.Gamma.Must("SLC_mosaic_S1_TOPS")
 
 func (s1 S1SLC) Mosaic(out base.SLC, opts MosaicOpts) (err error) {
     ferr := merr.Make("S1SLC.Mosaic")
@@ -133,7 +136,7 @@ func (s1 S1SLC) Mosaic(out base.SLC, opts MosaicOpts) (err error) {
     return nil
 }
 
-var derampRef = Gamma.Must("S1_deramp_TOPS_reference")
+var derampRef = common.Gamma.Must("S1_deramp_TOPS_reference")
 
 func (s1 S1SLC) DerampRef() (ds1 S1SLC, err error) {
     ferr := merr.Make("S1SLC.DerampRef")
@@ -155,14 +158,14 @@ func (s1 S1SLC) DerampRef() (ds1 S1SLC, err error) {
     return ds1, nil
 }
 
-var derampSlave = Gamma.Must("S1_deramp_TOPS_slave")
+var derampSlave = common.Gamma.Must("S1_deramp_TOPS_slave")
 
 func (s1 S1SLC) DerampSlave(ref *S1SLC, looks common.RngAzi, keep bool) (ret S1SLC, err error) {
     ferr := merr.Make("S1SLC.DerampSlave")
     
     looks.Default()
     
-    reftab, tab, id := ref.Tab, s1.Tab, s1.Format(DateShort)
+    reftab, tab, id := ref.Tab, s1.Tab, common.DateShort.Format(s1)
     
     clean := 1
     
@@ -197,7 +200,7 @@ func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
     file, err := os.Create(tab)
 
     if err != nil {
-        err = ferr.Wrap(FileCreateErr.Wrap(err, tab))
+        err = utils.FileCreateErr.Wrap(err, tab)
         return
     }
     
@@ -222,7 +225,7 @@ func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
         _, err = file.WriteString(line)
 
         if err != nil {
-            err = ferr.Wrap(FileWriteErr.Wrap(err, tab))
+            err = utils.FileWriteErr.Wrap(err, tab)
             return
         }
     }
@@ -232,25 +235,21 @@ func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
     return ret, nil
 }
 
-var MLIFun = Gamma.selectFun("multi_look_ScanSAR", "multi_S1_TOPS")
+var MLIFun = common.Gamma.SelectFun("multi_look_ScanSAR", "multi_S1_TOPS")
 
-func (s1 *S1SLC) MLI(mli *base.MLI, opt *base.MLIOpt) error {
+func (s1 *S1SLC) MLI(mli *base.MLI, opt *base.MLIOpt) (err error) {
     ferr := merr.Make("S1SLC.MLI")
     opt.Parse()
     
     wflag := 0
     
-    if opt.windowFlag {
+    if opt.WindowFlag {
         wflag = 1
     }
     
-    _, err := MLIFun(s1.Tab, mli.Dat, mli.Par, opt.Looks.Rng, opt.Looks.Azi,
-                     wflag, opt.refTab)
+    _, err = MLIFun(s1.Tab, mli.Dat, mli.Par, opt.Looks.Rng, opt.Looks.Azi,
+                     wflag, opt.RefTab)
     
-    if err != nil {
-        return ferr.Wrap(StructCreateError.Wrap(err, "MLI"))
-    }
-    
-    return nil
+    return
 }
 

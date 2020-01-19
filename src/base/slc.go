@@ -3,30 +3,33 @@ package base
 import (
     "fmt"
     
-    "../datafile"
+    "../data"
     "../plot"
-     "../common"
+    "../common"
 )
 
 type SLC struct {
-    datafile.File `json:"DatParFile"`
+    data.File
 }
 
-func NewSLC(dat, par string) (ret SLC, err error) {
-    ret.DatParFile, err = NewDatParFile(dat, par, "par", FloatCpx)
+func SLCFromFile(path string) (slc SLC, err error) {
+    slc.File, err = data.FromFile(path)
+    if err != nil { return; }
+    
+    err = slc.TypeCheck("SLC", "complex", data.FloatCpx, data.ShortCpx)
+    
     return
 }
 
-
-var multiLook = Gamma.Must("multi_look")
+var multiLook = common.Gamma.Must("multi_look")
 
 type (
     // TODO: add loff, nlines
     MLIOpt struct {
         //Subset
-        refTab string
+        RefTab string
         Looks common.RngAzi
-        windowFlag bool
+        WindowFlag bool
         plot.ScaleExp
     }
 )
@@ -34,8 +37,8 @@ type (
 func (opt *MLIOpt) Parse() {
     opt.ScaleExp.Parse()
     
-    if len(opt.refTab) == 0 {
-        opt.refTab = "-"
+    if len(opt.RefTab) == 0 {
+        opt.RefTab = "-"
     }
     
     opt.Looks.Default()
@@ -46,14 +49,10 @@ func (s SLC) MLI(out MLI, opt MLIOpt) (err error) {
     
     _, err = multiLook(s.Dat, s.Par, out.Dat, out.Par,
                        opt.Looks.Rng, opt.Looks.Azi,
-                       opt.Subset.RngOffset, opt.Subset.RngWidth,
+                       //opt.Subset.RngOffset, opt.Subset.RngWidth,
                        opt.ScaleExp.Scale, opt.ScaleExp.Exp)
     
-    if err != nil {
-        return merr.Make("SLC.MLI").Wrap(err)
-    }
-    
-    return nil
+    return
 }
 
 type (
@@ -68,7 +67,7 @@ type (
 )
 
 
-var sbiInt = Gamma.Must("SBI_INT")
+var sbiInt = common.Gamma.Must("SBI_INT")
 
 func (opt *SBIOpt) Default() {
     opt.Looks.Default()
@@ -90,13 +89,7 @@ func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (err error) {
                     opt.NormSquintDiff, opt.Looks.Rng, opt.Looks.Azi,
                     iwflg, cflg)
     
-    if err != nil {
-        err = CmdErr.Wrap(err, "SBI_INT")
-        //err = Handle(err, "SBI_INT failed")
-        return
-    }
-    
-    return nil
+    return
 }
 
 type (
@@ -111,8 +104,8 @@ type (
     }
     
     SSIOut struct {
-        Ifg IFG
-        Unw datafile.File
+        //Ifg IFG
+        Unw data.File
     }
 )
 
@@ -121,7 +114,7 @@ const (
     IfgUnwrapped
 )
 
-var ssiInt = Gamma.Must("SSI_INT")
+var ssiInt = common.Gamma.Must("SSI_INT")
 
 func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err error) {
     mode := 1
@@ -133,32 +126,26 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err
     cflg := 1
     if opt.Keep { cflg = 0 }
     
-    mID, sID := ref.Format(DateShort), slave.Format(DateShort)
+    short := common.DateShort
+    
+    mID, sID := short.Format(ref), short.Format(slave)
+    
     ID := fmt.Sprintf("%s_%s", mID, sID)
     
     _, err = ssiInt(ref.Dat, ref.Par, mli.Dat, mli.Par, opt.Hgt, opt.LtFine,
                     slave.Dat, slave.Par, mode, mID, sID, ID, opt.OutDir, cflg)
     
-    if err != nil {
-        err = CmdErr.Wrap(err, "SSI_INT")
-        //err = Handle(err, "SSI_INT failed")
-        return
-    }
-    
     // TODO: figure out the name of the output files
     
-    return ret, nil
+    return
 }
 
-func (s SLC) Raster(opt RasArgs) error {
-    opt.Mode = SingleLook
+func (s SLC) Raster(opt plot.RasArgs) error {
+    opt.Mode = plot.SingleLook
     return s.Raster(opt)
 }
 
 func (slc *SLC) Set(s string) (err error) {
-    if err = LoadJson(s, slc); err != nil {
-        return
-    }
-    
-    return slc.TypeCheck("SLC", "complex", FloatCpx, ShortCpx)
+    *slc, err = SLCFromFile(s)
+    return
 }

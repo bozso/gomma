@@ -2,27 +2,27 @@ package base
 
 import (
     "../plot"
-    "../datafile"
+    "../data"
 )
 
 type MLI struct {
-    datafile.File `json:"DatParFile"`
+    data.File `json:"DatParFile"`
 }
 
-func NewMLI(dat, par string) (ret MLI, err error) {
-    ret.DatParFile, err = NewDatParFile(dat, par, "par", Float)
+func MLIFromFile(path string) (mli MLI, err error) {
+    mli.File, err = data.FromFile(path)
+    if err != nil { return; }
+    
+    err = mli.TypeCheck("MLI", "float", data.Float)
     return
 }
 
 func (m MLI) Raster(opt plot.RasArgs) error {
-    opt.Mode = Power
+    opt.Mode = plot.Power
     return m.Raster(opt)
 }
 
 func (m *MLI) Set(s string) (err error) {
-    if err = LoadJson(s, m); err != nil {
-        return
-    }
-    
-    return m.TypeCheck("MLI", "float", Float)
+    *m, err = MLIFromFile(s)
+    return
 }

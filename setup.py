@@ -19,13 +19,14 @@ def generate_ninja():
     
     subdirs = {pth.join(src_path, elem)
         for elem in {
-            "datafile",
-            "utils",
+            "base",
             "command_line",
             "common",
+            "data",
+            "interferogram",
+            "plot",
             "sentinel1",
-            "base",
-            "plot"
+            "utils",
         }
     }
     

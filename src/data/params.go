@@ -1,4 +1,4 @@
-package datafile
+package data
 
 // TODO: reimplement so it reads from file instead of reading from
 // map

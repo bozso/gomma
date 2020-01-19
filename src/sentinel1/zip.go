@@ -6,6 +6,12 @@ import (
     "os"
     "path/filepath"
     "strings"
+    "time"
+    
+    "../data"
+    "../common"
+    "../utils"
+    "../base"
 )
 
 const (
@@ -45,7 +51,7 @@ type (
         DTID          string    `json:"-"`
         UID           string    `json:"-"`
         Templates     templates `json:"templates"`
-        //date                    `json:"date"`
+        date          DateRange `json:"date"`
     }
     
     
@@ -54,7 +60,7 @@ type (
 )
 
 var (
-    burstCorners = Gamma.selectFun("ScanSAR_burst_corners",
+    burstCorners = common.Gamma.SelectFun("ScanSAR_burst_corners",
         "SLC_burst_corners")
 
     calibPath = filepath.Join("annotation", "calibration")
@@ -78,14 +84,14 @@ func NewS1Zip(zipPath, pol string) (s1 *S1Zip, err error) {
     const rexTemplate = "%s-iw%%d-slc-%%s-.*"
 
     zipBase := filepath.Base(zipPath)
-    s1.zipPath, s1.zipBase, s1.pol = zipPath, zipBase, pol
+    s1.Path, s1.zipBase, s1.pol = zipPath, zipBase, pol
 
     s1.mission = strings.ToLower(zipBase[:3])
     s1.dateStr = zipBase[17:48]
 
     start, stop := zipBase[17:32], zipBase[33:48]
 
-    s1.date, err = NewDate(DLong, start, stop)
+    s1.date, err = NewDate(common.DateLong, start, stop)
     
     if err != nil {
         err = ferr.WrapFmt(err,
@@ -149,7 +155,7 @@ func (s1 S1Zip) Info(dst string) (iws IWInfos, err error) {
     return iws, nil
 }
 
-func makePoint(info Params, max bool) (ret Point, err error) {
+func makePoint(info data.Params, max bool) (ret common.Point, err error) {
     ferr := merr.Make("makePoint")
     var tpl_lon, tpl_lat string
 
@@ -175,14 +181,14 @@ func makePoint(info Params, max bool) (ret Point, err error) {
 type(
     IWInfo struct {
         nburst int
-        extent Rect
+        extent common.Rect
         bursts [nMaxBurst]float64
     }
     
     IWInfos [maxIW]IWInfo
 )
 
-var parCmd = Gamma.Must("par_S1_SLC")
+var parCmd = common.Gamma.Must("par_S1_SLC")
 
 func iwInfo(path string) (ret IWInfo, err error) {
     ferr := merr.Make("iwInfo")
@@ -262,7 +268,7 @@ func iwInfo(path string) (ret IWInfo, err error) {
         bursts: numbers}, nil
 }
 
-func (p Point) inIWs(IWs IWInfos) bool {
+func inIWs(p common.Point, IWs IWInfos) bool {
     for _, iw := range IWs {
         if p.InRect(&iw.extent) {
             return true
@@ -271,7 +277,7 @@ func (p Point) inIWs(IWs IWInfos) bool {
     return false
 }
 
-func (iw IWInfos) contains(aoi AOI) bool {
+func (iw IWInfos) contains(aoi common.AOI) bool {
     sum := 0
 
     for _, point := range aoi {
@@ -368,7 +374,7 @@ func (s1 S1Zip) SLC(pol string) (ret S1SLC, err error) {
     return ret, nil
 }
 
-func (s1 S1Zip) MLI(mode, pol string, out *MLI, opt *MLIOpt) (err error) {
+func (s1 S1Zip) MLI(mode, pol string, out *base.MLI, opt *base.MLIOpt) (err error) {
     ferr := merr.Make("S1Zip.MLI")
 
     //path := filepath.Join(s1.Root, mode)
@@ -413,7 +419,7 @@ func (s1 S1Zip) tabName(mode, pol string) string {
 }
 
 const (
-    ExtractErr Werror = "failed to extract %s file from '%s'"
+    ExtractErr utils.Werror = "failed to extract %s file from '%s'"
 )
 
 func (s1 S1Zip) ImportSLC(dst string) (err error) {
@@ -496,4 +502,41 @@ func (d ByDate) Swap(i, j int) { d[i], d[j] = d[j], d[i] }
 
 func (d ByDate) Less(i, j int) bool {
     return Before(d[i], d[j])
+}
+
+type DateRange struct {
+    start, stop, center time.Time
+}
+
+func NewDate(df common.DateFormat, start, stop string) (d DateRange, err error) {
+    _start, err := df.ParseDate(start)
+    if err != nil {
+        return
+    }
+
+    _stop, err := df.ParseDate(stop)
+    if err != nil {
+        return
+    }
+
+    // TODO: Optional check duration, is it max or min
+    delta := _start.Sub(_stop) / 2.0
+    d.center = _stop.Add(delta)
+
+    d.start = _start
+    d.stop = _stop
+
+    return d, nil
+}
+
+func (d DateRange) Start() time.Time {
+    return d.start
+}
+
+func (d DateRange) Center() time.Time {
+    return d.center
+}
+
+func (d DateRange) Stop() time.Time {
+    return d.stop
 }

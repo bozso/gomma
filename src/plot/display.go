@@ -2,14 +2,14 @@ package plot
 
 import (
     "../common"
-    "../datafile"
+    "../data"
 )
 
 type DisArgs struct {
     ScaleExp
     common.RngAzi
     common.Minmax
-    datafile.DType
+    data.DType
     Inverse
     Channel
     Mode       PlotMode
@@ -34,7 +34,7 @@ type DisArgs struct {
     CCMin      float64 `name:"ccMin" default:"0.2"`
 }
 
-func (arg *DisArgs) Parse(dat datafile.IFile) {
+func (arg *DisArgs) Parse(dat data.IFile) {
     arg.ScaleExp.Parse()
     
     if arg.Start == 0 {

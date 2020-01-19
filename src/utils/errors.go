@@ -60,17 +60,33 @@ func (e ErrorBase) Unwrap() error {
     return e.err
 }
 
-type FileOpenError struct {
-    path string
+type FileError struct {
+    path, op string
     err error
 }
 
-func (e FileOpenError) Error() string {
-    return fmt.Sprintf("failed to open file '%s'", e.path)
+func (e FileError) Error() string {
+    return fmt.Sprintf("failed to %s file '%s'", e.op, e.path)
 }
 
-func (e FileOpenError) Unwrap() error {
+func (e FileError) Unwrap() error {
     return e.err
+}
+
+func OpenFail(path string, err error) FileError {
+    return FileError{path, "open", err}
+}
+
+func CreateFail(path string, err error) FileError {
+    return FileError{path, "create", err}
+}
+
+func ReadFail(path string, err error) FileError {
+    return FileError{path, "read from", err}
+}
+
+func WriteFail(path string, err error) FileError {
+    return FileError{path, "write to", err}
 }
 
 type EmptyStringError struct {

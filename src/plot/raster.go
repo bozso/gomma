@@ -4,7 +4,7 @@ import (
     "fmt"
     
     "../common"
-    "../datafile"
+    "../data"
 )
 
 type RasArgs struct {
@@ -15,7 +15,7 @@ type RasArgs struct {
     Raster     string `name:"ras"`
 }
 
-func (opt *RasArgs) Parse(dat datafile.IFile) {
+func (opt *RasArgs) Parse(dat data.IFile) {
     opt.DisArgs.Parse(dat)
     
     if opt.AvgFact == 0 {
@@ -53,7 +53,7 @@ const (
     Undefined
 )
 
-func Raster(d datafile.IFile, opt RasArgs) (err error) {
+func Raster(d data.IFile, opt RasArgs) (err error) {
     opt.Parse(d)
     
     //fmt.Printf("%#v\n", opt)
@@ -91,9 +91,9 @@ func Raster(d datafile.IFile, opt RasArgs) (err error) {
         dt := 0
         
         switch opt.DType {
-        case datafile.FloatCpx:
+        case data.FloatCpx:
             dt = 0
-        case datafile.ShortCpx:
+        case data.ShortCpx:
             dt = 1
         default:
             // Error
@@ -102,7 +102,7 @@ func Raster(d datafile.IFile, opt RasArgs) (err error) {
                         opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
                         opt.LR, opt.Raster, dt)
     case MagPhasePwr:    
-        if opt.DType != datafile.FloatCpx {
+        if opt.DType != data.FloatCpx {
             // Error
         }
         
@@ -114,11 +114,11 @@ func Raster(d datafile.IFile, opt RasArgs) (err error) {
         dt := 0
         
         switch opt.DType {
-        case datafile.Float:
+        case data.Float:
             dt = 0
-        case datafile.Short:
+        case data.Short:
             dt = 1
-        case datafile.Double:
+        case data.Double:
             dt = 2
         default:
             // Error
@@ -132,9 +132,9 @@ func Raster(d datafile.IFile, opt RasArgs) (err error) {
         dt := 0
         
         switch opt.DType {
-        case datafile.FloatCpx:
+        case data.FloatCpx:
             dt = 0
-        case datafile.ShortCpx:
+        case data.ShortCpx:
             dt = 1
         default:
             // Error

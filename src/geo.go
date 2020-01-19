@@ -6,7 +6,7 @@ import (
     "os"
     "path/filepath"
     
-    "./datafile"
+    "./data"
 )
 
 

@@ -160,7 +160,7 @@ func makeGamma() GammaFun {
     return result
 }
 
-func (self GammaFun) selectFun(name1, name2 string) utils.CmdFun {
+func (self GammaFun) SelectFun(name1, name2 string) utils.CmdFun {
     ret, ok := self[name1]
     
     if ok {

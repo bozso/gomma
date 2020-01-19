@@ -1,4 +1,4 @@
-package datafile
+package data
 
 import (
     "strings"

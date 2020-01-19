@@ -1,4 +1,4 @@
-package datafile
+package data
 
 // TODO: seperate field for storing rng, azi, DType values
 
@@ -36,7 +36,7 @@ type (
     File struct {
         Dat, Par string
         ra       common.RngAzi
-        Time     time.Time
+        time     time.Time
         DType
     }
 )
@@ -79,6 +79,10 @@ func (d File) Azi() int {
 
 func (d File) FilePath() string {
     return d.Dat
+}
+
+func (d File) Date() time.Time {
+    return d.time
 }
 
 func (d File) Dtype() DType {
