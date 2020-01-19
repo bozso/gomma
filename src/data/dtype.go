@@ -1,6 +1,7 @@
 package data
 
 import (
+    "fmt"
     "strings"
     
     "../utils"
@@ -74,3 +75,45 @@ func (d DType) String() string {
     }
 }
 
+type TypeMismatchError struct {
+    ftype, expected string
+    DType
+    Err error
+}
+
+func (e TypeMismatchError) Error() string {
+    return fmt.Sprintf("expected datatype '%s' for %s datafile, got '%s'",
+        e.expected, e.ftype, e.DType.String())
+}
+
+func (e TypeMismatchError) Unwrap() error {
+    return e.Err
+}
+
+type UnknownTypeError struct {
+    DType
+    Err error
+}
+
+func (e UnknownTypeError) Error() string {
+    return fmt.Sprintf("unrecognised type '%s', expected a valid datatype",
+        e.DType.String())
+}
+
+func (e UnknownTypeError) Unwrap() error {
+    return e.Err
+}
+
+type WrongTypeError struct {
+    DType
+    kind string
+    Err error
+}
+
+func (e WrongTypeError) Error() string {
+    return fmt.Sprintf("wrong datatype '%s' for %s", e.kind, e.DType.String())
+}
+
+func (e WrongTypeError) Unwrap() error {
+    return e.Err
+}

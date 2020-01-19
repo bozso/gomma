@@ -3,13 +3,13 @@ package data
 // TODO: seperate field for storing rng, azi, DType values
 
 import (
-    //"fmt"
-    "os"
-    "strings"
+    "fmt"
     "strconv"
+    "errors"
     "time"
     
     "../utils"
+    "../utils/params"
     "../common"
 )
 
@@ -20,8 +20,11 @@ const (
     keyRng = "golang_meta_rng"
     keyAzi = "golang_meta_azi"
     keyDtype = "golang_meta_dtype"
+    keyDate = "date"
     separator = ":"
 )
+
+var emptyTime = time.Time{}
 
 type (    
     IFile interface {
@@ -32,10 +35,15 @@ type (
         //Move(string) (File, error)
     }
     
+    OptTime struct {
+        time.Time
+        present bool
+    }
+    
     File struct {
         Dat, Par string
         ra       common.RngAzi
-        time     time.Time
+        time     OptTime
         DType
     }
 )
@@ -47,23 +55,41 @@ func New(dat string, rng, azi int, dtype DType) (d File) {
     return
 }
 
+func newGammaParams(path string) (p params.Params, err error) {
+    return params.FromFile(path, separator)
+}
+
 func FromFile(path string) (d File, err error) {
     d.Par = path
     
-    pr := NewReader(path, separator)
+    pr, err := newGammaParams(path)
+    if err != nil { return }
     
-    d.Dat = pr.Param(keyDatafile)
+    d.Dat, err = pr.Param(keyDatafile)
+    if err != nil { return }
     
-    d.ra.Rng = pr.Int(keyRng, 0)
-    d.ra.Azi = pr.Int(keyAzi, 0)
+    d.ra.Rng, err = pr.Int(keyRng, 0)
+    if err != nil { return }
     
-    ds := pr.Param(keyDtype)
+    d.ra.Azi, err = pr.Int(keyAzi, 0)
+    if err != nil { return }
     
-    if err = pr.Wrap(); err != nil {
-        return
-    }
+    ds, err := pr.Param(keyDtype)
+    if err != nil { return }
     
     err = d.DType.Set(ds)
+
+    ds, err = pr.Param(keyDate)
+    if err == nil {
+        t, err := DateFmt.Parse(ds)
+        if err != nil { return d, err }
+        
+        d.time = OptTime{t, true}
+    }
+    
+    if errors.Is(err, params.ParamError) {
+        d.time = OptTime{present:false}
+    }
     
     return
 }
@@ -80,9 +106,9 @@ func (d File) FilePath() string {
     return d.Dat
 }
 
-func (d File) Date() time.Time {
-    return d.time
-}
+//func (d File) Date() time.Time {
+    //return d.time
+//}
 
 func (d File) Dtype() DType {
     return d.DType
@@ -110,32 +136,22 @@ func (d File) Save() (err error) {
     path := d.Par
     
     exists, err := utils.Exist(path)
-    if err != nil {
-        return
-    }
+    if err != nil { return; }
     
-    var p params
-    if !exists {
-        p = make(params)
+    var p params.Params
+    if exists {
+        p, err = params.FromFile(path, separator)
+        if err != nil { return; }
     } else {
-        p, err = fromFile(path, separator)
-        if err != nil {
-            return
-        }
+        p = params.New(path, separator)
     }
     
-    p[keyDatafile] = d.Dat
-    p[keyRng] = strconv.Itoa(d.ra.Rng)
-    p[keyAzi] = strconv.Itoa(d.ra.Azi)
-    p[keyDtype] = d.DType.String()
+    p.SetVal(keyDatafile, d.Dat)
+    p.SetVal(keyRng, strconv.Itoa(d.ra.Rng))
+    p.SetVal(keyAzi, strconv.Itoa(d.ra.Azi))
+    p.SetVal(keyDtype, d.DType.String())
     
-    w, err := os.Create(path)
-    if err != nil {
-        return
-    }
-    defer w.Close()
-    
-    err = p.Save(w, separator)
+    err = p.Save()
     return
 }
 
@@ -213,104 +229,24 @@ func SameShape(one IFile, two IFile) (err error) {
     return
 }
 
-//func (d *File) Parse() (err error) {
-    //var ferr = merr.Make("DatParFile.Parse")
-    
-    //if d.Ra.Rng, err = d.ParseRng(); err != nil {
-        //return ferr.Wrap(err)
-    //}
-    
-    //if d.Ra.Azi, err = d.ParseAzi(); err != nil {
-        //return ferr.Wrap(err)
-    //}
-    
-    //if d.Time, err = d.ParseDate(); err != nil {
-        //return ferr.Wrap(err)
-    //}
-    
-    //return nil
-//}
-
-func ParseDate(dateStr string) (t time.Time, err error) {
-    split := strings.Fields(dateStr)
-    
-    year, err := strconv.Atoi(split[0])
-    
-    if err != nil {
-        err = TimeParseErr.Wrap(err, "year", dateStr)
-        return
-    }
-    
-    var month time.Month
-    
-    switch split[1] {
-    case "01":
-        month = time.January
-    case "02":
-        month = time.February
-    case "03":
-        month = time.March
-    case "04":
-        month = time.April
-    case "05":
-        month = time.May
-    case "06":
-        month = time.June
-    case "07":
-        month = time.July
-    case "08":
-        month = time.August
-    case "09":
-        month = time.September
-    case "10":
-        month = time.October
-    case "11":
-        month = time.November
-    case "12":
-        month = time.December
-    }
-    
-    day, err := strconv.Atoi(split[2])
-        
-    if err != nil {
-        err = TimeParseErr.Wrap(err, "day", dateStr)
-        return
-    }
-    
-    var (
-        hour, min int
-        sec float64
-    )
-    
-    if len(split) == 6 {
-        
-        hour, err = strconv.Atoi(split[3])
-            
-        if err != nil {
-            err = TimeParseErr.Wrap(err, "hour", dateStr)
-            return
-        }
-        
-        min, err = strconv.Atoi(split[4])
-            
-        if err != nil {
-            err = TimeParseErr.Wrap(err, "minute", dateStr)
-            return
-        }
-        
-        sec, err = strconv.ParseFloat(split[5], 64)
-            
-        if err != nil {
-            err = TimeParseErr.Wrap(err, "seconds", dateStr)
-            return
-        }
-    }        
-    // TODO: parse nanoseconds
-    
-    t = time.Date(year, month, day, hour, min, int(sec), 0, time.UTC)
-    
-    return t, nil
+type ShapeMismatchError struct {
+    dat1, dat2, dim string
+    n1, n2 int
+    err error
 }
+
+func (s ShapeMismatchError) Error() string {
+    return fmt.Sprintf("expected datafile '%s' to have the same %s as " + 
+                       "datafile '%s' (%d != %d)", s.dat1, s.dim, s.dat2, s.n1,
+                       s.n2)
+}
+
+func (s ShapeMismatchError) Unwrap() error {
+    return s.err
+}
+
+
+const DateFmt common.DateFormat = "2016 12 05"
 
 type(
     Subset struct {

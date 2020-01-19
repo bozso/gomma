@@ -20,7 +20,7 @@ const (
     DateLong  DateFormat = "20060102T150405"
 )
 
-func (df DateFormat) ParseDate(str string) (t time.Time, err error) {
+func (df DateFormat) Parse(str string) (t time.Time, err error) {
     if t, err = time.Parse(string(df), str); err != nil {
         err = DateParseError{str, err}
     }
