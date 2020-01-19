@@ -1,11 +1,15 @@
-package gamma
+package base
 
 import (
     "fmt"
+    
+    "../datafile"
+    "../plot"
+     "../common"
 )
 
 type SLC struct {
-    DatParFile `json:"DatParFile"`
+    datafile.File `json:"DatParFile"`
 }
 
 func NewSLC(dat, par string) (ret SLC, err error) {
@@ -19,11 +23,11 @@ var multiLook = Gamma.Must("multi_look")
 type (
     // TODO: add loff, nlines
     MLIOpt struct {
-        Subset
+        //Subset
         refTab string
-        Looks RngAzi
+        Looks common.RngAzi
         windowFlag bool
-        ScaleExp
+        plot.ScaleExp
     }
 )
 
@@ -57,7 +61,7 @@ type (
         NormSquintDiff float64 `cli:"n,nsquint" dft:"0.5"`
         InvWeight      bool    `cli:"i,invw"`
         Keep           bool    `cli:"k,keep"`
-        Looks          RngAzi  `cli:"L,looks"`
+        Looks          common.RngAzi  `cli:"L,looks"`
         Ifg            string  `cli:"ifg"`
         Mli            string  `cli:"mli"`
     }
@@ -108,7 +112,7 @@ type (
     
     SSIOut struct {
         Ifg IFG
-        Unw DatFile
+        Unw datafile.File
     }
 )
 
@@ -151,33 +155,10 @@ func (s SLC) Raster(opt RasArgs) error {
     return s.Raster(opt)
 }
 
-type MLI struct {
-    DatParFile `json:"DatParFile"`
-}
-
-func NewMLI(dat, par string) (ret MLI, err error) {
-    ret.DatParFile, err = NewDatParFile(dat, par, "par", Float)
-    return
-}
-
-func (m MLI) Raster(opt RasArgs) error {
-    opt.Mode = Power
-    return m.Raster(opt)
-}
-
-
 func (slc *SLC) Set(s string) (err error) {
     if err = LoadJson(s, slc); err != nil {
         return
     }
     
     return slc.TypeCheck("SLC", "complex", FloatCpx, ShortCpx)
-}
-
-func (m *MLI) Set(s string) (err error) {
-    if err = LoadJson(s, m); err != nil {
-        return
-    }
-    
-    return m.TypeCheck("MLI", "float", Float)
 }

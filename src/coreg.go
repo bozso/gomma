@@ -5,12 +5,14 @@ import (
     "fmt"
     "log"
     "path/filepath"
+    
+    "./sentinel1"
 )
 
 type (
     S1CoregOut struct {
         RSLC SLC
-        Rslc S1SLC
+        Rslc sentinel1.S1SLC
         Ifg IFG
     }
     

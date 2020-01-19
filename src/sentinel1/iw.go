@@ -1,11 +1,15 @@
 package sentinel1
 
+import (
+    "../datafile"
+)
+
 const maxIW = 3
 
 type(  
     S1IW struct {
-        DatFile
-        TOPS_par Params
+        datafile.DatFile
+        TOPS_par string
     }
 
     IWs [maxIW]S1IW

@@ -2,14 +2,10 @@ package sentinel1
 
 import (
     "fmt"
-    "log"
     "math"
     "os"
-    "time"
     "path/filepath"
     "strings"
-    
-    "../common"
 )
 
 const (
@@ -49,7 +45,7 @@ type (
         DTID          string    `json:"-"`
         UID           string    `json:"-"`
         Templates     templates `json:"templates"`
-        date                    `json:"date"`
+        //date                    `json:"date"`
     }
     
     

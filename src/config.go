@@ -9,21 +9,7 @@ import (
 )
 
 type (
-    Minmax struct {
-        Min float64 `name:"min" default:"0.0"`
-        Max float64 `name:"max" default:"1.0"`
-    }
-    
-    IMinmax struct {
-        Min int `name:"min" default:"0"`
-        Max int `name:"max" default:"1"`
-    }
-    
-    LatLon struct {
-        Lat float64 `name:"lan" default:"1.0"`
-        Lon float64 `name:"lot" default:"1.0"`
-    }
-    
+    /*
     PreSelectOpt struct {
         DateStart, DateStop   string
         LowerLeft, UpperRight LatLon
@@ -34,7 +20,7 @@ type (
         DEMPath                   string
         Iter, NPoly, nPixel       int
         LanczosOrder, MLIOversamp int
-        DEMOverlap, OffsetWindows RngAzi
+        DEMOverlap, OffsetWindows common.RngAzi
         DEMOverSampling           LatLon
         AreaFactor, CCThresh      float64
         BandwithFrac, RngOversamp float64
@@ -62,8 +48,7 @@ type (
         IFGSelect     IfgSelectOpt
         CalcCoherence CoherenceOpt
     }
-
-    stepFun func(*Config) error
+    */
 )
 
 const (
@@ -71,6 +56,7 @@ const (
 )
 
 var (
+    /*
     defaultConfig = Config{
         General: GeneralOpt{
             Pol: "vv",
@@ -124,50 +110,10 @@ var (
             SlopeWindow:            5,
         },
     }
+    */
 )
 
 
-func (mm *IMinmax) Set(s string) (err error) {
-    var ferr = merr.Make("IMinmax.Decode")
-    
-    if len(s) == 0 {
-        return ferr.Wrap(EmptyStringError{})
-    }
-    
-    split := NewSplitParser(s, ",")
-    
-    mm.Min = split.Int(0)
-    mm.Max = split.Int(1)
-    
-    if err = split.Wrap(); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
-}
-
-func (ll LatLon) String() string {
-    return fmt.Sprintf("%f,%f", ll.Lon, ll.Lat)
-}
-
-func (ll *LatLon) Set(s string) (err error) {
-    var ferr = merr.Make("LatLon.Decode")
-
-    if len(s) == 0 {
-        return ferr.Wrap(EmptyStringError{})
-    }
-    
-    split := NewSplitParser(s, ",")
-    
-    ll.Lat = split.Float(0, 64)
-    ll.Lon = split.Float(1, 64)
-    
-    if err = split.Wrap(); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
-}
 
 func delim(msg, sym string) {
     msg = fmt.Sprintf("%s %s %s", sym, msg, sym)
@@ -193,43 +139,6 @@ func MakeDefaultConfig(path string) (err error) {
     
     if _, err = f.Write(out); err != nil {
         return Handle(err, "failed to write to file '%s'", path)
-    }
-
-    return nil
-}
-
-func SaveJson(path string, val interface{}) (err error) {
-    var ferr = merr.Make("SaveJson")
-    
-    var out []byte
-    if out, err = json.MarshalIndent(val, "", "    "); err != nil {
-        return ferr.WrapFmt(err,
-            "failed to json encode struct: %v", val)
-    }
-
-    var f *os.File
-    if f, err = os.Create(path); err != nil {
-        return ferr.WrapFmt(err, "failed to create file: %s", path)
-    }
-    defer f.Close()
-
-    if _, err = f.Write(out); err != nil {
-        return ferr.WrapFmt(err, "failed to write to file '%s'", path)
-    }
-
-    return nil
-}
-
-func LoadJson(path string, val interface{}) (err error) {
-    var ferr = merr.Make("LoadJson")
-    
-    var data []byte
-    if data, err = ReadFile(path); err != nil {
-        return ferr.WrapFmt(err, "failed to read file '%s'", path)
-    }
-    
-    if err := json.Unmarshal(data, &val); err != nil {
-        return ferr.WrapFmt(err, "failed to parse json data %s'", data)
     }
 
     return nil

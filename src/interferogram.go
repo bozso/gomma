@@ -5,6 +5,8 @@ import (
     "log"
     "strings"
     "strconv"
+    
+    "./datafile"
 )
 
 type (
@@ -51,8 +53,8 @@ var (
 )
 
 type IFG struct {
-    DatParFile              `json:"DatParFile"`
-    DiffPar   Params        `json:"diffparfile"`
+    datafile.DatFile        `json:"DatParFile"`
+    DiffPar   string        `json:"diffparfile"`
     Quality   string        `json:"quality"`
     SimUnwrap string        `json:"simulated_unwrapped"`
     DeltaT    time.Duration `json:"-"`

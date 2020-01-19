@@ -25,15 +25,15 @@ const (
 )
 
 type (    
-    IDatFile interface {
-        Datfile() string
+    IFile interface {
+        FilePath() string
         Rng() int
         Azi() int
         Dtype() DType
-        //Move(string) (DatFile, error)
+        //Move(string) (File, error)
     }
     
-    DatFile struct {
+    File struct {
         Dat, Par string
         ra       common.RngAzi
         Time     time.Time
@@ -41,14 +41,14 @@ type (
     }
 )
 
-func New(dat string, rng, azi int, dtype DType) (d DatFile) {
+func New(dat string, rng, azi int, dtype DType) (d File) {
     d.Dat, d.Par = dat, dat + ".par"
     d.ra.Rng, d.ra.Azi, d.DType = rng, azi, dtype
     
     return
 }
 
-func FromFile(path string) (d DatFile, err error) {
+func FromFile(path string) (d File, err error) {
     d.Par = path
     
     pr := NewReader(path, separator)
@@ -69,23 +69,23 @@ func FromFile(path string) (d DatFile, err error) {
     return
 }
 
-func (d DatFile) Rng() int {
+func (d File) Rng() int {
     return d.ra.Rng
 }
 
-func (d DatFile) Azi() int {
+func (d File) Azi() int {
     return d.ra.Azi
 }
 
-func (d DatFile) Datfile() string {
+func (d File) FilePath() string {
     return d.Dat
 }
 
-func (d DatFile) Dtype() DType {
+func (d File) Dtype() DType {
     return d.DType
 }
 
-func (d DatFile) TypeCheck(ftype, expect string, dtypes... DType) (err error) {
+func (d File) TypeCheck(ftype, expect string, dtypes... DType) (err error) {
     b, D := false, d.DType
     
     for _, dt := range dtypes {
@@ -103,7 +103,7 @@ func (d DatFile) TypeCheck(ftype, expect string, dtypes... DType) (err error) {
     return nil
 }
 
-func (d DatFile) Save() (err error) {
+func (d File) Save() (err error) {
     path := d.Par
     
     exists, err := utils.Exist(path)
@@ -136,7 +136,7 @@ func (d DatFile) Save() (err error) {
     return
 }
 
-func (d DatFile) WithShape(dat string, dtype DType) (df DatFile) {
+func (d File) WithShape(dat string, dtype DType) (df File) {
     if dtype == Unknown {
         dtype = d.DType
     }
@@ -146,8 +146,8 @@ func (d DatFile) WithShape(dat string, dtype DType) (df DatFile) {
 }
 
 
-func (d DatFile) Move(dir string) (dm DatFile, err error) {
-    var ferr = merr.Make("DatFile.Move")
+func (d File) Move(dir string) (dm File, err error) {
+    var ferr = merr.Make("File.Move")
     
     if dm.Dat, err = Move(d.Dat, dir); err != nil {
         err = ferr.Wrap(err)
@@ -159,8 +159,8 @@ func (d DatFile) Move(dir string) (dm DatFile, err error) {
     return dm, nil
 }
 
-func (d DatFile) Exist() (b bool, err error) {
-    var ferr = merr.Make("DatFile.Exist")
+func (d File) Exist() (b bool, err error) {
+    var ferr = merr.Make("File.Exist")
     
     if b, err = utils.Exist(d.Dat); err != nil {
         err = ferr.Wrap(err)
@@ -170,15 +170,15 @@ func (d DatFile) Exist() (b bool, err error) {
     return b, nil
 }
 
-func SameCols(one IDatFile, two IDatFile) (err error) {
+func SameCols(one IFile, two IFile) (err error) {
     var ferr = merr.Make("SameCols")
     
     n1, n2 := one.Rng(), two.Rng()
     
     if n1 != n2 {
         return ferr.Wrap(ShapeMismatchError{
-            dat1: one.Datfile(),
-            dat2: two.Datfile(),
+            dat1: one.FilePath(),
+            dat2: two.FilePath(),
             n1:n1,
             n2:n2,
             dim: "range samples / columns",
@@ -187,15 +187,15 @@ func SameCols(one IDatFile, two IDatFile) (err error) {
     return nil
 }
 
-func SameRows(one IDatFile, two IDatFile) error {
+func SameRows(one IFile, two IFile) error {
     var ferr = merr.Make("SameRows")
     
     n1, n2 := one.Azi(), two.Azi()
     
     if n1 != n2 {
         return ferr.Wrap(ShapeMismatchError{
-            dat1: one.Datfile(),
-            dat2: two.Datfile(),
+            dat1: one.FilePath(),
+            dat2: two.FilePath(),
             n1:n1,
             n2:n2,
             dim: "azimuth lines / rows",
@@ -205,7 +205,7 @@ func SameRows(one IDatFile, two IDatFile) error {
     return nil
 }
 
-func SameShape(one IDatFile, two IDatFile) (err error) {
+func SameShape(one IFile, two IFile) (err error) {
     var ferr = merr.Make("SameShape")
     
     if err = SameCols(one, two); err != nil {
@@ -219,7 +219,7 @@ func SameShape(one IDatFile, two IDatFile) (err error) {
     return nil
 }
 
-//func (d *DatFile) Parse() (err error) {
+//func (d *File) Parse() (err error) {
     //var ferr = merr.Make("DatParFile.Parse")
     
     //if d.Ra.Rng, err = d.ParseRng(); err != nil {
@@ -331,7 +331,7 @@ func ParseDate(dateStr string) (t time.Time, err error) {
     //fun := Gamma.Must("dis" + cmd)
     
     //if cmd == "SLC" {
-        //_, err := fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines, opt.Scale,
+        //_, err := fun(opt.File, opt.Rng, opt.Start, opt.Nlines, opt.Scale,
                       //opt.Exp)
         
         //if err != nil {
@@ -343,7 +343,7 @@ func ParseDate(dateStr string) (t time.Time, err error) {
 
 
 // TODO: implement proper selection of plot command
-//func (d DatFile) Raster(opt RasArgs) (err error) {
+//func (d File) Raster(opt RasArgs) (err error) {
     //err = opt.Parse(d)
     
     //if err != nil {
@@ -374,18 +374,18 @@ func ParseDate(dateStr string) (t time.Time, err error) {
     //}
     
     //if cmd == "SLC" {
-        //_, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+        //_, err = fun(opt.File, opt.Rng, opt.Start, opt.Nlines,
             //opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
             //opt.ImgFmt, opt.HeaderSize, opt.Raster)
 
     //} else {
         //if len(sec) == 0 {
-            //_, err = fun(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+            //_, err = fun(opt.File, opt.Rng, opt.Start, opt.Nlines,
                 //opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
                 //opt.LR, opt.Raster, opt.ImgFmt, opt.HeaderSize)
 
         //} else {
-            //_, err = fun(opt.Datfile, sec, opt.Rng, opt.Start, opt.Nlines,
+            //_, err = fun(opt.File, sec, opt.Rng, opt.Start, opt.Nlines,
                 //opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
                 //opt.LR, opt.Raster, opt.ImgFmt, opt.HeaderSize, opt.Raster)
         //}
@@ -435,7 +435,7 @@ func Move(path string, dir string) (s string, err error) {
 }
 
 
-func (d *DatFile) Set(s string) (err error) {
+func (d *File) Set(s string) (err error) {
     *d, err = FromFile(s)
     return
 }

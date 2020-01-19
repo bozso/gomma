@@ -2,9 +2,11 @@ package sentinel1
 
 import (
     "log"
+    "time"
 
     "../utils"
     "../common"
+    "../base"
 )
 
 type S1SLC struct {
@@ -104,7 +106,7 @@ type MosaicOpts struct {
 
 var mosaic = Gamma.Must("SLC_mosaic_S1_TOPS")
 
-func (s1 S1SLC) Mosaic(out SLC, opts MosaicOpts) (err error) {
+func (s1 S1SLC) Mosaic(out base.SLC, opts MosaicOpts) (err error) {
     ferr := merr.Make("S1SLC.Mosaic")
     
     opts.Looks.Default()
@@ -155,7 +157,7 @@ func (s1 S1SLC) DerampRef() (ds1 S1SLC, err error) {
 
 var derampSlave = Gamma.Must("S1_deramp_TOPS_slave")
 
-func (s1 S1SLC) DerampSlave(ref *S1SLC, looks RngAzi, keep bool) (ret S1SLC, err error) {
+func (s1 S1SLC) DerampSlave(ref *S1SLC, looks common.RngAzi, keep bool) (ret S1SLC, err error) {
     ferr := merr.Make("S1SLC.DerampSlave")
     
     looks.Default()
@@ -232,7 +234,7 @@ func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
 
 var MLIFun = Gamma.selectFun("multi_look_ScanSAR", "multi_S1_TOPS")
 
-func (s1 *S1SLC) MLI(mli *MLI, opt *MLIOpt) error {
+func (s1 *S1SLC) MLI(mli *base.MLI, opt *base.MLIOpt) error {
     ferr := merr.Make("S1SLC.MLI")
     opt.Parse()
     

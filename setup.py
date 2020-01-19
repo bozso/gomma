@@ -23,7 +23,9 @@ def generate_ninja():
             "utils",
             "command_line",
             "common",
-            "sentinel1"
+            "sentinel1",
+            "base",
+            "plot"
         }
     }
     
