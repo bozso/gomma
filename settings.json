@@ -1,0 +1,5 @@
+{
+    "RasExt":  "bmp",
+    "Path":    "/home/istvan/packages/downloaded/GAMMA_SOFTWARE-20181130",
+    "Modules": ["DIFF", "DISP", "ISP", "LAT", "IPTA"]
+}
