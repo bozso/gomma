@@ -52,18 +52,30 @@ func (ra *RngAzi) Set(s string) (err error) {
 }
 
 func (ra RngAzi) Check() (err error) {
-    var ferr = merr.Make("RngAzi.Check")
-     
     if ra.Rng == 0 {
-        return ferr.Wrap(ZeroDimError{dim: "range samples / columns"})
+        return ZeroDimError{dim: "range samples / columns"}
     }
     
     if ra.Azi == 0 {
-        return ferr.Wrap(ZeroDimError{dim: "azimuth lines / rows"})
+        return ZeroDimError{dim: "azimuth lines / rows"}
     }
     
     return nil
 }
+
+type ZeroDimError struct {
+    dim string
+    err error
+}
+
+func (e ZeroDimError) Error() string {
+    return fmt.Sprintf("expected %s to be non zero", e.dim)
+}
+
+func (e ZeroDimError) Unwrap() error {
+    return e.err
+}
+
 
 func (ra *RngAzi) Default() {
     if ra.Rng == 0 {

@@ -1,10 +1,13 @@
 package dem
 
 import (
+    "fmt"
+    
     "github.com/bozso/gamma/data"
     "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/plot"
+    "github.com/bozso/gamma/utils"
+    "github.com/bozso/gamma/utils/params"
 )
 
 type Lookup struct {
@@ -17,53 +20,47 @@ func (l *Lookup) Set(s string) (err error) {
 
 var coord2sarpix = common.Gamma.Must("coord_to_sarpix")
 
-func (ll common.LatLon) ToRadar(mpar, hgt, diffPar string) (ra common.RngAzi, err error) {
-    var ferr = merr.Make("LatLon.ToRadar")
+func ToRadar(ll common.LatLon, mpar, hgt, diffPar string) (ra common.RngAzi, err error) {
     const par = "corrected SLC/MLI range, azimuth pixel (int)"
     
     out, err := coord2sarpix(mpar, "-", ll.Lat, ll.Lon, hgt, diffPar)
     if err != nil {
-        err = ferr.WrapFmt(err, "failed to retreive radar coordinates")
+        err = utils.WrapFmt(err, "failed to retreive radar coordinates")
         return
     }
     
-    params := FromString(out, ":")
+    param := params.FromString(out, ":")
     
-    line, err := params.Param(par)
+    line, err := param.Param(par)
     
     if err != nil {
-        err = ferr.WrapFmt(err, "failed to retreive range, azimuth")
+        err = utils.WrapFmt(err, "failed to retreive range, azimuth")
         return
     }
     
     
-    split := NewSplitParser(line, " ")
+    split, err := utils.NewSplitParser(line, " ")
+    if err != nil { return }
     
-    if err = split.Wrap(); err != nil {
-        err = ferr.Wrap(err)
+    if split.Len() < 2 {
+        err = fmt.Errorf("split to retreive range, azimuth failed")
         return
     }
     
-    if len(split.split) < 2 {
-        err = ferr.Wrap(fmt.Errorf("split to retreive range, azimuth failed"))
-        return
-    }
+    ra.Rng, err = split.Int(0)
+    if err != nil { return }
     
-    ra.Rng = split.Int(0)
-    ra.Azi = split.Int(1)
-    
-    if err = split.Wrap(); err != nil {
-        err = ferr.Wrap(err)
-    }
+    ra.Azi, err = split.Int(1)
+    if err != nil { return }
     
     return ra, nil
 }
 
 func (l Lookup) Raster(opt plot.RasArgs) (err error) {
-    opt.Mode = MagPhase
+    opt.Mode = plot.MagPhase
     opt.Parse(l)
 
-    err = Raster(l, opt)
+    err = plot.Raster(l, opt)
     return
 }
 
@@ -85,8 +82,6 @@ const (
 )
 
 func (i *InterpolationMode) Decode(s string) (err error) {
-    var ferr = merr.Make("InterpolationMode.Decode")
-    
     switch s {
     case "NearestNeighbour":
         *i = NearestNeighbour
@@ -113,7 +108,8 @@ func (i *InterpolationMode) Decode(s string) (err error) {
     case "Gauss":
         *i = Gauss
     default:
-        err = ferr.Wrap(UnrecognizedMode{got: s, name:"Interpolation Mode"})
+        err = utils.UnrecognizedMode{got: s, name:"Interpolation Mode"}
+        return
     }
     
     return nil
@@ -201,12 +197,10 @@ func (opt *CodeOpt) Parse() (lrIn int, lrOut int) {
 var g2r = common.Gamma.Must("geocode")
 
 func (l Lookup) geo2radar(in, out data.IFile, opt CodeOpt) (err error) {
-    var ferr = merr.Make("Lookup.geo2radar")
-    
     lrIn, lrOut := opt.Parse()
     
     if err = opt.RngAzi.Check(); err != nil {
-        return ferr.Wrap(err)
+        return
     }
     
     intm := opt.InterpolMode
@@ -224,52 +218,46 @@ func (l Lookup) geo2radar(in, out data.IFile, opt CodeOpt) (err error) {
     case Gauss:
         interp = 4
     default:
-        return ferr.Wrap(ModeError{name: "interpolation option", got: intm})
+        return utils.UnrecognizedMode{got: intm, name:"Interpolation Mode"}
     }
     
-    dt, dtype := 0, in.Dtype()
+    dt, dtype := 0, in.DataType()
     
     switch dtype {
-    case Float:
+    case data.Float:
         dt = 0
-    case FloatCpx:
+    case data.FloatCpx:
         dt = 1
-    case Raster:
+    case data.Raster:
         dt = 2
-    case UChar:
+    case data.UChar:
         dt = 3
-    case Short:
+    case data.Short:
         dt = 4
-    case ShortCpx:
+    case data.ShortCpx:
         dt = 5
-    case Double:
+    case data.Double:
         dt = 6
     default:
-        return ferr.Wrap(WrongTypeError{DType: dtype, kind: "geo2radar"})
+        return data.WrongTypeError{DType: dtype, kind: "geo2radar"}
     }
     
     
-    _, err = g2r(l.Dat, in.Datfile(), in.Rng(),
-                 out.Datfile(), out.Rng(),
+    _, err = g2r(l.Dat, in.DataPath(), in.Rng(),
+                 out.DataPath(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Oversamp,
                  opt.MaxRad, opt.Npoints)
     
-    if err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
+    return
 }
 
 var r2g = common.Gamma.Must("geocode_back")
 
 func (l Lookup) radar2geo(in, out data.IFile, opt CodeOpt) (err error) {
-    var ferr = merr.Make("Lookup.radar2geo")
-
     lrIn, lrOut := opt.Parse()
     
     if err = opt.RngAzi.Check(); err != nil {
-        return ferr.Wrap(err)
+        return
     }
     
     intm := opt.InterpolMode
@@ -297,38 +285,34 @@ func (l Lookup) radar2geo(in, out data.IFile, opt CodeOpt) (err error) {
         case LanczosSqrt:
             interp = 7
         default:
-            return ferr.Wrap(ModeError{name: "interpolation option", got: intm})
+            return UnrecognizedMode{name: "interpolation option", got: intm}
         }
     }
     
     
-    dt, dtype := 0, in.Dtype()
+    dt, dtype := 0, in.DataType()
     
     switch dtype {
-    case Float:
+    case data.Float:
         dt = 0
-    case FloatCpx:
+    case data.FloatCpx:
         dt = 1
-    case Raster:
+    case data.Raster:
         dt = 2
-    case UChar:
+    case data.UChar:
         dt = 3
-    case Short:
+    case data.Short:
         dt = 4
-    case Double:
+    case data.Double:
         dt = 5
     default:
-        err = ferr.Wrap(WrongTypeError{DType: dtype, kind: "radar2geo"})
-        return
+        return data.WrongTypeError{DType: dtype, kind: "radar2geo"}
+        
     }
     
     _, err = r2g(in.Datfile(), in.Rng(), l.Dat,
                  out.Datfile(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Order)
     
-    if err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
+    return
 }

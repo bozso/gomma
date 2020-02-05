@@ -107,13 +107,14 @@ func (e UnknownTypeError) Unwrap() error {
 type WrongTypeError struct {
     Type
     kind string
-    Err error
+    err error
 }
 
 func (e WrongTypeError) Error() string {
-    return fmt.Sprintf("wrong datatype '%s' for %s", e.kind, e.Type.String())
+    return fmt.Sprintf("wrong datatype '%s' for %s", e.Type.String(),
+        e.kind)
 }
 
 func (e WrongTypeError) Unwrap() error {
-    return e.Err
+    return e.err
 }

@@ -12,9 +12,7 @@ import (
     "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/utils/params"
     "github.com/bozso/gamma/common"
-    //"../utils"
-    //"../utils/params"
-    //"../common"
+    "github.com/bozso/gamma/date"
 )
 
 const merr = utils.ModuleName("gamma.datafile")
@@ -32,7 +30,7 @@ var emptyTime = time.Time{}
 
 type (    
     IFile interface {
-        FilePath() string
+        DataPath() string
         Rng() int
         Azi() int
         DataType() Type
@@ -46,15 +44,15 @@ type (
     
     File struct {
         Dat, Par string
-        ra       common.RngAzi
-        time     OptTime
-        dtype    Type
+        Ra       common.RngAzi
+        Time     OptTime
+        Dtype    Type
     }
 )
 
 func New(dat string, rng, azi int, dtype Type) (d File) {
     d.Dat, d.Par = dat, dat + ".par"
-    d.ra.Rng, d.ra.Azi, d.dtype = rng, azi, dtype
+    d.Ra.Rng, d.Ra.Azi, d.Dtype = rng, azi, dtype
     
     return
 }
@@ -72,41 +70,41 @@ func FromFile(path string) (d File, err error) {
     d.Dat, err = pr.Param(keyDatafile)
     if err != nil { return }
     
-    d.ra.Rng, err = pr.Int(keyRng, 0)
+    d.Ra.Rng, err = pr.Int(keyRng, 0)
     if err != nil { return }
     
-    d.ra.Azi, err = pr.Int(keyAzi, 0)
+    d.Ra.Azi, err = pr.Int(keyAzi, 0)
     if err != nil { return }
     
     ds, err := pr.Param(keyDtype)
     if err != nil { return }
     
-    err = d.dtype.Set(ds)
+    err = d.Dtype.Set(ds)
 
     ds, err = pr.Param(keyDate)
     if err == nil {
         t, err := DateFmt.Parse(ds)
         if err != nil { return d, err }
         
-        d.time = OptTime{t, true}
+        d.Time = OptTime{t, true}
     }
     
     if errors.Is(err, params.ParamError) {
-        d.time = OptTime{present:false}
+        d.Time = OptTime{present:false}
     }
     
     return
 }
 
 func (d File) Rng() int {
-    return d.ra.Rng
+    return d.Ra.Rng
 }
 
 func (d File) Azi() int {
-    return d.ra.Azi
+    return d.Ra.Azi
 }
 
-func (d File) FilePath() string {
+func (d File) DataPath() string {
     return d.Dat
 }
 
@@ -115,25 +113,19 @@ func (d File) FilePath() string {
 //}
 
 func (d File) DataType() Type {
-    return d.dtype
+    return d.Dtype
 }
 
 func (d File) TypeCheck(ftype, expect string, dtypes... Type) (err error) {
-    b, D := false, d.dtype
+    D := d.Dtype
     
     for _, dt := range dtypes {
         if D == dt {
-            b = true
-            break
+            return nil
         }
     }
     
-    if !b {
-        err = TypeMismatchError{ftype:ftype, expected:expect, Type:D}
-        return
-    }
-    
-    return nil
+    return TypeMismatchError{ftype:ftype, expected:expect, Type:D}
 }
 
 func (d File) Save() (err error) {
@@ -145,15 +137,15 @@ func (d File) Save() (err error) {
     var p params.Params
     if exists {
         p, err = params.FromFile(path, separator)
-        if err != nil { return; }
+        if err != nil { return }
     } else {
         p = params.New(path, separator)
     }
     
     p.SetVal(keyDatafile, d.Dat)
-    p.SetVal(keyRng, strconv.Itoa(d.ra.Rng))
-    p.SetVal(keyAzi, strconv.Itoa(d.ra.Azi))
-    p.SetVal(keyDtype, d.dtype.String())
+    p.SetVal(keyRng, strconv.Itoa(d.Ra.Rng))
+    p.SetVal(keyAzi, strconv.Itoa(d.Ra.Azi))
+    p.SetVal(keyDtype, d.Dtype.String())
     
     err = p.Save()
     return
@@ -161,13 +153,12 @@ func (d File) Save() (err error) {
 
 func (d File) WithShape(dat string, dtype Type) (df File) {
     if dtype == Unknown {
-        dtype = d.dtype
+        dtype = d.Dtype
     }
     
-    df = New(dat, d.ra.Rng, d.ra.Azi, dtype)
+    df = New(dat, d.Ra.Rng, d.Ra.Azi, dtype)
     return
 }
-
 
 func (d File) Move(dir string) (dm File, err error) {
     dm.Dat, err = utils.Move(d.Dat, dir)
@@ -180,7 +171,7 @@ func (d File) Move(dir string) (dm File, err error) {
         return
     }
     
-    dm.ra, dm.dtype = d.ra, d.dtype
+    dm.Ra, dm.Dtype = d.Ra, d.Dtype
     
     return
 }
@@ -195,8 +186,8 @@ func SameCols(one IFile, two IFile) (err error) {
     
     if n1 != n2 {
         return ShapeMismatchError{
-            dat1: one.FilePath(),
-            dat2: two.FilePath(),
+            dat1: one.DataPath(),
+            dat2: two.DataPath(),
             n1:n1,
             n2:n2,
             dim: "range samples / columns",
@@ -210,8 +201,8 @@ func SameRows(one IFile, two IFile) error {
     
     if n1 != n2 {
         return ShapeMismatchError{
-            dat1: one.FilePath(),
-            dat2: two.FilePath(),
+            dat1: one.DataPath(),
+            dat2: two.DataPath(),
             n1:n1,
             n2:n2,
             dim: "azimuth lines / rows",
@@ -250,7 +241,7 @@ func (s ShapeMismatchError) Unwrap() error {
 }
 
 
-const DateFmt common.DateFormat = "2016 12 05"
+const DateFmt date.ParseFmt = "2016 12 05"
 
 type(
     Subset struct {

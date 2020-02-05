@@ -3,9 +3,9 @@
 *.ini
 .sconsign.dblite
 SConstruct
-.ninja_deps
-.ninja_log
-
+*.ninja_deps
+*.ninja_log
+*.ninja
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

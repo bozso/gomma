@@ -6,6 +6,7 @@ import (
     "github.com/bozso/gamma/data"
     "github.com/bozso/gamma/plot"
     "github.com/bozso/gamma/common"
+    "github.com/bozso/gamma/date"
 )
 
 type SLC struct {
@@ -126,7 +127,7 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err
     cflg := 1
     if opt.Keep { cflg = 0 }
     
-    short := common.DateShort
+    short := date.Short
     
     mID, sID := short.Format(ref), short.Format(slave)
     

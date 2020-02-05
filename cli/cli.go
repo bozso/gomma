@@ -1,4 +1,4 @@
-package command_line
+package cli
 
 import (
     "fmt"
@@ -205,8 +205,6 @@ func (g *geoCode) SetCli(c *Cli) {
 }
 
 func (c geoCode) Run() (err error) {
-    var ferr = merr.Make("geoCode.Run")
-    
     mode := strings.ToUpper(c.Mode)
     
     switch mode {
@@ -218,11 +216,7 @@ func (c geoCode) Run() (err error) {
         err = UnrecognizedMode{name: "geocoding", got: mode}
     }
     
-    if err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
+    return
 }
 
 

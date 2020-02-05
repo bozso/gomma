@@ -121,20 +121,6 @@ func (e UnrecognizedMode) Unwrap() error {
     return e.err
 }
 
-type ModeError struct {
-    name string
-    got fmt.Stringer
-    err error
-}
-
-func (e ModeError) Error() string {
-    return fmt.Sprintf("unrecognized mode '%s' for %s", e.got.String(), e.name)
-}
-
-func (e ModeError) Unwrap() error {
-    return e.err
-}
-
 type OutOfBoundError struct {
     idx, length int
     err error

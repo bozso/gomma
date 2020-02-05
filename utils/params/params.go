@@ -28,7 +28,15 @@ type (
 func New(path, sep string) (p Params) {
     p.path, p.sep = path, sep
     
-    p.p = make(params, defaultLen)
+    p.p = make(params, 1)
+    
+    return
+}
+
+func WithLen(path, sep string, count int) (p Params) {
+    p.path, p.sep = path, sep
+    
+    p.p = make(params, count)
     
     return
 }
@@ -53,6 +61,21 @@ func FromFile(path, sep string) (p Params, err error) {
     }
     
     return p, nil
+}
+
+func FromString(elems, sep string) (p Params) {
+    p.sep = sep
+    split := strings.Split(elems, "\n")
+    
+    for _, line := range split {
+        if len(line) == 0 || !strings.Contains(line, sep) {
+            continue
+        }
+        
+        p.p = append(p.p, line)
+    }
+    
+    return
 }
 
 func (p Params) Param(key string) (s string, err error) {

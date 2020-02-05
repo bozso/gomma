@@ -17,7 +17,7 @@ func FromFile(path string) (d File, err error) {
 func (d File) NewLookup(path string) (l Lookup) {
     l.Dat = path
     l.Ra = d.Ra
-    l.dtype = FloatCpx
+    l.Dtype = data.FloatCpx
     return
 }
 
@@ -43,5 +43,3 @@ func (f File) Raster(opt plot.RasArgs) (err error) {
     err = plot.Raster(f, opt)
     return nil
 }
-
-

@@ -1,4 +1,4 @@
-package command_line
+package cli
 
 
 import (
