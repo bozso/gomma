@@ -60,35 +60,6 @@ func (e ErrorBase) Unwrap() error {
     return e.err
 }
 
-type FileError struct {
-    path, op string
-    err error
-}
-
-func (e FileError) Error() string {
-    return fmt.Sprintf("failed to %s file '%s'", e.op, e.path)
-}
-
-func (e FileError) Unwrap() error {
-    return e.err
-}
-
-func OpenFail(path string, err error) FileError {
-    return FileError{path, "open", err}
-}
-
-func CreateFail(path string, err error) FileError {
-    return FileError{path, "create", err}
-}
-
-func ReadFail(path string, err error) FileError {
-    return FileError{path, "read from", err}
-}
-
-func WriteFail(path string, err error) FileError {
-    return FileError{path, "write to", err}
-}
-
 type EmptyStringError struct {
     variable string
     err      error
@@ -108,16 +79,20 @@ func (e EmptyStringError) Unwrap() error {
     return e.err
 }
 
-type UnrecognizedMode struct {
+func UnrecognizedMode(got, name string) error {
+    return UnrecognizedModeError{name, got, nil}
+}
+
+type UnrecognizedModeError struct {
     name, got string
     err error
 }
 
-func (e UnrecognizedMode) Error() string {
+func (e UnrecognizedModeError) Error() string {
     return fmt.Sprintf("unrecognized mode '%s' for %s", e.got, e.name)
 }
 
-func (e UnrecognizedMode) Unwrap() error {
+func (e UnrecognizedModeError) Unwrap() error {
     return e.err
 }
 

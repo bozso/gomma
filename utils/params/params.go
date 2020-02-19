@@ -17,7 +17,7 @@ type (
     Key string
     Separator string
     
-    params []string    
+    params = []string
     
     Params struct {
         path, sep string

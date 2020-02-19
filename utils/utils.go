@@ -65,23 +65,6 @@ func Empty(s string) bool {
     return len(s) == 0
 }
 
-func Exist(s string) (b bool, err error) {
-    b = false
-    _, err = os.Stat(s)
-
-    if err == nil {
-        b = true
-        return
-    }
-    
-    if os.IsNotExist(err) {
-        err = nil
-        return
-    }
-    
-    err = WrapFmt(err, "failed to check wether file '%s' exists", s)
-    return
-}
 
 func Fatal(err error, format string, args ...interface{}) {
     if err != nil {
@@ -90,19 +73,6 @@ func Fatal(err error, format string, args ...interface{}) {
     }
 }
 
-func Move(path string, dir string) (s string, err error) {
-    dst, err := filepath.Abs(filepath.Join(dir, filepath.Base(path)))
-    if err != nil {
-        err = WrapFmt(err, "failed to create absolute path")
-        return
-    }
-    
-    if err = os.Rename(path, dst); err != nil {
-        return
-    }
-    
-    return dst, nil
-}
 
 func MakeCmd(cmd string) CmdFun {
     return func(args ...interface{}) (string, error) {
@@ -128,149 +98,6 @@ func MakeCmd(cmd string) CmdFun {
 
         return result, nil
     }
-}
-
-type Reader struct {
-    *bufio.Scanner
-    *os.File
-}
-
-func NewReader(path string) (f Reader, err error) {
-    if f.File, err = os.Open(path); err != nil {
-        err = OpenFail(path, err)
-        return
-    }
-
-    f.Scanner = bufio.NewScanner(f.File)
-
-    return f, nil
-}
-
-func (f *Reader) SetCli(c *Cli, name, usage string) {
-    const defDesc = "By default it reads from standard input."
-    
-    c.Var(f, name, fmt.Sprintf("%s %s", usage, defDesc))
-}
-
-func (f Reader) String() string {
-    return ""
-}
-
-func (f *Reader) Set(s string) (err error) {
-    var r io.Reader
-    
-    if len(s) == 0 {
-        r = os.Stdin
-    } else {
-        *f, err = NewReader(s)
-        if err != nil {
-            return
-        }
-        r = f.File
-    }
-    
-    f.Scanner = bufio.NewScanner(r)
-    return nil
-}
-
-type Writer struct {
-    *bufio.Writer
-    *os.File
-    err error
-}
-
-func NewWriter(wr io.Writer) (w Writer) {
-    w.Writer = bufio.NewWriter(wr)
-    return
-}
-
-func (w *Writer) SetCli(c *Cli, name, usage string) {
-    const defDesc = "By default it writes to standard output."
-    
-    c.Var(w, name, fmt.Sprintf("%s %s", usage, defDesc))
-}
-
-func (w Writer) String() string {
-    return ""
-}
-
-func (w *Writer) Set(s string) (err error) {
-    if len(s) == 0 {
-        w.Writer = bufio.NewWriter(os.Stdout)
-    } else {
-        if w.File, err = os.Create(s); err != nil {
-            return CreateFail(s, err)
-        }
-        w.Writer = bufio.NewWriter(w.File)
-    }
-    
-    
-    return nil    
-}
-
-func (w *Writer) Wrap() error {
-    if w.err == nil {
-        return nil
-    }
-
-    if w.File != nil { 
-        return fmt.Errorf("error while writing to file '%s': %w",
-            w.File.Name(), w.err)
-    } else {
-        return fmt.Errorf("error while writing: %w", w.err)
-    }
-}
-
-func (w *Writer) Close() {
-    if w.File != nil {
-        w.File.Close()
-    }
-    w.Writer.Flush()
-}
-
-func NewWriterFile(name string) (w Writer) {
-    w.File, w.err = os.Create(name)
-    w.Writer = bufio.NewWriter(w.File)
-    
-    return
-}
-
-func (w *Writer) Write(b []byte) (n int) {
-    if w.err != nil {
-        return 0
-    }
-    
-    n, w.err = w.Writer.Write(b)
-    return
-}
-
-func (w *Writer) WriteString(s string) (n int) {
-    if w.err != nil {
-        return 0
-    }
-    
-    n, w.err = w.Writer.WriteString(s)
-    return
-}
-
-func (w *Writer) WriteFmt(tpl string, args ...interface{}) int {
-    return w.WriteString(fmt.Sprintf(tpl, args...))
-}
-
-
-func ReadFile(path string) (b []byte, err error) {
-    var f *os.File
-    if f, err = os.Open(path); err != nil {
-        err = FileOpenErr.Wrap(err, path)
-        return
-    }
-    defer f.Close()
-    
-    if b, err = ioutil.ReadAll(f); err != nil {
-        err = FileReadErr.Wrap(err, path)
-    }
-    
-    return
 }
 
 type SplitParser struct {

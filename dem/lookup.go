@@ -108,7 +108,7 @@ func (i *InterpolationMode) Decode(s string) (err error) {
     case "Gauss":
         *i = Gauss
     default:
-        err = utils.UnrecognizedMode{got: s, name:"Interpolation Mode"}
+        err = utils.UnrecognizedMode(s, "Interpolation Mode")
         return
     }
     
@@ -218,7 +218,7 @@ func (l Lookup) geo2radar(in, out data.IFile, opt CodeOpt) (err error) {
     case Gauss:
         interp = 4
     default:
-        return utils.UnrecognizedMode{got: intm, name:"Interpolation Mode"}
+        return utils.UnrecognizedMode(intm.String(), "Interpolation Mode")
     }
     
     dt, dtype := 0, in.DataType()
@@ -239,7 +239,7 @@ func (l Lookup) geo2radar(in, out data.IFile, opt CodeOpt) (err error) {
     case data.Double:
         dt = 6
     default:
-        return data.WrongTypeError{DType: dtype, kind: "geo2radar"}
+        return data.WrongType(dtype, "geo2radar")
     }
     
     
@@ -285,7 +285,7 @@ func (l Lookup) radar2geo(in, out data.IFile, opt CodeOpt) (err error) {
         case LanczosSqrt:
             interp = 7
         default:
-            return UnrecognizedMode{name: "interpolation option", got: intm}
+            return utils.UnrecognizedMode(intm.String(), "interpolation option")
         }
     }
     
@@ -306,12 +306,12 @@ func (l Lookup) radar2geo(in, out data.IFile, opt CodeOpt) (err error) {
     case data.Double:
         dt = 5
     default:
-        return data.WrongTypeError{DType: dtype, kind: "radar2geo"}
+        return data.WrongType(dtype, "radar2geo")
         
     }
     
-    _, err = r2g(in.Datfile(), in.Rng(), l.Dat,
-                 out.Datfile(), out.Rng(),
+    _, err = r2g(in.DataPath(), in.Rng(), l.Dat,
+                 out.DataPath(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Order)
     
     return

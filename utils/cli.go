@@ -92,7 +92,7 @@ func (c Cli) Run(args []string) (err error) {
     subcom, ok := c.subcommands[mode]
     
     if !ok {
-        return UnrecognizedMode{got:mode, name:"gamma"}
+        return UnrecognizedMode(mode, "gamma")
     }
     
     cli, act := &subcom.cli, subcom.action

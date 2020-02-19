@@ -104,6 +104,10 @@ func (e UnknownTypeError) Unwrap() error {
     return e.Err
 }
 
+func WrongType(dtype Type, kind string) error {
+    return WrongTypeError{dtype, kind, nil}
+}
+
 type WrongTypeError struct {
     Type
     kind string

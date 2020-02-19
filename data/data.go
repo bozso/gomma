@@ -15,50 +15,32 @@ import (
     "github.com/bozso/gamma/date"
 )
 
-const merr = utils.ModuleName("gamma.datafile")
-
-const (
-    keyDatafile = "golang_meta_datafile"
-    keyRng = "golang_meta_rng"
-    keyAzi = "golang_meta_azi"
-    keyDtype = "golang_meta_dtype"
-    keyDate = "date"
-    separator = ":"
-)
-
-var emptyTime = time.Time{}
-
 type (    
-    IFile interface {
+    Pather interface {
         DataPath() string
-        Rng() int
-        Azi() int
-        DataType() Type
-        //Move(string) (File, error)
     }
     
-    OptTime struct {
-        time.Time
-        present bool
+    Typer interface {
+        DataType() Type
     }
     
     File struct {
-        Dat, Par string
-        Ra       common.RngAzi
-        Time     OptTime
-        Dtype    Type
+        DatFile   string     `json:"datafile"`
+        ParFile   string     `json:"parameterfile"`
+        Dtype Type           `json:"data_type"`
+        Ra    common.RngAzi
+        time.Time
     }
 )
 
-func New(dat string, rng, azi int, dtype Type) (d File) {
-    d.Dat, d.Par = dat, dat + ".par"
-    d.Ra.Rng, d.Ra.Azi, d.Dtype = rng, azi, dtype
-    
-    return
-}
-
 func newGammaParams(path string) (p params.Params, err error) {
     return params.FromFile(path, separator)
+}
+
+func Import(path, rng, azi, Type string) (f File, err error) {
+    f.ParFile = path
+    
+    
 }
 
 func FromFile(path string) (d File, err error) {
@@ -82,15 +64,13 @@ func FromFile(path string) (d File, err error) {
     err = d.Dtype.Set(ds)
 
     ds, err = pr.Param(keyDate)
-    if err == nil {
-        t, err := DateFmt.Parse(ds)
-        if err != nil { return d, err }
+
+    if err != nil {
+        if errors.Is(err, params.ParamError) {
+            return
+        }
         
-        d.Time = OptTime{t, true}
-    }
-    
-    if errors.Is(err, params.ParamError) {
-        d.Time = OptTime{present:false}
+        d.Time, err = DateFmt.Parse(ds)
     }
     
     return
@@ -240,15 +220,14 @@ func (s ShapeMismatchError) Unwrap() error {
     return s.err
 }
 
-
 const DateFmt date.ParseFmt = "2016 12 05"
 
 type(
     Subset struct {
-        RngOffset int `name:"roff" default:"0"`
-        AziOffset int `name:"aoff" default:"0"`
-        RngWidth int `name:"rwidth" default:"0"`
-        AziLines int `name:"alines" default:"0"`
+        RngOffset int
+        AziOffset int
+        RngWidth int
+        AziLines int
     }
 )
 
