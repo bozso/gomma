@@ -9,6 +9,7 @@ import (
     "strings"
     
     "github.com/bozso/gamma/utils"
+    uio "github.com/bozso/gamma/utils/io"
 )
 
 const defaultLen = 15
@@ -44,7 +45,7 @@ func WithLen(path, sep string, count int) (p Params) {
 func FromFile(path, sep string) (p Params, err error) {
     p = New(path, sep)
     
-    reader, err := utils.NewReader(path)
+    reader, err := uio.NewReader(path)
     if err != nil {
         return
     }
@@ -99,7 +100,7 @@ func (p Params) Param(key string) (s string, err error) {
         return
     }
 
-    err = ParameterError{key:key, path:p.path}
+    err = NotFound{key:key, path:p.path}
     return
 }
 
@@ -165,18 +166,16 @@ func (p Params) SaveTo(w io.StringWriter) (err error) {
     return
 }
 
-type ParameterError struct {
+type NotFound struct {
     path, key string
     err error
 }
 
-func (p ParameterError) Error() string {
+func (p NotFound) Error() string {
     return fmt.Sprintf("failed to retreive parameter '%s' from file '%s'",
         p.key, p.path)
 }
 
-func (p ParameterError) Unwrap() error {
+func (p NotFound) Unwrap() error {
     return p.err
 }
-
-var ParamError = ParameterError{}

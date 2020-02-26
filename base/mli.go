@@ -10,7 +10,7 @@ type MLI struct {
 }
 
 func MLIFromFile(path string) (mli MLI, err error) {
-    mli.File, err = data.FromFile(path)
+    err = mli.Set(path)
     if err != nil { return; }
     
     err = mli.TypeCheck("MLI", "float", data.Float)

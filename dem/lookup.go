@@ -196,7 +196,7 @@ func (opt *CodeOpt) Parse() (lrIn int, lrOut int) {
 
 var g2r = common.Gamma.Must("geocode")
 
-func (l Lookup) geo2radar(in, out data.IFile, opt CodeOpt) (err error) {
+func (l Lookup) geo2radar(in, out data.Data, opt CodeOpt) (err error) {
     lrIn, lrOut := opt.Parse()
     
     if err = opt.RngAzi.Check(); err != nil {
@@ -243,7 +243,7 @@ func (l Lookup) geo2radar(in, out data.IFile, opt CodeOpt) (err error) {
     }
     
     
-    _, err = g2r(l.Dat, in.DataPath(), in.Rng(),
+    _, err = g2r(l.DatFile, in.DataPath(), in.Rng(),
                  out.DataPath(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Oversamp,
                  opt.MaxRad, opt.Npoints)
@@ -253,7 +253,7 @@ func (l Lookup) geo2radar(in, out data.IFile, opt CodeOpt) (err error) {
 
 var r2g = common.Gamma.Must("geocode_back")
 
-func (l Lookup) radar2geo(in, out data.IFile, opt CodeOpt) (err error) {
+func (l Lookup) radar2geo(in, out data.Data, opt CodeOpt) (err error) {
     lrIn, lrOut := opt.Parse()
     
     if err = opt.RngAzi.Check(); err != nil {
@@ -310,7 +310,7 @@ func (l Lookup) radar2geo(in, out data.IFile, opt CodeOpt) (err error) {
         
     }
     
-    _, err = r2g(in.DataPath(), in.Rng(), l.Dat,
+    _, err = r2g(in.DataPath(), in.Rng(), l.DatFile,
                  out.DataPath(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Order)
     

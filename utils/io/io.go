@@ -1,11 +1,16 @@
 package io
 
 import (
+    "strings"
+    "fmt"
     "bufio"
     "os"
-    "ioutil"
+    "io"
+    "io/ioutil"
+    "path/filepath"
     
     "github.com/bozso/gamma/utils"
+    "github.com/bozso/gamma/utils/path"
 )
 
 type Reader struct {
@@ -163,17 +168,87 @@ func (e FileError) Unwrap() error {
 }
 
 func OpenFail(p string, err error) FileError {
-    return FileError{path, "open", err}
+    return FileError{p, "open", err}
 }
 
 func CreateFail(p string, err error) FileError {
-    return FileError{path, "create", err}
+    return FileError{p, "create", err}
 }
 
 func ReadFail(p string, err error) FileError {
-    return FileError{path, "read from", err}
+    return FileError{p, "read from", err}
 }
 
 func WriteFail(p string, err error) FileError {
-    return FileError{path, "write to", err}
+    return FileError{p, "write to", err}
+}
+
+
+type Path struct {
+    s string
+}
+
+func (p Path) String() string {
+    return p.s
+}
+
+func (p Path) Abs() (pp Path, err error) {
+    pp.s, err = filepath.Abs(p.s)
+    return
+}
+
+func (p Path) Len() int {
+    return len(p.s)
+}
+
+type File struct {
+    Path
+}
+
+func (v *File) Set(s string) (err error) {
+    b := false
+    
+    if len(s) == 0 {
+        return utils.EmptyStringError{}
+    }
+    
+    b, err = path.Exist(s)
+    
+    if err != nil { return }
+    
+    if !b {
+        return fmt.Errorf("path '%s' does not exist", s)
+    }
+    
+    v.s = s
+    return nil
+}
+
+func (f File) Reader() (r io.Reader, err error) {
+    r, err = NewReader(f.String())
+    return
+}
+
+type Files []*File
+
+func (f Files) String() string {
+    if f != nil {
+        // TODO: list something sensible
+        return ""
+    }
+    
+    return ""
+}
+
+func (f Files) Set(s string) (err error) {
+    split := strings.Split(s, ",")
+    
+    f = make(Files, len(split))
+    
+    for ii, fpath := range f {
+        if err = fpath.Set(split[ii]); err != nil {
+            return
+        }
+    }
+    return nil
 }

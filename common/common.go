@@ -11,6 +11,7 @@ import (
     "fmt"
     
     "github.com/bozso/gamma/utils"
+    "github.com/bozso/gamma/utils/io"
 )
 
 const DefaultCachePath = "/mnt/bozso_i/cache"
@@ -20,35 +21,36 @@ type RngAzi struct {
     Azi int `json:"azi"`
 }
 
-var DefRA = RngAzi{Rng:1, Azi:1}
+var DefaultRngAzi = RngAzi{Rng:1, Azi:1}
 
 func (ra RngAzi) String() string {
     return fmt.Sprintf("%d,%d", ra.Rng, ra.Azi)
 }
 
 func (ra *RngAzi) Set(s string) (err error) {
-    var ferr = merr.Make("RngAzi.Decode")
-    
     if len(s) == 0 {
-        return ferr.Wrap(utils.EmptyStringError{})
+        return utils.EmptyStringError{}
     }
     
     split, err := utils.NewSplitParser(s, ",")
-    if err != nil {
-        return ferr.Wrap(err)
-    }
+    if err != nil { return }
     
     ra.Rng, err = split.Int(0)
-    if err != nil {
-        return ferr.Wrap(err)
-    }
+    if err != nil { return }
 
     ra.Azi, err = split.Int(1)
-    if err != nil {
-        return ferr.Wrap(err)
+    
+    return
+}
+
+func (ra *RngAzi) Default() {
+    if ra.Rng == 0 {
+        ra.Rng = 1
     }
     
-    return nil
+    if ra.Azi == 0 {
+        ra.Azi = 1
+    }
 }
 
 func (ra RngAzi) Check() (err error) {
@@ -61,6 +63,11 @@ func (ra RngAzi) Check() (err error) {
     }
     
     return nil
+}
+
+type Dims interface {
+    Rng() int
+    Azi() int
 }
 
 type ZeroDimError struct {
@@ -76,16 +83,6 @@ func (e ZeroDimError) Unwrap() error {
     return e.err
 }
 
-
-func (ra *RngAzi) Default() {
-    if ra.Rng == 0 {
-        ra.Rng = 1
-    }
-    
-    if ra.Azi == 0 {
-        ra.Azi = 1
-    }
-}
 
 type (
     Minmax struct {
@@ -124,16 +121,10 @@ type (
 )
 
 const (
-    useVersion = "20181130"
     BufSize    = 50
 )
 
 var (
-    // TODO: deprecate
-    //versions = map[string]string{
-    //    "20181130": "/home/istvan/progs/GAMMA_SOFTWARE-20181130",
-    //}
-
     Pols = [4]string{"vv", "hh", "hv", "vh"}
     
     // TODO: get settings path from environment variable
@@ -278,37 +269,32 @@ func (ll *LatLon) Set(s string) (err error) {
 }
 
 func SaveJson(path string, val interface{}) (err error) {
-    var ferr = merr.Make("SaveJson")
-    
-    var out []byte
-    if out, err = json.MarshalIndent(val, "", "    "); err != nil {
-        return ferr.WrapFmt(err,
-            "failed to json encode struct: %v", val)
+    out, err := json.MarshalIndent(val, "", "    ")
+    if err != nil {
+        return utils.WrapFmt(err, "failed to json encode struct: %v", val)
     }
 
-    var f *os.File
-    if f, err = os.Create(path); err != nil {
-        return ferr.WrapFmt(err, "failed to create file: %s", path)
+    f, err := os.Create(path)
+    if err != nil {
+        return io.CreateFail(path, err)
     }
     defer f.Close()
 
     if _, err = f.Write(out); err != nil {
-        return ferr.WrapFmt(err, "failed to write to file '%s'", path)
+        return io.WriteFail(path, err)
     }
 
     return nil
 }
 
 func LoadJson(path string, val interface{}) (err error) {
-    var ferr = merr.Make("LoadJson")
-    
-    var data []byte
-    if data, err = utils.ReadFile(path); err != nil {
-        return ferr.WrapFmt(err, "failed to read file '%s'", path)
+    d, err := io.ReadFile(path)
+    if err != nil {
+        return utils.WrapFmt(err, "failed to read file '%s'", path)
     }
     
-    if err := json.Unmarshal(data, &val); err != nil {
-        return ferr.WrapFmt(err, "failed to parse json data %s'", data)
+    if err := json.Unmarshal(d, &val); err != nil {
+        return utils.WrapFmt(err, "failed to parse json data %s'", d)
     }
 
     return nil

@@ -1,5 +1,12 @@
 package path
 
+import (
+    "os"
+    "path/filepath"
+    
+    "github.com/bozso/gamma/utils"
+)
+
 func Exist(s string) (b bool, err error) {
     b = false
     _, err = os.Stat(s)
@@ -14,13 +21,13 @@ func Exist(s string) (b bool, err error) {
         return
     }
     
-    err = WrapFmt(err, "failed to check wether file '%s' exists", s)
+    err = utils.WrapFmt(err, "failed to check wether file '%s' exists", s)
     return
 }
 func Move(path string, dir string) (s string, err error) {
     dst, err := filepath.Abs(filepath.Join(dir, filepath.Base(path)))
     if err != nil {
-        err = WrapFmt(err, "failed to create absolute path")
+        err = utils.WrapFmt(err, "failed to create absolute path")
         return
     }
     
@@ -29,4 +36,12 @@ func Move(path string, dir string) (s string, err error) {
     }
     
     return dst, nil
+}
+
+func Mkdir(name string) (err error) {
+    if err = os.MkdirAll(name, os.ModePerm); err != nil {
+        err = utils.WrapFmt(err, "failed to create directory '%s'", name)
+    }
+    
+    return
 }

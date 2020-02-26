@@ -34,7 +34,7 @@ type DisArgs struct {
     CCMin      float64 `name:"ccMin" default:"0.2"`
 }
 
-func (arg *DisArgs) Parse(dat data.IFile) {
+func (arg *DisArgs) Parse(dat data.Data) {
     arg.ScaleExp.Parse()
     
     if arg.Start == 0 {

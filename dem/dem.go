@@ -9,13 +9,22 @@ type File struct {
     data.File
 }
 
+var Import = data.Importer{
+    RngKey: "width",
+    AziKey: "nlines",
+}
+
 func FromFile(path string) (d File, err error) {
-    d.File, err = data.FromFile(path)
+    err = d.Set(path)
+    if err != nil { return; }
+    
+    err = d.TypeCheck("DEM", "float", data.Float)
     return
+
 }
 
 func (d File) NewLookup(path string) (l Lookup) {
-    l.Dat = path
+    l.DatFile = path
     l.Ra = d.Ra
     l.Dtype = data.FloatCpx
     return
@@ -23,16 +32,6 @@ func (d File) NewLookup(path string) (l Lookup) {
 
 
 func (d *File) Set(s string) (err error) {
-    return
-}
-
-func (f File) ParseRng() (i int, err error) {
-    i, err = f.Int("width", 0)
-    return
-}
-
-func (f File) ParseAzi() (i int, err error) {
-    i, err = f.Int("nlines", 0)
     return
 }
 

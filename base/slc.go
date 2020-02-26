@@ -14,7 +14,7 @@ type SLC struct {
 }
 
 func SLCFromFile(path string) (slc SLC, err error) {
-    slc.File, err = data.FromFile(path)
+    err = slc.Set(path)
     if err != nil { return; }
     
     err = slc.TypeCheck("SLC", "complex", data.FloatCpx, data.ShortCpx)
@@ -48,7 +48,7 @@ func (opt *MLIOpt) Parse() {
 func (s SLC) MLI(out MLI, opt MLIOpt) (err error) {
     opt.Parse()
     
-    _, err = multiLook(s.Dat, s.Par, out.Dat, out.Par,
+    _, err = multiLook(s.DatFile, s.ParFile, out.DatFile, out.ParFile,
                        opt.Looks.Rng, opt.Looks.Azi,
                        //opt.Subset.RngOffset, opt.Subset.RngWidth,
                        opt.ScaleExp.Scale, opt.ScaleExp.Exp)
@@ -85,7 +85,8 @@ func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (err error) {
     if opt.InvWeight { iwflg = 1 }
     if opt.Keep { cflg = 1 }
     
-    _, err = sbiInt(ref.Dat, ref.Par, slave.Dat, slave.Par,
+    _, err = sbiInt(ref.DatFile, ref.ParFile,
+                    slave.DatFile, slave.ParFile,
                     opt.Ifg, opt.Ifg + ".off", opt.Mli, opt.Mli + ".par", 
                     opt.NormSquintDiff, opt.Looks.Rng, opt.Looks.Azi,
                     iwflg, cflg)
@@ -133,8 +134,9 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err
     
     ID := fmt.Sprintf("%s_%s", mID, sID)
     
-    _, err = ssiInt(ref.Dat, ref.Par, mli.Dat, mli.Par, opt.Hgt, opt.LtFine,
-                    slave.Dat, slave.Par, mode, mID, sID, ID, opt.OutDir, cflg)
+    _, err = ssiInt(ref.DatFile, ref.ParFile, mli.DatFile, mli.ParFile,
+        opt.Hgt, opt.LtFine, slave.DatFile, slave.ParFile, mode,
+        mID, sID, ID, opt.OutDir, cflg)
     
     // TODO: figure out the name of the output files
     

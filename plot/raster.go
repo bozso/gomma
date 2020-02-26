@@ -15,7 +15,7 @@ type RasArgs struct {
     Raster     string `name:"ras"`
 }
 
-func (opt *RasArgs) Parse(dat data.IFile) {
+func (opt *RasArgs) Parse(dat data.Data) {
     opt.DisArgs.Parse(dat)
     
     if opt.AvgFact == 0 {
@@ -53,7 +53,7 @@ const (
     Undefined
 )
 
-func Raster(d data.IFile, opt RasArgs) (err error) {
+func Raster(d data.Data, opt RasArgs) (err error) {
     opt.Parse(d)
     
     //fmt.Printf("%#v\n", opt)

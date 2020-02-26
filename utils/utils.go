@@ -2,13 +2,8 @@ package utils
 
 import (
     "fmt"
-    "path/filepath"
     "log"
-    "os"
-    "io"
     "os/exec"
-    "bufio"
-    "io/ioutil"
     "strconv"
     "strings"
 )
@@ -151,118 +146,14 @@ func (sp SplitParser) Int(idx int) (i int, err error) {
 }
 
 func (sp SplitParser) Float(idx int) (f float64, err error) {
-    ferr := merr.Make("SplitParser.Float")
-    
     s, err := sp.Idx(idx)
-    
-    if err != nil {
-        err = ferr.Wrap(err)
-        return
-    }
+    if err != nil { return }
     
     f, err = strconv.ParseFloat(s, 64)
     
-    if err != nil {
-        err = ferr.Wrap(err)
-    }
-    
     return
 }
 
-
-
-type Path struct {
-    s string
-}
-
-func (p Path) String() string {
-    return p.s
-}
-
-func (p Path) Abs() (pp Path, err error) {
-    ferr := merr.Make("Path.Abs")
-    
-    pp.s, err = filepath.Abs(p.s)
-    
-    if err != nil {
-        err = ferr.Wrap(err)
-    }
-    return
-}
-
-func (p Path) Len() int {
-    return len(p.s)
-}
-
-type File struct {
-    Path
-}
-
-func (v *File) Set(s string) (err error) {
-    b, ferr := false, merr.Make("File.Decode")
-    
-    if len(s) == 0 {
-        return ferr.Fmt("expected non empty filepath")
-    }
-    
-    b, err = Exist(s)
-    
-    if err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if !b {
-        return ferr.Fmt("path '%s' does not exist", s)
-    }
-    
-    v.s = s
-    return nil
-}
-
-func (f File) Reader() (r Reader, err error) {
-    var ferr = merr.Make("File.Reader")
-    
-    if r, err = NewReader(f.String()); err != nil {
-        err = ferr.Wrap(err)
-    }
-    return
-}
-
-type Files []*File
-
-func (f Files) String() string {
-    if f != nil {
-        // TODO: list something sensible
-        return ""
-    }
-    
-    return ""
-}
-
-func (f Files) Set(s string) (err error) {
-    ferr := merr.Make("Files.Decode")
-    
-    split := strings.Split(s, ",")
-    
-    f = make(Files, len(split))
-    
-    for ii, fpath := range f {
-        if err = fpath.Set(split[ii]); err != nil {
-            return ferr.Wrap(err)
-        }
-    }
-    return nil
-}
-
-func Mkdir(name string) (err error) {
-    var ferr = merr.Make("Mkdir")
-    
-    if err = os.MkdirAll(name, os.ModePerm); err != nil {
-        err = ferr.WrapFmt(err, "failed to create directory '%s'", name)
-    }
-    
-    return
-}
 
 type ( 
     ModuleName string

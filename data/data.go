@@ -4,13 +4,11 @@ package data
 
 import (
     "fmt"
-    "strconv"
-    "errors"
     "time"
     
     
-    "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/utils/params"
+    "github.com/bozso/gamma/utils/path"
     "github.com/bozso/gamma/common"
     "github.com/bozso/gamma/date"
 )
@@ -24,11 +22,17 @@ type (
         DataType() Type
     }
     
+    Data interface {
+        Typer
+        Pather
+        common.Dims
+    }
+    
     File struct {
-        DatFile   string     `json:"datafile"`
-        ParFile   string     `json:"parameterfile"`
-        Dtype Type           `json:"data_type"`
-        Ra    common.RngAzi
+        DatFile   string  `json:"datafile"`
+        ParFile   string  `json:"parameterfile"`
+        Dtype     Type    `json:"data_type"`
+        Ra        common.RngAzi
         time.Time
     }
 )
@@ -37,43 +41,8 @@ func newGammaParams(path string) (p params.Params, err error) {
     return params.FromFile(path, separator)
 }
 
-func Import(path, rng, azi, Type string) (f File, err error) {
-    f.ParFile = path
-    
-    
-}
-
-func FromFile(path string) (d File, err error) {
-    d.Par = path
-    
-    pr, err := newGammaParams(path)
-    if err != nil { return }
-    
-    d.Dat, err = pr.Param(keyDatafile)
-    if err != nil { return }
-    
-    d.Ra.Rng, err = pr.Int(keyRng, 0)
-    if err != nil { return }
-    
-    d.Ra.Azi, err = pr.Int(keyAzi, 0)
-    if err != nil { return }
-    
-    ds, err := pr.Param(keyDtype)
-    if err != nil { return }
-    
-    err = d.Dtype.Set(ds)
-
-    ds, err = pr.Param(keyDate)
-
-    if err != nil {
-        if errors.Is(err, params.ParamError) {
-            return
-        }
-        
-        d.Time, err = DateFmt.Parse(ds)
-    }
-    
-    return
+func (f File) JsonName() string {
+    return fmt.Sprintf("%s.json", f.DatFile)
 }
 
 func (d File) Rng() int {
@@ -85,7 +54,7 @@ func (d File) Azi() int {
 }
 
 func (d File) DataPath() string {
-    return d.Dat
+    return d.DatFile
 }
 
 //func (d File) Date() time.Time {
@@ -108,45 +77,34 @@ func (d File) TypeCheck(ftype, expect string, dtypes... Type) (err error) {
     return TypeMismatchError{ftype:ftype, expected:expect, Type:D}
 }
 
-func (d File) Save() (err error) {
-    path := d.Par
-    
-    exists, err := utils.Exist(path)
-    if err != nil { return; }
-    
-    var p params.Params
-    if exists {
-        p, err = params.FromFile(path, separator)
-        if err != nil { return }
-    } else {
-        p = params.New(path, separator)
+func (d File) Save(p string) (err error) {
+    if len(p) == 0 {
+        p = d.JsonName()
     }
     
-    p.SetVal(keyDatafile, d.Dat)
-    p.SetVal(keyRng, strconv.Itoa(d.Ra.Rng))
-    p.SetVal(keyAzi, strconv.Itoa(d.Ra.Azi))
-    p.SetVal(keyDtype, d.Dtype.String())
-    
-    err = p.Save()
+    err = common.SaveJson(p, d)
     return
 }
 
-func (d File) WithShape(dat string, dtype Type) (df File) {
+func (d File) WithShape(dat string, dtype Type) File {
     if dtype == Unknown {
         dtype = d.Dtype
     }
     
-    df = New(dat, d.Ra.Rng, d.Ra.Azi, dtype)
-    return
+    return File{
+        DatFile: dat,
+        Ra: d.Ra,
+        Dtype: dtype,
+    }
 }
 
 func (d File) Move(dir string) (dm File, err error) {
-    dm.Dat, err = utils.Move(d.Dat, dir)
+    dm.DatFile, err = path.Move(d.DatFile, dir)
     if err != nil {
         return
     }
 
-    dm.Par, err = utils.Move(d.Par, dir)
+    dm.ParFile, err = path.Move(d.ParFile, dir)
     if err != nil {
         return
     }
@@ -157,17 +115,15 @@ func (d File) Move(dir string) (dm File, err error) {
 }
 
 func (d File) Exist() (b bool, err error) {
-    b, err = utils.Exist(d.Dat)
+    b, err = path.Exist(d.DatFile)
     return
 }
 
-func SameCols(one IFile, two IFile) (err error) {
+func SameCols(one common.Dims, two common.Dims) *ShapeMismatchError {
     n1, n2 := one.Rng(), two.Rng()
     
     if n1 != n2 {
-        return ShapeMismatchError{
-            dat1: one.DataPath(),
-            dat2: two.DataPath(),
+        return &ShapeMismatchError{
             n1:n1,
             n2:n2,
             dim: "range samples / columns",
@@ -176,13 +132,11 @@ func SameCols(one IFile, two IFile) (err error) {
     return nil
 }
 
-func SameRows(one IFile, two IFile) error {
+func SameRows(one common.Dims, two common.Dims) *ShapeMismatchError {
     n1, n2 := one.Azi(), two.Azi()
     
     if n1 != n2 {
-        return ShapeMismatchError{
-            dat1: one.DataPath(),
-            dat2: two.DataPath(),
+        return &ShapeMismatchError{
             n1:n1,
             n2:n2,
             dim: "azimuth lines / rows",
@@ -192,15 +146,11 @@ func SameRows(one IFile, two IFile) error {
     return nil
 }
 
-func SameShape(one IFile, two IFile) (err error) {
-    
+func SameShape(one common.Dims, two common.Dims) (err *ShapeMismatchError) {
     err = SameCols(one, two)
-    if err != nil {
-        return
-    }
+    if err != nil { return }
 
     err = SameRows(one, two)
-
     return
 }
 
@@ -212,8 +162,13 @@ type ShapeMismatchError struct {
 
 func (s ShapeMismatchError) Error() string {
     return fmt.Sprintf("expected datafile '%s' to have the same %s as " + 
-                       "datafile '%s' (%d != %d)", s.dat1, s.dim, s.dat2, s.n1,
-                       s.n2)
+        "datafile '%s' (%d != %d)", s.dat1, s.dim, s.dat2, s.n1, s.n2)
+}
+
+func (s ShapeMismatchError) Pathes(one, two Pather) error {
+    s.dat1, s.dat2 = one.DataPath(), two.DataPath()
+    
+    return s
 }
 
 func (s ShapeMismatchError) Unwrap() error {
@@ -244,6 +199,10 @@ type(
 
 
 func (d *File) Set(s string) (err error) {
-    *d, err = FromFile(s)
+    err = common.LoadJson(s, d)
     return
 }
+
+const (
+    separator = ":"
+)
