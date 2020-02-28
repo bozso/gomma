@@ -56,6 +56,11 @@ type ErrorBase struct {
     err error
 }
 
+func (e *ErrorBase) Wrap(err error) *ErrorBase {
+    e.err = err
+    return e
+}
+
 func (e ErrorBase) Unwrap() error {
     return e.err
 }

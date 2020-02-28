@@ -1,6 +1,7 @@
 package common
 
 import (
+    "fmt"
     "log"
     "os"
     "math"
@@ -11,13 +12,14 @@ import (
     
     "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/utils/io"
+    "github.com/bozso/gamma/utils/command"
 )
 
 const DefaultCachePath = "/mnt/bozso_i/cache"
 
 type (
     Slice []string
-    GammaFun map[string]utils.CmdFun
+    Commands map[string]Command
 
     settings struct {
         RasExt    string
@@ -35,8 +37,16 @@ var (
     
     // TODO: get settings path from environment variable
     Settings = loadSettings("/home/istvan/progs/gamma/bin/settings.json")
-    Gamma = makeGamma()
+    commands = makeCommands()
 )
+
+func Must(name string) (c Command) {
+    return commands.Must(name)
+}
+
+func Select(name1, name2 string) (c Command) {
+    return commands.Select(name1, name2)
+}
 
 func loadSettings(path string) (ret settings) {
     if err := LoadJson(path, &ret); err != nil {
@@ -47,10 +57,27 @@ func loadSettings(path string) (ret settings) {
     return
 }
 
-func makeGamma() GammaFun {
-    Path := Settings.Path
+type Command struct {
+    command.Command
+}
 
-    result := make(map[string]utils.CmdFun)
+func (c Command) Call(args ...interface{}) (s string, err error) {
+    arg := make([]string, len(args))
+
+    for ii, elem := range args {
+        if elem == nil {
+            arg[ii] = "-"
+        } else {
+            arg[ii] = fmt.Sprint(elem)
+        }
+    }
+
+    return c.Command.CallWithArgs(arg...)
+}
+
+func makeCommands() Commands {
+    Path := Settings.Path
+    result := make(Commands)
 
     for _, module := range Settings.Modules {
         for _, dir := range [2]string{"bin", "scripts"} {
@@ -63,7 +90,9 @@ func makeGamma() GammaFun {
             }
 
             for _, path := range glob {
-                result[filepath.Base(path)] = utils.MakeCmd(path)
+                result[filepath.Base(path)] = Command{
+                        Command:command.New(path),
+                    }
             }
         }
     }
@@ -71,25 +100,25 @@ func makeGamma() GammaFun {
     return result
 }
 
-func (self GammaFun) SelectFun(name1, name2 string) utils.CmdFun {
-    ret, ok := self[name1]
+func (cs Commands) Select(name1, name2 string) (c Command) {
+    c, ok := cs[name1]
     
     if ok {
-        return ret
+        return
     }
     
-    ret, ok = self[name2]
+    c, ok = cs[name2]
     
     if !ok {
         log.Fatalf("either '%s' or '%s' must be an available executable",
             name1, name2)
     }
     
-    return ret
+    return
 }
 
-func (self GammaFun) Must(name string) (ret utils.CmdFun) {
-    ret, ok := self[name]
+func (cs Commands) Must(name string) (c Command) {
+    c, ok := cs[name]
     
     if !ok {
         log.Fatalf("failed to find Gamma executable '%s'", name)

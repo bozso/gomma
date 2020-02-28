@@ -1,6 +1,7 @@
 package interferogram
 
 import (
+    "github.com/bozso/gamma/common"
     "github.com/bozso/gamma/data"
 )
 
@@ -13,7 +14,7 @@ const (
 
 type (
     Coherence struct {
-        data.File
+        data.FloatFile
     }
     
     CoherenceOpt struct {
@@ -26,19 +27,18 @@ type (
 )
 
 
-
 var (
-    phaseSlope = Gamma.Must("phase_slope")
-    CCAdaptive = Gamma.Must("cc_ad")
+    phaseSlope = common.Must("phase_slope")
+    ccAdaptive = common.Must("cc_ad")
 )
 
-func (ifg File) Coherence(opt CoherenceOpt) (c Coherence, err error) {
+func (ifg File) Coherence(opt CoherenceOpt, c Coherence) (err error) {
     weightFlag := CoherenceWeight[opt.WeightType]
     
     //log.info("CALCULATING COHERENCE AND CREATING QUICKLOOK IMAGES.")
     //log.info('Weight type is "%s"'.format(weight_type))
     
-    width := ifg.Rng
+    width := ifg.Ra.Rng
     
     log.Printf("Estimating phase slope.")
     
@@ -46,19 +46,17 @@ func (ifg File) Coherence(opt CoherenceOpt) (c Coherence, err error) {
     slope := ".cpx"
     
     // parameters: xmin, xmax, ymin, ymax not yet given
-    _, err = phaseSlope(ifg.Dat, slope, opt.SlopeWindow,
+    _, err = phaseSlope.Call(ifg.DatFile, slope, opt.SlopeWindow,
                         opt.SlopeCorrelationThresh)
     
-    if err != nil {
-        return
-    }
+    if err != nil { return }
 
     log.Printf("Calculating coherence.")
     
     mli1, mli2 := "", ""
     
-    _, err = CCAdaptive(ifg.Dat, mli1, mli2, slope, nil, c.Dat, width,
-                        opt.Box.Min, opt.Box.Max, weightFlag)
+    _, err = ccAdaptive.Call(ifg.DatFile, mli1, mli2, slope, nil,
+        c.DatFile, width, opt.Box.Min, opt.Box.Max, weightFlag)
     
     return
 }

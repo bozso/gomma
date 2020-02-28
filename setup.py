@@ -21,7 +21,8 @@ class Project(object):
                 "interferogram", "plot", "sentinel1", "utils", 
                 path.join("utils", "params"),
                 path.join("utils", "io"),
-                path.join("utils", "path")
+                path.join("utils", "path"),
+                path.join("utils", "command"),
             }
         }
         

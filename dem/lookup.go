@@ -11,19 +11,15 @@ import (
 )
 
 type Lookup struct {
-    data.File
+    data.ComplexFile
 }
 
-func (l *Lookup) Set(s string) (err error) {
-    return common.LoadJson(s, l)
-}
-
-var coord2sarpix = common.Gamma.Must("coord_to_sarpix")
+var coord2sarpix = common.Must("coord_to_sarpix")
 
 func ToRadar(ll common.LatLon, mpar, hgt, diffPar string) (ra common.RngAzi, err error) {
     const par = "corrected SLC/MLI range, azimuth pixel (int)"
     
-    out, err := coord2sarpix(mpar, "-", ll.Lat, ll.Lon, hgt, diffPar)
+    out, err := coord2sarpix.Call(mpar, "-", ll.Lat, ll.Lon, hgt, diffPar)
     if err != nil {
         err = utils.WrapFmt(err, "failed to retreive radar coordinates")
         return
@@ -194,7 +190,7 @@ func (opt *CodeOpt) Parse() (lrIn int, lrOut int) {
 }
 
 
-var g2r = common.Gamma.Must("geocode")
+var g2r = common.Must("geocode")
 
 func (l Lookup) geo2radar(in, out data.Data, opt CodeOpt) (err error) {
     lrIn, lrOut := opt.Parse()
@@ -243,7 +239,7 @@ func (l Lookup) geo2radar(in, out data.Data, opt CodeOpt) (err error) {
     }
     
     
-    _, err = g2r(l.DatFile, in.DataPath(), in.Rng(),
+    _, err = g2r.Call(l.DatFile, in.DataPath(), in.Rng(),
                  out.DataPath(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Oversamp,
                  opt.MaxRad, opt.Npoints)
@@ -251,7 +247,7 @@ func (l Lookup) geo2radar(in, out data.Data, opt CodeOpt) (err error) {
     return
 }
 
-var r2g = common.Gamma.Must("geocode_back")
+var r2g = common.Must("geocode_back")
 
 func (l Lookup) radar2geo(in, out data.Data, opt CodeOpt) (err error) {
     lrIn, lrOut := opt.Parse()
@@ -310,7 +306,7 @@ func (l Lookup) radar2geo(in, out data.Data, opt CodeOpt) (err error) {
         
     }
     
-    _, err = r2g(in.DataPath(), in.Rng(), l.DatFile,
+    _, err = r2g.Call(in.DataPath(), in.Rng(), l.DatFile,
                  out.DataPath(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Order)
     

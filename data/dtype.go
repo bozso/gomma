@@ -76,14 +76,14 @@ func (d Type) String() string {
 }
 
 type TypeMismatchError struct {
-    ftype, expected string
+    datafile, expected string
     Type
     Err error
 }
 
 func (e TypeMismatchError) Error() string {
-    return fmt.Sprintf("expected datatype '%s' for %s datafile, got '%s'",
-        e.expected, e.ftype, e.Type.String())
+    return fmt.Sprintf("expected datatype '%s' for datafile '%s', got '%s'",
+        e.expected, e.datafile, e.Type.String())
 }
 
 func (e TypeMismatchError) Unwrap() error {

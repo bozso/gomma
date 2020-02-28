@@ -3,16 +3,8 @@ package utils
 import (
     "fmt"
     "log"
-    "os/exec"
     "strconv"
     "strings"
-)
-
-const merr = ModuleName("gamma.utils")
-
-type (
-    CmdFun     func(args ...interface{}) (string, error)
-    Joiner     func(args ...string) string
 )
 
 type ColorCode int
@@ -34,6 +26,7 @@ func Color(s string, color ColorCode) string {
             error_   = "\033[1;31m%s\033[0m"
             debug    = "\033[0;36m%s\033[0m"
             bold     = "\033[1;0m%s\033[0m"
+            end      = "\033[0m"
     )
     
     var format string
@@ -68,33 +61,6 @@ func Fatal(err error, format string, args ...interface{}) {
     }
 }
 
-
-func MakeCmd(cmd string) CmdFun {
-    return func(args ...interface{}) (string, error) {
-        arg := make([]string, len(args))
-
-        for ii, elem := range args {
-            if elem != nil {
-                arg[ii] = fmt.Sprint(elem)
-            } else {
-                arg[ii] = "-"
-            }
-        }
-
-        // fmt.Printf("%s %s\n", cmd, str.Join(arg, " "))
-        // os.Exit(0)
-
-        out, err := exec.Command(cmd, arg...).CombinedOutput()
-        result := string(out)
-
-        if err != nil {
-            return "", ExeErr.Wrap(err, cmd, strings.Join(arg, " "), result)
-        }
-
-        return result, nil
-    }
-}
-
 type SplitParser struct {
     split []string
     len int
@@ -105,7 +71,7 @@ func NewSplitParser(s, sep string) (sp SplitParser, err error) {
     sp.len = len(sp.split)
     
     if sp.len == 0 {
-        err = merr.Make("NewSplitParser").Fmt(
+        err = fmt.Errorf(
             "string '%s' could no be split into " +
             "multiple parts with separator '%s'", s, sep)
     }
@@ -127,21 +93,14 @@ func (sp SplitParser) Idx(idx int) (s string, err error) {
 }
 
 func (sp SplitParser) Int(idx int) (i int, err error) {
-    ferr := merr.Make("SplitParser.Int")
-    
+
     s, err := sp.Idx(idx)
     
     if err != nil {
-        err = ferr.Wrap(err)
         return
     }
     
     i, err = strconv.Atoi(s)
-    
-    if err != nil {
-        err = ferr.Wrap(err)
-    }
-    
     return
 }
 
@@ -152,58 +111,4 @@ func (sp SplitParser) Float(idx int) (f float64, err error) {
     f, err = strconv.ParseFloat(s, 64)
     
     return
-}
-
-
-type ( 
-    ModuleName string
-    FnName string
-    
-    OpError struct {
-        module ModuleName
-        fn     FnName
-        ctx    string
-        err    error
-    }
-)
-
-func (m ModuleName) Make(fn FnName) OpError {
-    return OpError{module: m, fn:fn}
-}
-
-func (e OpError) Error() (s string) {
-    s = fmt.Sprintf("\n  %s/%s", e.module, e.fn)
-    //s = fmt.Sprintf("\n  %s", Color(s, Error))
-    
-    if ctx := e.ctx; len(ctx) > 0 {
-        s = fmt.Sprintf("%s: %s", s, ctx)
-    } 
-    
-    if e.err != nil {
-        s = fmt.Sprintf("%s: %s", s, e.err)
-    }
-    
-    return
-}
-
-func (e OpError) Unwrap() error {
-    return e.err
-}
-
-func (e OpError) Wrap(err error) error {
-    e.err = err
-    return e
-}
-
-func (e OpError) WrapFmt(err error, msg string, args ...interface{}) error {
-    e.err = err
-    e.ctx = fmt.Sprintf(msg, args...)
-    
-    return e
-}
-
-func (e OpError) Fmt(msg string, args ...interface{}) error {
-    e.err = fmt.Errorf(msg, args...)
-    
-    return e
 }

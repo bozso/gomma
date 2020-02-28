@@ -10,19 +10,10 @@ import (
 )
 
 type SLC struct {
-    data.File
+    data.ComplexFile `json:"SLC"`
 }
 
-func SLCFromFile(path string) (slc SLC, err error) {
-    err = slc.Set(path)
-    if err != nil { return; }
-    
-    err = slc.TypeCheck("SLC", "complex", data.FloatCpx, data.ShortCpx)
-    
-    return
-}
-
-var multiLook = common.Gamma.Must("multi_look")
+var multiLook = common.Must("multi_look")
 
 type (
     // TODO: add loff, nlines
@@ -48,7 +39,7 @@ func (opt *MLIOpt) Parse() {
 func (s SLC) MLI(out MLI, opt MLIOpt) (err error) {
     opt.Parse()
     
-    _, err = multiLook(s.DatFile, s.ParFile, out.DatFile, out.ParFile,
+    _, err = multiLook.Call(s.DatFile, s.ParFile, out.DatFile, out.ParFile,
                        opt.Looks.Rng, opt.Looks.Azi,
                        //opt.Subset.RngOffset, opt.Subset.RngWidth,
                        opt.ScaleExp.Scale, opt.ScaleExp.Exp)
@@ -68,7 +59,7 @@ type (
 )
 
 
-var sbiInt = common.Gamma.Must("SBI_INT")
+var sbiInt = common.Must("SBI_INT")
 
 func (opt *SBIOpt) Default() {
     opt.Looks.Default()
@@ -85,7 +76,7 @@ func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (err error) {
     if opt.InvWeight { iwflg = 1 }
     if opt.Keep { cflg = 1 }
     
-    _, err = sbiInt(ref.DatFile, ref.ParFile,
+    _, err = sbiInt.Call(ref.DatFile, ref.ParFile,
                     slave.DatFile, slave.ParFile,
                     opt.Ifg, opt.Ifg + ".off", opt.Mli, opt.Mli + ".par", 
                     opt.NormSquintDiff, opt.Looks.Rng, opt.Looks.Azi,
@@ -116,7 +107,7 @@ const (
     IfgUnwrapped
 )
 
-var ssiInt = common.Gamma.Must("SSI_INT")
+var ssiInt = common.Must("SSI_INT")
 
 func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err error) {
     mode := 1
@@ -134,7 +125,7 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err
     
     ID := fmt.Sprintf("%s_%s", mID, sID)
     
-    _, err = ssiInt(ref.DatFile, ref.ParFile, mli.DatFile, mli.ParFile,
+    _, err = ssiInt.Call(ref.DatFile, ref.ParFile, mli.DatFile, mli.ParFile,
         opt.Hgt, opt.LtFine, slave.DatFile, slave.ParFile, mode,
         mID, sID, ID, opt.OutDir, cflg)
     
@@ -146,9 +137,4 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err
 func (s SLC) Raster(opt plot.RasArgs) error {
     opt.Mode = plot.SingleLook
     return s.Raster(opt)
-}
-
-func (slc *SLC) Set(s string) (err error) {
-    *slc, err = SLCFromFile(s)
-    return
 }

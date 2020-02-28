@@ -27,10 +27,10 @@ type (
     }
     
     File struct {
-        DatFile   string  `json:"datafile"`
-        ParFile   string  `json:"parameterfile"`
-        Dtype     Type    `json:"data_type"`
-        Ra        common.RngAzi
+        DatFile   string        `json:"datafile"`
+        ParFile   string        `json:"parameterfile"`
+        Dtype     Type          `json:"data_type"`
+        Ra        common.RngAzi `json: "rng_azi"`
         time.Time
     }
 )
@@ -63,7 +63,7 @@ func (d File) DataType() Type {
     return d.Dtype
 }
 
-func (d File) TypeCheck(ftype, expect string, dtypes... Type) (err error) {
+func (d File) TypeCheck(expect string, dtypes... Type) (err error) {
     D := d.Dtype
     
     for _, dt := range dtypes {
@@ -72,7 +72,7 @@ func (d File) TypeCheck(ftype, expect string, dtypes... Type) (err error) {
         }
     }
     
-    return TypeMismatchError{ftype:ftype, expected:expect, Type:D}
+    return TypeMismatchError{datafile:d.DatFile, expected:expect, Type:D}
 }
 
 func (d File) Save(p string) (err error) {
