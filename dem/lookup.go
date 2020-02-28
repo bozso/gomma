@@ -199,7 +199,7 @@ var g2r = common.Gamma.Must("geocode")
 func (l Lookup) geo2radar(in, out data.Data, opt CodeOpt) (err error) {
     lrIn, lrOut := opt.Parse()
     
-    if err = opt.RngAzi.Check(); err != nil {
+    if err = opt.RngAzi.Validate(); err != nil {
         return
     }
     
@@ -256,7 +256,7 @@ var r2g = common.Gamma.Must("geocode_back")
 func (l Lookup) radar2geo(in, out data.Data, opt CodeOpt) (err error) {
     lrIn, lrOut := opt.Parse()
     
-    if err = opt.RngAzi.Check(); err != nil {
+    if err = opt.RngAzi.Validate(); err != nil {
         return
     }
     

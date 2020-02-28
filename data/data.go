@@ -1,7 +1,5 @@
 package data
 
-// TODO: seperate field for storing rng, azi, DType values
-
 import (
     "fmt"
     "time"
@@ -150,8 +148,7 @@ func SameShape(one common.Dims, two common.Dims) (err *ShapeMismatchError) {
     err = SameCols(one, two)
     if err != nil { return }
 
-    err = SameRows(one, two)
-    return
+    return SameRows(one, two)
 }
 
 type ShapeMismatchError struct {
@@ -195,7 +192,6 @@ type(
         //s.AziLines = d.GetAzi()
     //}
 //}
-
 
 
 func (d *File) Set(s string) (err error) {

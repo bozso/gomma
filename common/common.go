@@ -8,7 +8,6 @@ import (
     "strings"
     "encoding/json"
     "path/filepath"
-    "fmt"
     
     "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/utils/io"
@@ -16,90 +15,7 @@ import (
 
 const DefaultCachePath = "/mnt/bozso_i/cache"
 
-type RngAzi struct {
-    Rng int `json:"rng"`
-    Azi int `json:"azi"`
-}
-
-var DefaultRngAzi = RngAzi{Rng:1, Azi:1}
-
-func (ra RngAzi) String() string {
-    return fmt.Sprintf("%d,%d", ra.Rng, ra.Azi)
-}
-
-func (ra *RngAzi) Set(s string) (err error) {
-    if len(s) == 0 {
-        return utils.EmptyStringError{}
-    }
-    
-    split, err := utils.NewSplitParser(s, ",")
-    if err != nil { return }
-    
-    ra.Rng, err = split.Int(0)
-    if err != nil { return }
-
-    ra.Azi, err = split.Int(1)
-    
-    return
-}
-
-func (ra *RngAzi) Default() {
-    if ra.Rng == 0 {
-        ra.Rng = 1
-    }
-    
-    if ra.Azi == 0 {
-        ra.Azi = 1
-    }
-}
-
-func (ra RngAzi) Check() (err error) {
-    if ra.Rng == 0 {
-        return ZeroDimError{dim: "range samples / columns"}
-    }
-    
-    if ra.Azi == 0 {
-        return ZeroDimError{dim: "azimuth lines / rows"}
-    }
-    
-    return nil
-}
-
-type Dims interface {
-    Rng() int
-    Azi() int
-}
-
-type ZeroDimError struct {
-    dim string
-    err error
-}
-
-func (e ZeroDimError) Error() string {
-    return fmt.Sprintf("expected %s to be non zero", e.dim)
-}
-
-func (e ZeroDimError) Unwrap() error {
-    return e.err
-}
-
-
 type (
-    Minmax struct {
-        Min float64 `name:"min" default:"0.0"`
-        Max float64 `name:"max" default:"1.0"`
-    }
-    
-    IMinmax struct {
-        Min int `name:"min" default:"0"`
-        Max int `name:"max" default:"1"`
-    }
-    
-    LatLon struct {
-        Lat float64 `name:"lan" default:"1.0"`
-        Lon float64 `name:"lot" default:"1.0"`
-    }
-
     Slice []string
     GammaFun map[string]utils.CmdFun
 
@@ -107,16 +23,6 @@ type (
         RasExt    string
         Path      string
         Modules   []string
-    }
-
-    Point struct {
-        X, Y float64
-    }
-    
-    AOI [4]Point
-    
-    Rectangle struct {
-        Max, Min Point
     }
 )
 
@@ -197,12 +103,6 @@ func NoExt(p string) string {
     return strings.TrimSuffix(p, path.Ext(p))
 }
 
-
-func (p Point) InRect(r Rectangle) bool {
-    return (p.X < r.Max.X && p.X > r.Min.X &&
-            p.Y < r.Max.Y && p.Y > r.Min.Y)
-}
-
 func isclose(num1, num2 float64) bool {
     return math.RoundToEven(math.Abs(num1 - num2)) > 0.0
 }
@@ -216,57 +116,6 @@ func (sl Slice) Contains(s string) bool {
     return false
 }
 
-func (mm *IMinmax) Set(s string) (err error) {
-    if len(s) == 0 {
-        return utils.EmptyStringError{}
-    }
-    
-    split, err := utils.NewSplitParser(s, ",")
-    if err != nil {
-        return
-    }
-    
-    mm.Min, err = split.Int(0)
-    if err != nil {
-        return
-    }
-    
-    mm.Max, err = split.Int(1)
-    if err != nil {
-        return
-    }
-    
-    return nil
-}
-
-func (ll LatLon) String() string {
-    return fmt.Sprintf("%f,%f", ll.Lon, ll.Lat)
-}
-
-func (ll *LatLon) Set(s string) (err error) {
-    var ferr = merr.Make("LatLon.Decode")
-
-    if len(s) == 0 {
-        return ferr.Wrap(utils.EmptyStringError{})
-    }
-    
-    split, err := utils.NewSplitParser(s, ",")
-    if err != nil {
-        return
-    }
-    
-    ll.Lat, err = split.Float(0)
-    if err != nil {
-        return
-    }
-
-    ll.Lon, err = split.Float(1)
-    if err != nil {
-        return
-    }
-    
-    return nil
-}
 
 func SaveJson(path string, val interface{}) (err error) {
     out, err := json.MarshalIndent(val, "", "    ")
@@ -287,6 +136,10 @@ func SaveJson(path string, val interface{}) (err error) {
     return nil
 }
 
+type Validator interface {
+    Validate() error
+}
+
 func LoadJson(path string, val interface{}) (err error) {
     d, err := io.ReadFile(path)
     if err != nil {
@@ -296,6 +149,14 @@ func LoadJson(path string, val interface{}) (err error) {
     if err := json.Unmarshal(d, &val); err != nil {
         return utils.WrapFmt(err, "failed to parse json data %s'", d)
     }
-
-    return nil
+    
+    v, ok := val.(Validator)
+    
+    if !ok {
+        return nil
+    }
+    
+    err = v.Validate()
+    
+    return
 }
