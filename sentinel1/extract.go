@@ -2,12 +2,15 @@ package sentinel1
 
 import (
     "io"
-    "os"
     "log"
     "fmt"
     "archive/zip"
     "path/filepath"
     "regexp"
+
+    "github.com/bozso/gamma/utils"
+    "github.com/bozso/gamma/utils/path"
+    "github.com/bozso/gamma/utils/stream"
 )
 
 type Extractor struct {
@@ -58,18 +61,14 @@ func (ex *Extractor) Extract(mode tplType, iw int) (s string) {
 
 func (ex Extractor) extract(template, dst string) (s string, err error) {
     //log.Fatalf("%s %s", root, template)
-    
-    var (
-        ferr = merr.Make("Extractor.extract")
-        matched, exist bool
-    )
+    var matched, exist bool
     
     // go through files in the zipfile
     for _, zipfile := range ex.ReadCloser.File {
         name := zipfile.Name
         
         if matched, err = regexp.MatchString(name, template); err != nil {
-            err = ferr.WrapFmt(err,
+            err = utils.WrapFmt(err,
                 "failed to check whether zipped file '%s' matches templates",
                 name)
             return
@@ -85,14 +84,14 @@ func (ex Extractor) extract(template, dst string) (s string, err error) {
         //fmt.Printf("\n\nCurrent: %s\nTemplate: %s\nMatched: %v\n",
         //    name, template, matched)
         
-        if exist, err = Exist(s); err != nil {
-            err = ferr.WrapFmt(err, "stat failed on file '%s'", name)
+        if exist, err = paths.Exist(s); err != nil {
+            err = utils.WrapFmt(err, "stat failed on file '%s'", name)
             return
         }
         
         if !exist {
             if err = extractFile(zipfile, s); err != nil {
-                err = ferr.Wrap(ExtractError{name, err})
+                err = ExtractError{name, err}
                 return
             }
         }
@@ -102,32 +101,26 @@ func (ex Extractor) extract(template, dst string) (s string, err error) {
 }
 
 func extractFile(src *zip.File, dst string) (err error) {
-    var (
-        ferr = merr.Make("extractFile")
-        srcName = src.Name
-        in io.ReadCloser
-    )
-
-    if in, err = src.Open(); err != nil {
-        return ferr.Wrap(FileOpenError{srcName, err})
-    }
+    srcName := src.Name
+    
+    in, err := stream.Open(srcName)
+    
+    if err != nil { return }
     defer in.Close()
     
     dir := filepath.Dir(dst)
-    if err = Mkdir(dir); err != nil {
-        return ferr.Wrap(err)
+    if err = path.Mkdir(dir); err != nil {
+        return
     }
     
-    var out *os.File
-    if out, err = os.Create(dst); err != nil {
-        return ferr.Wrap(FileOpenError{dst, err})
-    }
+    out, err := stream.Create(dst)
+    if err != nil { return }
     defer out.Close()
     
     log.Printf("Extracting '%s' into '%s'", srcName, dst)
     
     if _, err = io.Copy(out, in); err != nil {
-        return ferr.WrapFmt(err,
+        return utils.WrapFmt(err,
             "failed to copy contents of '%s' into '%s'", srcName, dst)
     }
 

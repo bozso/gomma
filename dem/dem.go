@@ -9,9 +9,20 @@ type File struct {
     data.FloatFile
 }
 
-var Import = data.Importer{
+var Import = data.ParamKeys{
     RngKey: "width",
     AziKey: "nlines",
+    TypeKey: "",
+    DateKey: "",
+}
+
+func FromDataPath(p string) (f File) {
+    f.FloatFile.File = data.FromDataPath(p, "dem_par")
+    return
+}
+
+func (f *File) Load() (err error) {
+    return f.FloatFile.Load(&Import)
 }
 
 func (d File) NewLookup(path string) (l Lookup) {

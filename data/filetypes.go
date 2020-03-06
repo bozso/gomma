@@ -5,7 +5,7 @@ type FloatFile struct {
 }
 
 func (f FloatFile) Validate() (err error) {
-    return f.TypeCheck("float", Float, Double)
+    return f.TypeCheck(Float, Double)
 }
 
 type ComplexFile struct {
@@ -13,5 +13,5 @@ type ComplexFile struct {
 }
 
 func (c ComplexFile) Validate() (err error) {
-    return c.TypeCheck("complex", ShortCpx, FloatCpx)
+    return c.TypeCheck(ShortCpx, FloatCpx)
 }

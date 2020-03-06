@@ -7,9 +7,8 @@ import (
     "os"
     "io"
     "strings"
-    
-    "github.com/bozso/gamma/utils"
-    uio "github.com/bozso/gamma/utils/io"
+
+    "github.com/bozso/gamma/utils/stream"
 )
 
 const defaultLen = 15
@@ -25,6 +24,11 @@ type (
         p params
     }
 )
+
+func (p Params) ToParser() (par Parser) {
+    par.Retreiver = p
+    return
+}
 
 func New(path, sep string) (p Params) {
     p.path, p.sep = path, sep
@@ -45,14 +49,16 @@ func WithLen(path, sep string, count int) (p Params) {
 func FromFile(path, sep string) (p Params, err error) {
     p = New(path, sep)
     
-    reader, err := uio.NewReader(path)
+    reader, err := stream.Open(path)
     if err != nil {
         return
     }
     defer reader.Close()
     
-    for reader.Scan() {
-        line := reader.Text()
+    scanner := reader.Scanner()
+    
+    for scanner.Scan() {
+        line := scanner.Text()
         
         if len(line) == 0 || !strings.Contains(line, sep) {
             continue
@@ -104,36 +110,6 @@ func (p Params) Param(key string) (s string, err error) {
     return
 }
 
-func (p Params) Splitter(key string) (sp utils.SplitParser, err error) {
-    s, err := p.Param(key)
-    if err != nil {
-        return
-    }
-    
-    sp, err = utils.NewSplitParser(s, " ")
-    return
-}
-
-
-func (p Params) Int(key string, idx int) (ii int, err error) {
-    sp, err := p.Splitter(key)
-    if err != nil {
-        return
-    }
-    
-    ii, err = sp.Int(idx)
-    return
-}
-
-func (p Params) Float(key string, idx int) (ff float64, err error) {
-    sp, err := p.Splitter(key)
-    if err != nil {
-        return
-    }
-    
-    ff, err = sp.Float(idx)
-    return
-}
 
 func (p Params) SetVal(key, val string) {
     s := fmt.Sprintf("%s%s%s", key, p.sep, val)

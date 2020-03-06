@@ -3,7 +3,6 @@ package common
 import (
     "fmt"
     "log"
-    "os"
     "math"
     "path"
     "strings"
@@ -11,8 +10,9 @@ import (
     "path/filepath"
     
     "github.com/bozso/gamma/utils"
-    "github.com/bozso/gamma/utils/io"
     "github.com/bozso/gamma/utils/command"
+    "github.com/bozso/gamma/utils/stream"
+    upath "github.com/bozso/gamma/utils/path"
 )
 
 const DefaultCachePath = "/mnt/bozso_i/cache"
@@ -151,15 +151,13 @@ func SaveJson(path string, val interface{}) (err error) {
     if err != nil {
         return utils.WrapFmt(err, "failed to json encode struct: %v", val)
     }
-
-    f, err := os.Create(path)
-    if err != nil {
-        return io.CreateFail(path, err)
-    }
+    
+    f, err := stream.Create(path)
+    if err != nil { return }
     defer f.Close()
 
     if _, err = f.Write(out); err != nil {
-        return io.WriteFail(path, err)
+        return
     }
 
     return nil
@@ -169,10 +167,10 @@ type Validator interface {
     Validate() error
 }
 
-func LoadJson(path string, val interface{}) (err error) {
-    d, err := io.ReadFile(path)
+func LoadJson(p string, val interface{}) (err error) {
+    d, err := upath.ReadFile(p)
     if err != nil {
-        return utils.WrapFmt(err, "failed to read file '%s'", path)
+        return utils.WrapFmt(err, "failed to read file '%s'", p)
     }
     
     if err := json.Unmarshal(d, &val); err != nil {

@@ -77,7 +77,7 @@ const (
     Gauss
 )
 
-func (i *InterpolationMode) Decode(s string) (err error) {
+func (i *InterpolationMode) Set(s string) (err error) {
     switch s {
     case "NearestNeighbour":
         *i = NearestNeighbour

@@ -82,7 +82,7 @@ type TypeMismatchError struct {
 }
 
 func (e TypeMismatchError) Error() string {
-    return fmt.Sprintf("expected datatype '%s' for datafile '%s', got '%s'",
+    return fmt.Sprintf("expected datatype(s) '%s' for datafile '%s', got '%s'",
         e.expected, e.datafile, e.Type.String())
 }
 

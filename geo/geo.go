@@ -2,13 +2,16 @@ package geo
 
 import (
     "log"
-    "fmt"
     "os"
     "path/filepath"
     
     "github.com/bozso/gamma/data"
+    "github.com/bozso/gamma/dem"
     "github.com/bozso/gamma/plot"
     "github.com/bozso/gamma/base"
+    "github.com/bozso/gamma/common"
+    "github.com/bozso/gamma/utils"
+    "github.com/bozso/gamma/utils/path"
 )
 
 
@@ -21,7 +24,7 @@ func (h *Hgt) Set(s string) (err error) {
 }
 
 func (h Hgt) Raster(opt plot.RasArgs) (err error) {
-    opt.Mode = Height
+    opt.Mode = plot.Height
     opt.Parse(h)
     
     err = plot.Raster(h, opt)
@@ -29,8 +32,7 @@ func (h Hgt) Raster(opt plot.RasArgs) (err error) {
 }
 
 type Geocode struct {
-    MLI base.MLI
-    DiffPar, Offs, Offsets, Ccp, Coffs, Coffsets, Sigma0, Gamma0 string
+    DiffPar, Offs, Offsets, Ccp, Coffs, Coffsets string
 }
 
 type (
@@ -69,35 +71,32 @@ const (
 )
 
 var (
-    createDiffPar = common.Gamma.Must("create_diff_par")
-    vrt2dem = common.Gamma.Must("vrt2dem")
-    //gcMap = common.Gamma.Must("gc_map2")
-    gcMap = common.Gamma.Must("gc_map")
-    pixelArea = common.Gamma.Must("pixel_area")
-    offsetPwrm = common.Gamma.Must("offset_pwrm")
-    offsetFitm = common.Gamma.Must("offset_fitm")
-    gcMapFine = common.Gamma.Must("gc_map_fine")
+    createDiffPar = common.Must("create_diff_par")
+    vrt2dem = common.Must("vrt2dem")
+    gcMap = common.Must("gc_map")
+    pixelArea = common.Must("pixel_area")
+    offsetPwrm = common.Must("offset_pwrm")
+    offsetFitm = common.Must("offset_fitm")
+    gcMapFine = common.Must("gc_map_fine")
+    
+    //gcMap = common.Must("gc_map2")
 )
 
+type GeocodeOpt struct {
+    MasterMLI base.MLI
+    DEMOverlap, OffsetWindows common.RngAzi
+    Iter, NPoly, RngOversamp, nPixel, LanczosOrder int
+    MLIOversamp int
+    DEMOversamp common.LatLon
+    VrtPath string
+    CCThresh, AreaFactor, BandwithFrac float64
+}
+
 func (g* GeocodeOpt) Run(outDir string) (err error) {
-    var ferr = merr.Make("GeocodeOpt")
-    
     geodir := filepath.Join(outDir, "geo")
     
-    if err = Mkdir(geodir); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    var demOrig DEM
-    if demOrig, err = NewDEM(filepath.Join(geodir, "srtm.dem"), "");
-       err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    vrtPath := g.DEMPath
-    
-    if len(vrtPath) == 0 {
-        return ferr.Wrap(fmt.Errorf("path to vrt files not specified"))
+    if err = path.Mkdir(geodir); err != nil {
+        return
     }
     
     overlap := g.DEMOverlap
@@ -116,28 +115,39 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         npoly = 4
     }
     
+    originalDem := dem.FromDataPath(filepath.Join(geodir, "srtm.dem"))
     
+    vrtPath := g.VrtPath
     
-    var ex bool
-    if ex, err = Exist(demOrig.Dat); err != nil {
-        return ferr.WrapFmt(err,
+    if err = utils.NotEmpty("path to vrt files", vrtPath); err != nil {
+        return
+    }
+
+    ex, err := path.Exist(originalDem.DatFile)
+    if err != nil {
+        return utils.WrapFmt(err,
             "failed to check whether original DEM exists")
     }
     
-    var mli MLI
-    if mli, err = NewMLI(g.Master.Dat, g.Master.Par); err != nil {
-        return ferr.WrapFmt(err, "failed to parse master MLI file")
-    }
+    mli := g.MasterMLI
     
     if !ex {
         log.Printf("Creating DEM from %s\n", vrtPath)
         
         // magic number 2 = add interpolated geoid offset
-        _, err = vrt2dem(vrtPath, mli.Par, demOrig.Dat, demOrig.Par, 2, "-")
+        _, err = vrt2dem.Call(vrtPath, mli.ParFile,
+            originalDem.DatFile, originalDem.ParFile, 2, "-")
         
-        if err != nil {
-            return ferr.WrapFmt(err, "failed to create DEM from vrt file")
+        if err != nil { return }
+        
+        if err = originalDem.Load(); err != nil {
+            return
         }
+        
+        if err = originalDem.Save(""); err != nil {
+            return
+        }
+        
     } else {
         log.Println("DEM already imported.")
     }
@@ -145,7 +155,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     mra := mli.Ra
     offsetWin := g.OffsetWindows
     
-    Patch := RngAzi{
+    Patch := common.RngAzi{
         Rng: int(float64(mra.Rng) / float64(offsetWin.Rng) +
              float64(overlap.Rng) / 2),
         
@@ -163,99 +173,49 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         Patch.Azi += 1
     }
     
-    var dem DEM
-    if dem, err = NewDEM(filepath.Join(geodir, "dem_seg.dem"), "");
-       err != nil {
-        return ferr.Wrap(err)
+    segmentedDem := dem.FromDataPath(filepath.Join(geodir, "dem_seg.dem"))
+
+    gdir := path.NewJoiner(geodir)
+    
+    Geo := Geocode{
+        Offs    : gdir.Join("offs"),
+        Offsets : gdir.Join("offsets"),
+        Ccp     : gdir.Join("ccp"),
+        Coffs   : gdir.Join("coffs"),
+        Coffsets: gdir.Join("coffsets"),
+        DiffPar : gdir.Join("diff_par"),
     }
     
-    geo := Geocode{
-        Offs    : filepath.Join(geodir, "offs"),
-        Offsets : filepath.Join(geodir, "offsets"),
-        Ccp     : filepath.Join(geodir, "ccp"),
-        Coffs   : filepath.Join(geodir, "coffs"),
-        Coffsets: filepath.Join(geodir, "coffsets"),
-        DiffPar : filepath.Join(geodir, "diff_par"),
-        MLI     : mli,
-    }
+    sigma0 := mli.WithShape(gdir.Join("sigma0"), data.Float)
+    gamma0 := mli.WithShape(gdir.Join("gamma0"), data.Float)
+    lsMap := mli.WithShape(gdir.Join("lsmap"), data.Float)
+    simSar := mli.WithShape(gdir.Join("sim_sar"), data.Float)
+    zenith := mli.WithShape(gdir.Join("zenith"), data.Float)
+    orient := mli.WithShape(gdir.Join("orient"), data.Float)
+    inc := mli.WithShape(gdir.Join("inclination"), data.Float)
+    proj := mli.WithShape(gdir.Join("projection"), data.Float)
+    pix := mli.WithShape(gdir.Join("pixel_area"), data.Float)
     
-    var sigma0, gamma0, lsMap, simSar, zenith, orient, inc, pix, proj DatFile
-    
-    if sigma0, err =  mli.Like(filepath.Join(geodir, "sigma0"), Float);
-       err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if gamma0, err =  mli.Like(filepath.Join(geodir, "gamma0"), Float);
-       err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    // datatype of lsmap?
-    if lsMap, err =  mli.Like(filepath.Join(geodir, "lsmap"), Float);
-       err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if simSar, err =  mli.Like(filepath.Join(geodir, "sim_sar"), Float);
-       err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if zenith, err =  mli.Like(filepath.Join(geodir, "zenith"), Float);
-       err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if orient, err =  mli.Like(filepath.Join(geodir, "orient"), Float);
-       err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if inc, err =  mli.Like(filepath.Join(geodir, "inclination"), Float);
-       err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if proj, err =  mli.Like(filepath.Join(geodir, "projection"), Float);
-       err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if pix, err =  mli.Like(filepath.Join(geodir, "pixel_area"), Float);
-       err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    var lookup Lookup
-    if lookup.DatFile, err = dem.Like(filepath.Join(geodir, "lookup"), FloatCpx);
-       err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    var lookupOld string
-    if lookupOld, err = TmpFile(""); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    var ex1 bool
-    if ex1, err = Exist(lookup.Dat); err != nil {
-        return ferr.WrapFmt(err,
+    lookup := segmentedDem.NewLookup(gdir.Join("lookup"))
+    lookupOld := segmentedDem.NewLookup(gdir.Join("lookup_old"))
+
+    ex1, err := path.Exist(lookup.DatFile)
+    if err != nil {
+        return utils.WrapFmt(err,
             "failed to check whether lookup table exists")
-        return
     }
     
-    
-    var ex2 bool
-    if ex2, err = Exist(dem.Par); err != nil {
-        return ferr.WrapFmt(err,
+    ex2, err := path.Exist(segmentedDem.ParFile)
+    if err != nil {
+        return utils.WrapFmt(err,
             "failed to check whether DEM parameter exists")
     }
+    
     
     if !ex1 && !ex2 {
         log.Println("Calculating initial lookup table.")
         
-        oversamp := g.DEMOverSampling
+        oversamp := g.DEMOversamp
         
         if oversamp.Lat < 1.0 {
             oversamp.Lat = 2.0
@@ -270,39 +230,42 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         }
         
         /*
-        _, err = gcMap(mli.par, demOrig.par, demOrig.dat, dem.par, dem.dat,
-                       dem.lookup, oversamp.Lat, oversamp.Lon, demOrig.lsMap,
-                       geo.lsMap, demOrig.incidence, demOrig.resolution,
-                       demOrig.offnadir, g.RngOversamp, Standard, NoMask,
+        _, err = gcMap(mli.par, originalDem.par, originalDem.dat, dem.par, dem.dat,
+                       dem.lookup, oversamp.Lat, oversamp.Lon, originalDem.lsMap,
+                       geo.lsMap, originalDem.incidence, originalDem.resolution,
+                       originalDem.offnadir, g.RngOversamp, Standard, NoMask,
                        g.nPixel, "-", Actual)
         */
         
-        _, err = gcMap(mli.Par, nil, demOrig.Par, demOrig.Dat, dem.Par, dem.Dat,
-                       lookup.Dat, oversamp.Lat, oversamp.Lon, simSar.Dat,
-                       zenith.Dat, orient.Dat, inc.Dat, proj.Dat, pix.Dat,
-                       lsMap.Dat, g.nPixel, 2, g.RngOversamp)
-        
-        if err != nil {
-            return ferr.Wrap(err)
-        }      
+        _, err = gcMap.Call(mli.ParFile, nil,
+            originalDem.ParFile, originalDem.DatFile,
+            segmentedDem.ParFile, segmentedDem.DatFile,
+            lookup.DatFile, oversamp.Lat, oversamp.Lon,
+            simSar.DatFile, zenith.DatFile, orient.DatFile,
+            inc.DatFile, proj.DatFile, pix.DatFile,
+            lsMap.DatFile, g.nPixel, 2, g.RngOversamp)
+                
+        if err != nil { return }      
     } else {
         log.Println("Initial lookup table already created.")
     }
     
-    dra := dem.Ra
-    
-    _, err = pixelArea(mli.Par, dem.Par, dem.Dat, lookup.Dat, lsMap.Dat,
-                       inc.Dat, sigma0.Dat, gamma0.Dat, g.AreaFactor)
-    
-    if err != nil {
-        return ferr.Wrap(err)
+    if err = segmentedDem.Load(); err != nil {
+        return
     }
     
-    _, err = createDiffPar(mli.Par, nil, geo.DiffPar, SLC_MLI, NonInter)
+    dra := segmentedDem.Ra
     
-    if err != nil {
-        return ferr.Wrap(err)
-    }
+    _, err = pixelArea.Call(mli.ParFile,
+        segmentedDem.ParFile, segmentedDem.DatFile,
+        lookup.DatFile, lsMap.DatFile,
+        inc.DatFile, sigma0.DatFile, gamma0.DatFile, g.AreaFactor)
+    
+    if err != nil { return }
+    
+    _, err = createDiffPar.Call(mli.ParFile, nil, Geo.DiffPar, SLC_MLI, NonInter)
+    
+    if err != nil { return }
     
     log.Println("Refining lookup table.")
     
@@ -312,72 +275,65 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         for ii := 0; ii < itr; ii++ {
             log.Printf("ITERATION %d / %d\n", ii + 1, itr)
             
-            if err = os.Remove(geo.DiffPar); err != nil {
-                return ferr.WrapFmt(err, "failed to remove file '%s'",
-                    geo.DiffPar)
+            if err = os.Remove(Geo.DiffPar); err != nil {
+                return utils.WrapFmt(err, "failed to remove file '%s'",
+                    Geo.DiffPar)
             }
 
             // copy previous lookup table
-            if err = os.Rename(lookup.Dat, lookupOld); err != nil {
-                return ferr.WrapFmt(err,
-                    "failed to move lookup file '%s'", lookup.Dat)
+            err = os.Rename(lookup.DatFile, lookupOld.DatFile)
+            if err != nil {
+                return utils.WrapFmt(err,
+                    "failed to move lookup file '%s'", lookup.DatFile)
             }
             
-            _, err = createDiffPar(mli.Par, nil, geo.DiffPar,
+            _, err = createDiffPar.Call(mli.ParFile, nil, Geo.DiffPar,
                                    SLC_MLI, NonInter)
             
-            if err != nil {
-                return ferr.Wrap(err)
-            }
+            if err != nil { return }
             
-            _, err = offsetPwrm(geo.Sigma0, mli.Dat, geo.DiffPar, geo.Offs,
-                                geo.Ccp, Patch.Rng, Patch.Azi, geo.Offsets,
-                                g.MLIOversamp, offsetWin.Rng, offsetWin.Azi,
-                                g.CCThresh, g.LanczosOrder, g.BandwithFrac)
+            _, err = offsetPwrm.Call(sigma0.DatFile, mli.DatFile,
+                Geo.DiffPar, Geo.Offs, Geo.Ccp, Patch.Rng, Patch.Azi,
+                Geo.Offsets, g.MLIOversamp, offsetWin.Rng,
+                offsetWin.Azi, g.CCThresh, g.LanczosOrder,
+                g.BandwithFrac)
             
-            if err != nil {
-                return ferr.Wrap(err)
-            }
+            if err != nil { return }
             
-            _, err = offsetFitm(geo.Offs, geo.Ccp, geo.DiffPar, geo.Coffs,
-                                geo.Coffsets, g.CCThresh, npoly, NonInter)
+            _, err = offsetFitm.Call(Geo.Offs, Geo.Ccp, Geo.DiffPar,
+                Geo.Coffs, Geo.Coffsets, g.CCThresh, npoly, NonInter)
             
-            
-            if err != nil {
-                return ferr.Wrap(err)
-            }
+            if err != nil { return }
 
             // update previous lookup table
             // TODO: magic number 1
-            _, err = gcMapFine(lookupOld, dra.Rng, geo.DiffPar,
-                               lookup.Dat, 1)
+            _, err = gcMapFine.Call(lookupOld.DatFile, dra.Rng,
+                Geo.DiffPar, lookup.DatFile, 1)
             
-            if err != nil {
-                return ferr.Wrap(err)
-            }
+            if err != nil { return }
 
             // create new simulated ampliutides with the new lookup table
-            _, err = pixelArea(mli.Par, dem.Par, dem.Dat, lookup.Dat, lsMap.Dat,
-                               inc.Dat, sigma0.Dat, gamma0.Dat, g.AreaFactor)
+            _, err = pixelArea.Call(mli.ParFile,
+                segmentedDem.ParFile, segmentedDem.DatFile,
+                lookup.DatFile, lsMap.DatFile, inc.DatFile,
+                sigma0.DatFile, gamma0.DatFile, g.AreaFactor)
             
-            if err != nil {
-                return ferr.Wrap(err)
-            }
+            if err != nil { return }
 
         }
         log.Println("ITERATION DONE.")
     }
     
     
-    toSave := []IDatFile{
-        &dem, &demOrig, &lookup, &sigma0, &gamma0, &lsMap, &simSar, &zenith,
-        &orient, &inc, &pix, &proj,
+    toSave := []data.Saver{
+        &segmentedDem, &lookup, &sigma0, &gamma0, &lsMap, &simSar,
+        &zenith, &orient, &inc, &pix, &proj,
     }
     
     for _, s := range toSave {
-        if err = SaveJson(s.Datfile() + ".json", s); err != nil {
-            return ferr.Wrap(err)
-        }
+        err = s.Save("")
+        
+        if err != nil { return }
     }
     
     return nil

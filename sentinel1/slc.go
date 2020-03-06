@@ -104,7 +104,7 @@ type MosaicOpts struct {
     RefTab string
 }
 
-var mosaic = common.Gamma.Must("SLC_mosaic_S1_TOPS")
+var mosaic = common.Must("SLC_mosaic_S1_TOPS")
 
 func (s1 S1SLC) Mosaic(out base.SLC, opts MosaicOpts) (err error) {
     ferr := merr.Make("S1SLC.Mosaic")
@@ -133,7 +133,7 @@ func (s1 S1SLC) Mosaic(out base.SLC, opts MosaicOpts) (err error) {
     return nil
 }
 
-var derampRef = common.Gamma.Must("S1_deramp_TOPS_reference")
+var derampRef = common.Must("S1_deramp_TOPS_reference")
 
 func (s1 S1SLC) DerampRef() (ds1 S1SLC, err error) {
     ferr := merr.Make("S1SLC.DerampRef")
@@ -155,7 +155,7 @@ func (s1 S1SLC) DerampRef() (ds1 S1SLC, err error) {
     return ds1, nil
 }
 
-var derampSlave = common.Gamma.Must("S1_deramp_TOPS_slave")
+var derampSlave = common.Must("S1_deramp_TOPS_slave")
 
 func (s1 S1SLC) DerampSlave(ref *S1SLC, looks common.RngAzi, keep bool) (ret S1SLC, err error) {
     ferr := merr.Make("S1SLC.DerampSlave")
@@ -232,7 +232,7 @@ func (s1 S1SLC) RSLC(outDir string) (ret S1SLC, err error) {
     return ret, nil
 }
 
-var MLIFun = common.Gamma.SelectFun("multi_look_ScanSAR", "multi_S1_TOPS")
+var MLIFun = common.SelectFun("multi_look_ScanSAR", "multi_S1_TOPS")
 
 func (s1 *S1SLC) MLI(mli *base.MLI, opt *base.MLIOpt) (err error) {
     ferr := merr.Make("S1SLC.MLI")

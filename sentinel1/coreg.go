@@ -5,13 +5,19 @@ import (
     "fmt"
     "log"
     "path/filepath"
+
+    "github.com/bozso/gamma/base"
+    "github.com/bozso/gamma/common"
+    "github.com/bozso/gamma/utils"
+    ifg "github.com/bozso/gamma/interferogram"
 )
+
 
 type (
     S1CoregOut struct {
-        RSLC SLC
-        Rslc sentinel1.S1SLC
-        Ifg IFG
+        RSLC base.SLC
+        Rslc S1SLC
+        Ifg ifg.File
     }
     
     S1CoregOpt struct {
@@ -20,13 +26,13 @@ type (
         CoherenceThresh, FractionThresh float64
         PhaseStdevThresh                float64
         Clean, UseInter                 bool  
-        Looks                           RngAzi
+        Looks                           common.RngAzi
     }
 )
 
-var coregFun = Gamma.Must("S1_coreg_TOPS")
+var coregFun = common.Must("S1_coreg_TOPS")
 
-func (s1 *S1CoregOpt) SetCli(c *Cli) {
+func (s1 *S1CoregOpt) SetCli(c *utils.Cli) {
 
     c.StringVar(&s1.IfgPath, "ifg",
         "Output interferogram metadata file", "")
@@ -55,8 +61,6 @@ func (s1 *S1CoregOpt) SetCli(c *Cli) {
 }
 
 func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
-    var ferr = merr.Make("S1CoregOpt.Coreg")
-    
     cleaning, flag1 := 0, 0
     
     if sc.Clean {
@@ -74,13 +78,11 @@ func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
     hgt := sc.Hgt
     
     if c.Rslc, err = slc.RSLC(sc.OutDir); err != nil {
-        err = ferr.Wrap(err)
         return
     }
     
     exist := false
     if exist, err = c.Rslc.Exist(); err != nil {
-        err = ferr.Wrap(err)
         return
     }
     
@@ -88,7 +90,6 @@ func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
         log.Printf("Coregistered RSLC already exists, moving it to directory.")
         
         if c.Rslc, err = c.Rslc.Move(sc.RslcPath); err != nil {
-            err = ferr.Wrap(err)
             return
         }
         
@@ -98,14 +99,12 @@ func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
     if ref == nil {
         log.Printf("Coregistering: '%s'", slc2Tab)
         
-        _, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, c.Rslc.Tab,
-                          hgt, sc.Looks.Rng, sc.Looks.Azi, sc.Poly1,
-                          sc.Poly2, sc.CoherenceThresh,
-                          sc.FractionThresh, sc.PhaseStdevThresh,
-                          cleaning, flag1)
+        _, err = coregFun.Call(slc1Tab, slc1ID, slc2Tab, slc2ID,
+            c.Rslc.Tab, hgt, sc.Looks.Rng, sc.Looks.Azi, sc.Poly1,
+            sc.Poly2, sc.CoherenceThresh, sc.FractionThresh,
+            sc.PhaseStdevThresh, cleaning, flag1)
         
         if err != nil {
-            err = ferr.Wrap(err)
             return
         }
     } else {
@@ -114,41 +113,35 @@ func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
         log.Printf("Coregistering: '%s'. Reference: '%s'", slc2Tab,
             rslcRefTab)
         
-        _, err = coregFun(slc1Tab, slc1ID, slc2Tab, slc2ID, c.Rslc.Tab,
-                          hgt, sc.Looks.Rng, sc.Looks.Azi, sc.Poly1,
-                          sc.Poly2, sc.CoherenceThresh,
-                          sc.FractionThresh, sc.PhaseStdevThresh,
-                          cleaning, flag1, rslcRefTab, rslcRefID)
+        _, err = coregFun.Call(slc1Tab, slc1ID, slc2Tab, slc2ID,
+            c.Rslc.Tab, hgt, sc.Looks.Rng, sc.Looks.Azi, sc.Poly1,
+            sc.Poly2, sc.CoherenceThresh, sc.FractionThresh,
+            sc.PhaseStdevThresh, cleaning, flag1, rslcRefTab, rslcRefID)
         
         if err != nil {
-            err = ferr.Wrap(err)
             return
         }
     }
     
     if c.RSLC, err = NewSLC(slc2ID + ".rslc", ""); err != nil {
-        err = ferr.Wrap(err)
         return
     }
     
     ID := fmt.Sprintf("%s_%s", slc1ID, slc2ID)
     
-    var ifg IFG
-    if ifg, err = NewIFG(ID + ".diff", ID + ".off", ID + ".diff_par");
-       err != nil {
-        err = ferr.Wrap(err)
+    ifg, err := NewIFG(ID + ".diff", ID + ".off", ID + ".diff_par")
+    if err != nil {
         return
     }
     
     ifg.Quality = ID + ".results"
         
     if c.Rslc, err = c.Rslc.Move(sc.RslcPath); err != nil {
-        err = ferr.Wrap(err)
         return
     }
     
     if c.Ifg, err = ifg.Move(sc.IfgPath); err != nil {
-        err = ferr.WrapFmt(err,
+        err = utils.WrapFmt(err,
             "failed to move interferogram '%s' to IFG directory",
             ifg.Dat)
         return
@@ -159,14 +152,14 @@ func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
         pattern := filepath.Join(sc.OutDir, slc1ID + "*")
         
         if glob, err = filepath.Glob(pattern); err != nil {
-            err = ferr.WrapFmt(err,
+            err = utils.WrapFmt(err,
                 "globbing for leftover files from coregistration failed")
             return
         }
         
         for _, file := range glob {
             if err = os.Remove(file); err != nil {
-                err = ferr.WrapFmt(err, "failed to remove file '%s'",
+                err = utils.WrapFmt(err, "failed to remove file '%s'",
                     file)
                 return
             }
@@ -175,14 +168,14 @@ func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
         pattern = filepath.Join(sc.OutDir, slc2ID + "*")
         
         if glob, err = filepath.Glob(pattern); err != nil {
-            err = ferr.WrapFmt(err,
+            err = utils.WrapFmt(err,
                 "globbing for leftover files from coregistration failed")
             return
         }
         
         for _, file := range glob {
             if err = os.Remove(file); err != nil {
-                err = ferr.WrapFmt(err, "failed to remove file '%s'",
+                err = utils.WrapFmt(err, "failed to remove file '%s'",
                     file)
                 return
             }

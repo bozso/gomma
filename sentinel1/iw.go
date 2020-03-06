@@ -17,7 +17,7 @@ type(
 )
 
 func NewIW(dat, par, TOPS_par string) (iw S1IW) {
-    iw.Dat = dat
+    iw.DatFile = dat
     
     if len(par) == 0 {
         par = dat + ".par"

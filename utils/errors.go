@@ -65,6 +65,14 @@ func (e ErrorBase) Unwrap() error {
     return e.err
 }
 
+func NotEmpty(variable, s string) (err error) {
+    if len(s) == 0 {
+        return EmptyStringError{variable, nil}
+    }
+    
+    return nil
+}
+
 type EmptyStringError struct {
     variable string
     err      error

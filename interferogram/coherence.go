@@ -1,6 +1,9 @@
 package interferogram
 
 import (
+    "log"
+    
+    "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/common"
     "github.com/bozso/gamma/data"
 )
@@ -12,6 +15,17 @@ const (
     Gaussian
 )
 
+func (cw CoherenceWeight) String() string {
+    switch cw {
+    case Constant:
+        return "constant"
+    case Gaussian:
+        return "gaussian"
+    default:
+        return "unknown"
+    }
+}
+
 type (
     Coherence struct {
         data.FloatFile
@@ -21,7 +35,7 @@ type (
         Box                    common.Minmax
         SlopeCorrelationThresh float64
         SlopeWindow            int
-        DatFile,  string
+        DatFile string
         Weight CoherenceWeight
     }
 )
@@ -33,7 +47,17 @@ var (
 )
 
 func (ifg File) Coherence(opt CoherenceOpt, c Coherence) (err error) {
-    weightFlag := CoherenceWeight[opt.WeightType]
+    weightFlag := 0
+    
+    switch w := opt.Weight; w {
+    case Constant:
+        weightFlag = 0
+    case Gaussian:
+        weightFlag = 1
+    default:
+        return utils.UnrecognizedMode(w.String(),
+            "adaptive coherence calculation")
+    }
     
     //log.info("CALCULATING COHERENCE AND CREATING QUICKLOOK IMAGES.")
     //log.info('Weight type is "%s"'.format(weight_type))
@@ -42,7 +66,7 @@ func (ifg File) Coherence(opt CoherenceOpt, c Coherence) (err error) {
     
     log.Printf("Estimating phase slope.")
     
-    // TODO: figure out name
+    // TODO: figure out a name
     slope := ".cpx"
     
     // parameters: xmin, xmax, ymin, ymax not yet given

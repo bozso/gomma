@@ -8,9 +8,10 @@ import (
     "strings"
     "time"
     
-    "github.com/bozso/gamma/data"
+    "github.com/bozso/gamma/date"
     "github.com/bozso/gamma/common"
     "github.com/bozso/gamma/utils"
+    "github.com/bozso/gamma/utils/params"
     "github.com/bozso/gamma/base"
 )
 
@@ -60,7 +61,7 @@ type (
 )
 
 var (
-    burstCorners = common.Gamma.SelectFun("ScanSAR_burst_corners",
+    burstCorners = common.SelectFun("ScanSAR_burst_corners",
         "SLC_burst_corners")
 
     calibPath = filepath.Join("annotation", "calibration")
@@ -155,7 +156,7 @@ func (s1 S1Zip) Info(dst string) (iws IWInfos, err error) {
     return iws, nil
 }
 
-func makePoint(info data.Params, max bool) (ret common.Point, err error) {
+func makePoint(info params.Parser, max bool) (ret common.Point, err error) {
     ferr := merr.Make("makePoint")
     var tpl_lon, tpl_lat string
 
@@ -188,7 +189,7 @@ type(
     IWInfos [maxIW]IWInfo
 )
 
-var parCmd = common.Gamma.Must("par_S1_SLC")
+var parCmd = common.Must("par_S1_SLC")
 
 func iwInfo(path string) (ret IWInfo, err error) {
     ferr := merr.Make("iwInfo")
@@ -506,7 +507,7 @@ type DateRange struct {
     start, stop, center time.Time
 }
 
-func NewDate(df common.DateFormat, start, stop string) (d DateRange, err error) {
+func NewDate(df date.ParseFmt, start, stop string) (d DateRange, err error) {
     _start, err := df.ParseDate(start)
     if err != nil {
         return

@@ -1,20 +1,29 @@
 package interferogram
 
 import (
+    "time"
+    "log"
+    "strings"
+    "strconv"
+    
     "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/datafile"
+    "github.com/bozso/gamma/data"
+    "github.com/bozso/gamma/base"
     "github.com/bozso/gamma/plot"
+    "github.com/bozso/gamma/utils"
+    "github.com/bozso/gamma/utils/path"
+    "github.com/bozso/gamma/utils/stream"
 )
 
 type File struct {
-    data.File
+    data.ComplexFile
     DiffPar   string        `json:"diff_par"`
     Quality   string        `json:"quality"`
     SimUnwrap string        `json:"simulated_unwrap"`
     DeltaT    time.Duration `json:"delta_time"`
 }
 
-func New(dat, off, diffpar string) (ifg IFG) {
+func New(dat, off, diffpar string) (ifg File) {
     ifg.File.DatFile, ifg.File.ParFile = dat, off
 
     if len(diffpar) == 0 {
@@ -26,23 +35,47 @@ func New(dat, off, diffpar string) (ifg IFG) {
     return
 }
 
+// TODO: implement
+var Importer = data.ParamKeys{
+    
+}
+
+// TODO: implement
+func (f *File) Load() (err error) {
+    return nil
+}
+
+func (ifg File) WithShape(datafile, off, diffpar string) (out File) {
+    if len(off) == 0 {
+        diffpar = datafile + ".off"
+    }
+
+    if len(diffpar) == 0 {
+        diffpar = datafile + ".diff_par"
+    }
+    
+    out.File.DatFile, out.File.ParFile, out.DiffPar = datafile, off, diffpar
+    
+    return
+}
+
 func (i File) Move(dir string) (im File, err error) {
-    if im.DatParFile, err = i.DatParFile.Move(dir); err != nil {
+    if im.File, err = i.File.Move(dir); err != nil {
         return
     }
     
-    if im.DiffPar.Par, err = Move(i.DiffPar.Par, dir); err != nil {
+    if im.DiffPar, err = path.Move(i.DiffPar, dir); err != nil {
         return
     }
     
     if len(i.SimUnwrap) > 0 {
-        if im.SimUnwrap, err = Move(i.SimUnwrap, dir); err != nil {
+        if im.SimUnwrap, err = path.Move(i.SimUnwrap, dir); err != nil {
             return
         }
     }
     
     if len(i.Quality) > 0 {
-        if im.Quality, err = Move(i.Quality, dir); err != nil {
+        if im.Quality, err = path.Move(i.Quality, dir); err != nil {
             return
         }
     }
@@ -50,23 +83,22 @@ func (i File) Move(dir string) (im File, err error) {
     return
 }
 
-func (i *File) Validate() (err error) {
-    return i.TypeCheck("IFG", "complex", ShortCpx, FloatCpx)
-}
 
 func (ifg File) CheckQuality() (b bool, err error) {
     qual := ifg.Quality
     
-    file, err := NewReader(qual)
-    if err != nil { return }
-    
+    file := stream.In{}
+    if err = file.Set(qual); err != nil {
+        return
+    }
     defer file.Close()
     
     offs := 0.0
     var diff float64
 
-    for file.Scan() {
-        line := file.Text()
+    scan := file.Scanner()
+    for scan.Scan() {
+        line := scan.Text()
         
         if len(line) == 0 {
             continue
@@ -103,10 +135,11 @@ type (
     OffsetAlgo int
 
     IfgOpt struct {
-        Looks RngAzi
+        Looks common.RngAzi
         interact bool
-        hgt string
+        hgt, datapath, off, diff string
         algo OffsetAlgo
+        ref *base.SLC
     }
 )
 
@@ -121,7 +154,7 @@ var (
     slcDiffIntf   = common.Must("SLC_diff_intf")
 )
 
-func FromSLC(slc1, slc2, ref *base.SLC, out File, opt IfgOpt) (err error) {
+func FromSLC(slc1, slc2 base.SLC, opt IfgOpt) (out File, err error) {
     inter := 0
     
     if opt.interact {
@@ -130,36 +163,38 @@ func FromSLC(slc1, slc2, ref *base.SLC, out File, opt IfgOpt) (err error) {
     
     rng, azi := opt.Looks.Rng, opt.Looks.Azi
     
-    par1, par2 := slc1.Par, slc2.Par
+    par1, par2 := slc1.ParFile, slc2.ParFile
+    
+    out = New(opt.datapath, opt.off, opt.diff)
     
     // TODO: check arguments!
-    _, err = createOffset.Call(par1, par2, out.Par, opt.algo,
+    _, err = createOffset.Call(par1, par2, out.ParFile, opt.algo,
         rng, azi, inter)
     if err != nil { return }
     
     slcRefPar := "-"
     
-    if ref != nil {
-        slcRefPar = ref.Par
+    if ref := opt.ref; ref != nil {
+        slcRefPar = ref.ParFile
     }
     
-    _, err = phaseSimOrb.Call(par1, par2, out.Par, opt.hgt,
+    _, err = phaseSimOrb.Call(par1, par2, out.ParFile, opt.hgt,
         out.SimUnwrap, slcRefPar, nil, nil, 1)
     if err != nil { return }
 
-    dat1, dat2 := slc1.Dat, slc2.Dat
-    _, err = slcDiffIntf(dat1, dat2, par1, par2, out.Par,
+    dat1, dat2 := slc1.DatFile, slc2.DatFile
+    _, err = slcDiffIntf.Call(dat1, dat2, par1, par2, out.ParFile,
         out.SimUnwrap, out.DiffPar, rng, azi, 0, 0)
     if err != nil { return }
     
-    if err = out.Parse(); err != nil {
+    if err = out.Load(); err != nil {
         return
     }
     
     // TODO: Check date difference order
     out.DeltaT = slc1.Time.Sub(slc2.Time)
     
-    return nil
+    return
 }
 
 type CpxToReal int
@@ -191,7 +226,7 @@ func (c CpxToReal) String() string {
 
 var cpxToReal = common.Must("cpx_to_real")
 
-func (ifg File) ToReal(mode CpxToReal, d data.Data) (err error) {
+func (ifg File) ToReal(mode CpxToReal, d data.FloatFile) (err error) {
     d.Ra = ifg.Ra
     
     Mode := 0
@@ -208,7 +243,7 @@ func (ifg File) ToReal(mode CpxToReal, d data.Data) (err error) {
     case Phase:
         Mode = 4
     default:
-        err = ModeError{name:"IFG.ToReal", got:mode}
+        err = utils.UnrecognizedMode(mode.String(), "interferogram.ToReal")
         return
     }
     
@@ -220,7 +255,7 @@ func (ifg File) ToReal(mode CpxToReal, d data.Data) (err error) {
 var rasmph_pwr24 = common.Must("rasmph_pwr24")
 
 func (ifg File) Raster(opt plot.RasArgs) (err error) {
-    opt.Mode = MagPhasePwr
+    opt.Mode = plot.MagPhasePwr
 
     err = ifg.Raster(opt)
     return
@@ -234,7 +269,7 @@ type AdaptFiltOpt struct {
 
 var adf = common.Must("adf")
 
-func (ifg IFG) AdaptFilt(opt AdaptFiltOpt, Ifg IFG, cc Coherence) (err error) {
+func (ifg File) AdaptFilt(opt AdaptFiltOpt, Ifg File, cc Coherence) (err error) {
     step := float64(opt.FFTWindow) / 8.0
     
     if opt.step > 0.0 {
