@@ -115,7 +115,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         npoly = 4
     }
     
-    originalDem := dem.FromDataPath(filepath.Join(geodir, "srtm.dem"))
+    demLoader := dem.FromDataPath(filepath.Join(geodir, "srtm.dem"))
     
     vrtPath := g.VrtPath
     
@@ -123,7 +123,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         return
     }
 
-    ex, err := path.Exist(originalDem.DatFile)
+    ex, err := path.Exist(demLoader.DatFile)
     if err != nil {
         return utils.WrapFmt(err,
             "failed to check whether original DEM exists")
@@ -136,20 +136,22 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         
         // magic number 2 = add interpolated geoid offset
         _, err = vrt2dem.Call(vrtPath, mli.ParFile,
-            originalDem.DatFile, originalDem.ParFile, 2, "-")
+            demLoader.DatFile, demLoader.ParFile, 2, "-")
         
         if err != nil { return }
         
-        if err = originalDem.Load(); err != nil {
-            return
-        }
-        
-        if err = originalDem.Save(""); err != nil {
-            return
-        }
         
     } else {
         log.Println("DEM already imported.")
+    }
+
+    originalDem, err := demLoader.Load()
+    if err != nil {
+        return
+    }
+
+    if err = originalDem.Save(""); err != nil {
+        return
     }
     
     mra := mli.Ra
@@ -173,7 +175,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         Patch.Azi += 1
     }
     
-    segmentedDem := dem.FromDataPath(filepath.Join(geodir, "dem_seg.dem"))
+    demLoader = dem.FromDataPath(filepath.Join(geodir, "dem_seg.dem"))
 
     gdir := path.NewJoiner(geodir)
     
@@ -196,8 +198,6 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     proj := mli.WithShape(gdir.Join("projection"), data.Float)
     pix := mli.WithShape(gdir.Join("pixel_area"), data.Float)
     
-    lookup := segmentedDem.NewLookup(gdir.Join("lookup"))
-    lookupOld := segmentedDem.NewLookup(gdir.Join("lookup_old"))
 
     ex1, err := path.Exist(lookup.DatFile)
     if err != nil {
@@ -205,12 +205,11 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
             "failed to check whether lookup table exists")
     }
     
-    ex2, err := path.Exist(segmentedDem.ParFile)
+    ex2, err := path.Exist(demLoader.ParFile)
     if err != nil {
         return utils.WrapFmt(err,
             "failed to check whether DEM parameter exists")
     }
-    
     
     if !ex1 && !ex2 {
         log.Println("Calculating initial lookup table.")
@@ -239,7 +238,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         
         _, err = gcMap.Call(mli.ParFile, nil,
             originalDem.ParFile, originalDem.DatFile,
-            segmentedDem.ParFile, segmentedDem.DatFile,
+            demLoader.ParFile, demLoader.DatFile,
             lookup.DatFile, oversamp.Lat, oversamp.Lon,
             simSar.DatFile, zenith.DatFile, orient.DatFile,
             inc.DatFile, proj.DatFile, pix.DatFile,
@@ -250,9 +249,14 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         log.Println("Initial lookup table already created.")
     }
     
-    if err = segmentedDem.Load(); err != nil {
+    segmentedDem, err := demLoader.Load();
+    if err != nil {
         return
     }
+
+    lookup := segmentedDem.NewLookup(gdir.Join("lookup"))
+    lookupOld := segmentedDem.NewLookup(gdir.Join("lookup_old"))
+
     
     dra := segmentedDem.Ra
     

@@ -49,6 +49,21 @@ func (o Out) BufWriter() (w *bufio.Writer) {
     return
 }
 
-func (o Out) WriteFail(p string, err error) error {
+func (o Out) Write(p []byte) (nn int, err error) {
+    nn, err = o.WriteCloser.Write(p)
+    
+    if err != nil {
+        err = o.WriteFail(err)
+    }
+    return
+}
+
+func (o Out) WriteString(s string) (nn int, err error) {
+    nn, err = o.Write([]byte(s))
+    return
+    
+}
+
+func (o Out) WriteFail(err error) error {
     return o.Fail("write to", err)
 }

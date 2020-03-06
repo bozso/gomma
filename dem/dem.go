@@ -16,13 +16,18 @@ var Import = data.ParamKeys{
     DateKey: "",
 }
 
-func FromDataPath(p string) (f File) {
-    f.FloatFile.File = data.FromDataPath(p, "dem_par")
+type Loader struct {
+    data.Loader
+}
+
+func FromDataPath(p string) (l Loader) {
+    l.Loader = data.FromDataPath(p, "dem_par").WithKeys(&Import)
     return
 }
 
-func (f *File) Load() (err error) {
-    return f.FloatFile.Load(&Import)
+func (l Loader) Load() (f File, err error) {
+    f, err = l.Load()
+    return
 }
 
 func (d File) NewLookup(path string) (l Lookup) {

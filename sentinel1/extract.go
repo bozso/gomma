@@ -21,7 +21,7 @@ type Extractor struct {
     err error
 }
 
-func (s1 *S1Zip) newExtractor(dst string) (ex Extractor) {
+func (s1 *Zip) newExtractor(dst string) (ex Extractor) {
     ex.path      = &s1.Path
     ex.templates = &s1.Templates
     ex.pol       = s1.pol
@@ -84,7 +84,7 @@ func (ex Extractor) extract(template, dst string) (s string, err error) {
         //fmt.Printf("\n\nCurrent: %s\nTemplate: %s\nMatched: %v\n",
         //    name, template, matched)
         
-        if exist, err = paths.Exist(s); err != nil {
+        if exist, err = path.Exist(s); err != nil {
             err = utils.WrapFmt(err, "stat failed on file '%s'", name)
             return
         }

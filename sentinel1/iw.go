@@ -2,47 +2,76 @@ package sentinel1
 
 import (
     "github.com/bozso/gamma/data"
-    "github.com/bozso/gamma/utils"
+    "github.com/bozso/gamma/utils/path"
+    "github.com/bozso/gamma/utils/params"
 )
 
 const maxIW = 3
 
-type(  
-    S1IW struct {
-        data.File
+type(
+    IWLoader struct {
+        data.Loader
         TOPS_par string
     }
-
-    IWs [maxIW]S1IW
+    
+    IWLoaders [maxIW]IWLoader
 )
 
-func NewIW(dat, par, TOPS_par string) (iw S1IW) {
-    iw.DatFile = dat
+func NewIW(dat, par, TOPS_par string) (l IWLoader) {
+    l.DatFile = dat
     
     if len(par) == 0 {
         par = dat + ".par"
     }
     
-    iw.Params = Params{Par: par, Sep: ":"}
+    l.ParFile = par
     
     if len(TOPS_par) == 0 {
         TOPS_par = dat + ".TOPS_par"
     }
 
-    iw.TOPS_par = Params{Par: TOPS_par, Sep: ":"}
-
+    l.TOPS_par = TOPS_par
+    
+    // do we need a custom importer?
+    
     return
 }
 
-func (iw S1IW) Move(dir string) (miw S1IW, err error) {
-    ferr := merr.Make("S1IW.Move")
+func (l IWLoader) GetParser() (p params.Parser, err error) {
+    p1, err := l.GetParser()
+    if err != nil { return }
     
+    p2, err := data.NewGammaParams(l.TOPS_par)
+    if err != nil { return }
+    
+    p = params.NewTeeParser(p1, p2).ToParser()
+    return
+}
+
+func (l IWLoader) Load() (iw IW, err error) {
+    p, err := l.GetParser()
+    if err != nil { return }
+    
+    iw.File, err = l.LoadWithParser(p)
+    iw.TOPS_par = l.TOPS_par
+    return
+}
+
+
+type(  
+    IW struct {
+        data.ComplexFile
+        TOPS_par string
+    }
+
+    IWs [maxIW]IW
+)
+
+func (iw IW) Move(dir string) (miw IW, err error) {
     if miw.File, err = iw.File.Move(dir); err != nil {
-        err = ferr.Wrap(err)
         return
     }
     
-    miw.TOPS_par, err = utils.Move(iw.TOPS_par, dir)
-    
-    return miw, nil
+    miw.TOPS_par, err = path.Move(iw.TOPS_par, dir)
+    return
 }

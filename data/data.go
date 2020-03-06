@@ -40,18 +40,8 @@ type (
     }
 )
 
-func newGammaParams(path string) (p params.Params, err error) {
+func NewGammaParams(path string) (p params.Params, err error) {
     return params.FromFile(path, separator)
-}
-
-func FromDataPath(p, ext string) (f File) {
-    if len(ext) == 0 {
-        ext = "par"
-    }
-    
-    f.DatFile = p
-    f.ParFile = fmt.Sprintf("%s.%s", p, ext)
-    return
 }
 
 func (f File) JsonName() string {
@@ -101,10 +91,10 @@ func (d File) TypeCheck(dtypes... Type) (err error) {
 }
 
 func (d File) Save(p string) (err error) {
-    if len(p) == 0 {
-        p = d.JsonName()
-    }
-    
+    return d.SaveWithPath(d.JsonName())
+}
+
+func (d File) SaveWithPath(p string) (err error) {
     return common.SaveJson(p, d)
 }
 
@@ -120,48 +110,8 @@ func (d File) WithShape(dat string, dtype Type) File {
     }
 }
 
-func (f File) GetParser() (p params.Params, err error) {
-    p, err = newGammaParams(f.ParFile)
-    return
-}
-
-func (f *File) Load(k *ParamKeys) (err error) {
-    p, err := f.GetParser()
-    if err != nil { return }
-    
-    if k == nil {
-        k = &DefaultKeys
-    }
-    
-    return f.LoadWithParser(k, params.Parser{p})
-}
-
-func (f *File) LoadWithParser(k *ParamKeys, pr params.Parser) (err error) {
-    if err != nil { return }
-    
-    f.Ra.Rng, err = pr.Int(k.RngKey, 0)
-    if err != nil { return }
-    
-    f.Ra.Azi, err = pr.Int(k.AziKey, 0)
-    if err != nil { return }
-    
-    s, err := pr.Param(k.TypeKey)
-    if err != nil { return }
-    
-    err = f.Dtype.Set(s)
-    if err != nil { return }
-    
-    if d := k.DateKey; len(d) != 0 {
-        s, err = pr.Param(d)
-        if err != nil { return }
-        
-        f.Time, err = DateFmt.Parse(s)
-    }
-    
-    return
-}
-
 func (d File) Move(dir string) (dm File, err error) {
+    dm = d
     dm.DatFile, err = path.Move(d.DatFile, dir)
     if err != nil { return }
     

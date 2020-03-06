@@ -13,8 +13,6 @@ type (
     ParseFmt string
 )
 
-
-// TODO: these are Sentinel-1 specific, should be moved accordingly
 const (
     Short ParseFmt = "20060102"
     Long  ParseFmt = "20060102T150405"

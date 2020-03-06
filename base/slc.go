@@ -107,10 +107,7 @@ const (
     IfgUnwrapped
 )
 
-var (
-    ssiInt = common.Must("SSI_INT")
-    short = date.Short
-)
+var ssiInt = common.Must("SSI_INT")
 
 func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err error) {
     mode := 1
@@ -122,7 +119,7 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err
     cflg := 1
     if opt.Keep { cflg = 0 }
     
-    mID, sID := short.Format(ref), short.Format(slave)
+    mID, sID := date.Short.Format(ref), date.Short.Format(slave)
     
     ID := fmt.Sprintf("%s_%s", mID, sID)
     

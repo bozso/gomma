@@ -9,18 +9,19 @@ import (
     "github.com/bozso/gamma/base"
     "github.com/bozso/gamma/common"
     "github.com/bozso/gamma/utils"
+    "github.com/bozso/gamma/date"
     ifg "github.com/bozso/gamma/interferogram"
 )
 
 
 type (
-    S1CoregOut struct {
+    CoregOut struct {
         RSLC base.SLC
-        Rslc S1SLC
+        Rslc SLC
         Ifg ifg.File
     }
     
-    S1CoregOpt struct {
+    CoregOpt struct {
         Tab, ID, IfgPath, RslcPath      string
         OutDir, Hgt, Poly1, Poly2, Mli  string
         CoherenceThresh, FractionThresh float64
@@ -32,7 +33,7 @@ type (
 
 var coregFun = common.Must("S1_coreg_TOPS")
 
-func (s1 *S1CoregOpt) SetCli(c *utils.Cli) {
+func (s1 *CoregOpt) SetCli(c *utils.Cli) {
 
     c.StringVar(&s1.IfgPath, "ifg",
         "Output interferogram metadata file", "")
@@ -60,7 +61,7 @@ func (s1 *S1CoregOpt) SetCli(c *utils.Cli) {
     c.StringVar(&s1.Mli, "mli", "", "Output? MLI metadata file.")
 }
 
-func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
+func (sc *CoregOpt) Coreg(slc, ref *SLC) (c CoregOut, err error) {
     cleaning, flag1 := 0, 0
     
     if sc.Clean {
@@ -72,7 +73,7 @@ func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
     }
     
     slc1Tab, slc1ID := sc.Tab, sc.ID
-    slc2Tab, slc2ID := slc.Tab, slc.Format(DateShort)
+    slc2Tab, slc2ID := slc.Tab, date.Short.Format(slc)
     
     // TODO: parse opt.hgt
     hgt := sc.Hgt
@@ -96,31 +97,28 @@ func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
         return c, nil
     }
     
+    args := []interface{}{
+        slc1Tab, slc1ID, slc2Tab, slc2ID, c.Rslc.Tab, hgt,
+        sc.Looks.Rng, sc.Looks.Azi, sc.Poly1, sc.Poly2,
+        sc.CoherenceThresh, sc.FractionThresh, sc.PhaseStdevThresh,
+        cleaning, flag1,
+    }
+    
     if ref == nil {
         log.Printf("Coregistering: '%s'", slc2Tab)
         
-        _, err = coregFun.Call(slc1Tab, slc1ID, slc2Tab, slc2ID,
-            c.Rslc.Tab, hgt, sc.Looks.Rng, sc.Looks.Azi, sc.Poly1,
-            sc.Poly2, sc.CoherenceThresh, sc.FractionThresh,
-            sc.PhaseStdevThresh, cleaning, flag1)
-        
-        if err != nil {
-            return
-        }
     } else {
-        rslcRefTab, rslcRefID := ref.Tab, ref.Format(DateShort)
+        rslcRefTab, rslcRefID := ref.Tab, date.Short.Format(ref)
         
         log.Printf("Coregistering: '%s'. Reference: '%s'", slc2Tab,
             rslcRefTab)
         
-        _, err = coregFun.Call(slc1Tab, slc1ID, slc2Tab, slc2ID,
-            c.Rslc.Tab, hgt, sc.Looks.Rng, sc.Looks.Azi, sc.Poly1,
-            sc.Poly2, sc.CoherenceThresh, sc.FractionThresh,
-            sc.PhaseStdevThresh, cleaning, flag1, rslcRefTab, rslcRefID)
-        
-        if err != nil {
-            return
-        }
+        args = append(args, rslcRefTab, rslcRefID)
+    }
+
+    _, err = coregFun.Call(args...)
+    if err != nil {
+        return
     }
     
     if c.RSLC, err = NewSLC(slc2ID + ".rslc", ""); err != nil {
@@ -182,5 +180,5 @@ func (sc *S1CoregOpt) Coreg(slc, ref *S1SLC) (c S1CoregOut, err error) {
         }
     }
     
-    return c, nil
+    return
 }
