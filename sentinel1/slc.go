@@ -7,8 +7,8 @@ import (
     "strings"
     "path/filepath"
 
-    "github.com/bozso/gamma/utils"
-    "github.com/bozso/gamma/utils/stream"
+    "github.com/bozso/gotoolbox/cli/stream"
+    
     "github.com/bozso/gamma/common"
     "github.com/bozso/gamma/base"
     "github.com/bozso/gamma/date"

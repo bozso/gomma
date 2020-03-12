@@ -8,7 +8,7 @@ import (
     "io"
     "strings"
 
-    "github.com/bozso/gamma/utils/stream"
+    "github.com/bozso/gotoolbox/path"
 )
 
 const defaultLen = 15
@@ -20,7 +20,8 @@ type (
     params = []string
     
     Params struct {
-        path, sep string
+        file path.File
+        sep string
         p params
     }
 )
@@ -30,34 +31,29 @@ func (p Params) ToParser() (par Parser) {
     return
 }
 
-func New(path, sep string) (p Params) {
-    p.path, p.sep = path, sep
-    
-    p.p = make(params, 1)
-    
+func New(file path.File, sep string) (p Params) {
+    p = WithLen(file, sep, 1)
     return
 }
 
-func WithLen(path, sep string, count int) (p Params) {
-    p.path, p.sep = path, sep
+func WithLen(file path.File, sep string, count int) (p Params) {
+    p.file, p.sep = file, sep
     
     p.p = make(params, count)
     
     return
 }
 
-func FromFile(path, sep string) (p Params, err error) {
-    p = New(path, sep)
+func FromFile(file path.File, sep string) (p Params, err error) {
+    p = New(file, sep)
     
-    reader, err := stream.Open(path)
+    reader, err := file.Scanner()
     if err != nil {
         return
     }
     defer reader.Close()
     
-    scanner := reader.Scanner()
-    
-    for scanner.Scan() {
+    for reader.Scan() {
         line := scanner.Text()
         
         if len(line) == 0 || !strings.Contains(line, sep) {
@@ -67,7 +63,7 @@ func FromFile(path, sep string) (p Params, err error) {
         p.p = append(p.p, line)
     }
     
-    return p, nil
+    return
 }
 
 func FromString(elems, sep string) (p Params) {
@@ -106,7 +102,7 @@ func (p Params) Param(key string) (s string, err error) {
         return
     }
 
-    err = NotFound{key:key, path:p.path}
+    err = NotFound{key:key, path:p.file.String()}
     return
 }
 

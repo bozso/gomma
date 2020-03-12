@@ -8,9 +8,8 @@ import (
     "path/filepath"
     "regexp"
 
-    "github.com/bozso/gamma/utils"
-    "github.com/bozso/gamma/utils/path"
-    "github.com/bozso/gamma/utils/stream"
+    "github.com/bozso/gotoolbox/path"
+    "github.com/bozso/gotoolbox/cli/stream"
 )
 
 type Extractor struct {

@@ -3,7 +3,6 @@ package cli
 import (
     "fmt"
     
-    "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/sentinel1"
 )
 

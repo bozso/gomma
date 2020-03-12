@@ -4,7 +4,6 @@ import (
     "fmt"
     "os"
 
-    "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/cli"
 )
 

@@ -1,8 +1,7 @@
 package common
 
-import (
-    "github.com/bozso/gamma/utils"
-)
+//import (
+//)
 
 type(
     Minmax struct {
@@ -17,11 +16,11 @@ type(
 )
 
 func (mm *IMinmax) Set(s string) (err error) {
-    if len(s) == 0 {
-        return utils.EmptyStringError{}
+    if err = errors.NotEmpty(s, "IMinmax"); err != nil {
+        return
     }
     
-    split, err := utils.NewSplitParser(s, ",")
+    split, err := splitted.New(s, ",")
     if err != nil {
         return
     }

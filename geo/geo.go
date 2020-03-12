@@ -5,13 +5,13 @@ import (
     "os"
     "path/filepath"
     
+    "github.com/bozso/gotoolbox/path"
+
     "github.com/bozso/gamma/data"
     "github.com/bozso/gamma/dem"
     "github.com/bozso/gamma/plot"
     "github.com/bozso/gamma/base"
     "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/utils"
-    "github.com/bozso/gamma/utils/path"
 )
 
 

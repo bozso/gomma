@@ -1,8 +1,9 @@
 package sentinel1
 
 import (
+    "github.com/bozso/gotoolbox/path"
+
     "github.com/bozso/gamma/data"
-    "github.com/bozso/gamma/utils/path"
     "github.com/bozso/gamma/utils/params"
 )
 

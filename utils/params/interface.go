@@ -3,8 +3,8 @@ package params
 import (
     "fmt"
     "errors"
-    
-    "github.com/bozso/gamma/utils"
+
+    "github.com/bozso/gotoolbox/splitted"
 )
 
 type Inter interface {
@@ -28,13 +28,13 @@ type Parser struct {
     Retreiver
 }
 
-func (p Parser) Splitter(key string) (sp utils.SplitParser, err error) {
+func (p Parser) Splitter(key string) (sp splitted.Parser, err error) {
     s, err := p.Param(key)
     if err != nil {
         return
     }
     
-    sp, err = utils.NewSplitParser(s, " ")
+    sp, err = splitted.New(s, " ")
     return
 }
 

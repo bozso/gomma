@@ -6,7 +6,6 @@ import (
     "github.com/bozso/gamma/data"
     "github.com/bozso/gamma/common"
     "github.com/bozso/gamma/plot"
-    "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/utils/params"
 )
 

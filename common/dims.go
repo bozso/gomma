@@ -2,8 +2,8 @@ package common
 
 import (
     "fmt"
-    "github.com/bozso/gamma/utils"
-
+    "github.com/bozso/gotoolbox/splitted"
+    "github.com/bozso/gotoolbox/errors"
 )
 
 type RngAzi struct {
@@ -18,11 +18,12 @@ func (ra RngAzi) String() string {
 }
 
 func (ra *RngAzi) Set(s string) (err error) {
-    if len(s) == 0 {
-        return utils.EmptyStringError{}
+    
+    if err = errors.NotEmpty(s, "RngAzi"); err != nil {
+        return
     }
     
-    split, err := utils.NewSplitParser(s, ",")
+    split, err := splitted.New(s, ",")
     if err != nil { return }
     
     ra.Rng, err = split.Int(0)

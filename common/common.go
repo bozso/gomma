@@ -9,10 +9,9 @@ import (
     "encoding/json"
     "path/filepath"
     
-    "github.com/bozso/gamma/utils"
-    "github.com/bozso/gamma/utils/command"
-    "github.com/bozso/gamma/utils/stream"
-    upath "github.com/bozso/gamma/utils/path"
+    "github.com/bozso/gotoolbox/command"
+    "github.com/bozso/gotoolbox/errors"
+    "github.com/bozso/gotoolbox/path"
 )
 
 const DefaultCachePath = "/mnt/bozso_i/cache"
@@ -48,8 +47,8 @@ func Select(name1, name2 string) (c Command) {
     return commands.Select(name1, name2)
 }
 
-func loadSettings(path string) (ret settings) {
-    if err := LoadJson(path, &ret); err != nil {
+func loadSettings(file path.File) (ret settings) {
+    if err := LoadJson(file, &ret); err != nil {
         log.Fatalf("Failed to load Gamma settings from '%s'\nError:'%s'\n!",
             path, err)
     }
@@ -86,7 +85,7 @@ func makeCommands() Commands {
             glob, err := filepath.Glob(_path)
 
             if err != nil {
-                utils.Fatal(err, "Glob '%s' failed! %s", _path, err)
+                log.Fatal(err, "Glob '%s' failed! %s", _path, err)
             }
 
             for _, path := range glob {
@@ -127,12 +126,7 @@ func (cs Commands) Must(name string) (c Command) {
     return
 }
 
-
-func NoExt(p string) string {
-    return strings.TrimSuffix(p, path.Ext(p))
-}
-
-func isclose(num1, num2 float64) bool {
+func isClose(num1, num2 float64) bool {
     return math.RoundToEven(math.Abs(num1 - num2)) > 0.0
 }
 
@@ -146,13 +140,13 @@ func (sl Slice) Contains(s string) bool {
 }
 
 
-func SaveJson(path string, val interface{}) (err error) {
+func SaveJson(pth path.File, val interface{}) (err error) {
     out, err := json.MarshalIndent(val, "", "    ")
     if err != nil {
-        return utils.WrapFmt(err, "failed to json encode struct: %v", val)
+        return errors.WrapFmt(err, "failed to json encode struct: %v", val)
     }
     
-    f, err := stream.Create(path)
+    f, err := pth.Create()
     if err != nil { return }
     defer f.Close()
 
@@ -167,14 +161,14 @@ type Validator interface {
     Validate() error
 }
 
-func LoadJson(p string, val interface{}) (err error) {
-    d, err := upath.ReadFile(p)
+func LoadJson(p path.File, val interface{}) (err error) {
+    d, err := p.ReadAll()
     if err != nil {
-        return utils.WrapFmt(err, "failed to read file '%s'", p)
+        return errors.WrapFmt(err, "failed to read file '%s'", p)
     }
     
     if err := json.Unmarshal(d, &val); err != nil {
-        return utils.WrapFmt(err, "failed to parse json data %s'", d)
+        return errors.WrapFmt(err, "failed to parse json data %s'", d)
     }
     
     v, ok := val.(Validator)

@@ -4,7 +4,6 @@ import (
     "fmt"
     "strings"
     
-    "github.com/bozso/gamma/utils"
 )
 
 type Type int

@@ -3,7 +3,6 @@ package interferogram
 import (
     "log"
     
-    "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/common"
     "github.com/bozso/gamma/data"
 )

@@ -8,7 +8,6 @@ import (
 
     "github.com/bozso/gamma/base"
     "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/date"
     ifg "github.com/bozso/gamma/interferogram"
 )

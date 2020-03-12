@@ -11,11 +11,11 @@ import (
     "github.com/bozso/gamma/data"
     "github.com/bozso/gamma/date"
     "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/utils"
     "github.com/bozso/gamma/utils/params"
-    "github.com/bozso/gamma/utils/path"
-    "github.com/bozso/gamma/utils/stream"
     "github.com/bozso/gamma/base"
+
+    "github.com/bozso/gotoolbox/path"
+    "github.com/bozso/gotoolbox/cli/stream"
 )
 
 const (

@@ -3,7 +3,7 @@ package common
 import (
     "fmt"
 
-    "github.com/bozso/gamma/utils"
+    "github.com/bozso/gotoolbox/errors"
 )
 
 type LatLon struct {
@@ -16,11 +16,11 @@ func (ll LatLon) String() string {
 }
 
 func (ll *LatLon) Set(s string) (err error) {
-    if len(s) == 0 {
-        return utils.EmptyStringError{}
+    if err = errors.NotEmpty(s, "LatLon"); err != nil {
+        return
     }
     
-    split, err := utils.NewSplitParser(s, ",")
+    split, err := splitted.New(s, ",")
     if err != nil {
         return
     }
