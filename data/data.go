@@ -14,7 +14,7 @@ import (
 
 type (    
     Pather interface {
-        DataPath() string
+        DataPath() path.File
     }
     
     Typer interface {
@@ -28,24 +28,30 @@ type (
     }
     
     Saver interface {
-        Save(string) error
+        Save(path.File) error
+    }
+    
+    FilePaths struct {
+        DatFile   path.File     `json:"datafile"`
+        ParFile   path.File     `json:"parameterfile"`        
     }
     
     File struct {
-        DatFile   string        `json:"datafile"`
-        ParFile   string        `json:"parameterfile"`
+        Paths
         Dtype     Type          `json:"data_type"`
         Ra        common.RngAzi `json:"rng_azi"`
         time.Time
     }
 )
 
-func NewGammaParams(path string) (p params.Params, err error) {
-    return params.FromFile(path, separator)
+func NewGammaParams(file path.File) (p params.Params, err error) {
+    return params.FromFile(file, separator)
 }
 
-func (f File) JsonName() string {
-    return fmt.Sprintf("%s.json", f.DatFile)
+func (f File) JsonName() (file path.File) {
+    // it is okay for the path to not exist
+    file, _ = path.New(fmt.Sprintf("%s.json", f.DatFile)).ToFile()
+    return
 }
 
 func (d File) Rng() int {
@@ -56,7 +62,7 @@ func (d File) Azi() int {
     return d.Ra.Azi
 }
 
-func (d File) DataPath() string {
+func (d File) DataPath() path.File {
     return d.DatFile
 }
 
@@ -94,34 +100,53 @@ func (d File) Save(p string) (err error) {
     return d.SaveWithPath(d.JsonName())
 }
 
-func (d File) SaveWithPath(p string) (err error) {
-    return common.SaveJson(p, d)
+func (d File) SaveWithPath(file path.File) (err error) {
+    return common.SaveJson(file, d)
 }
 
-func (d File) WithShape(dat string, dtype Type) File {
+func (d File) WithShape(dat path.File, dtype Type) File {
     if dtype == Unknown {
         dtype = d.Dtype
     }
     
     return File{
-        DatFile: dat,
+        Paths: d.Paths,
         Ra: d.Ra,
         Dtype: dtype,
     }
 }
 
-func (d File) Move(dir string) (dm File, err error) {
+func (d File) Move(dir path.Dir) (dm File, err error) {
     dm = d
-    dm.DatFile, err = path.Move(d.DatFile, dir)
-    if err != nil { return }
-    
-    p := d.ParFile
-    
-    if len(p) > 0 {
-        p, err = path.Move(p, dir)
-        if err != nil { return }
+    p, err := d.DatFile.Move(dir)
+    if err != nil {
+        return
     }
-    dm.ParFile = p
+    
+    dm.DatFile, err = p.ToFile()
+    if err != nil {
+        return
+    }
+    
+    par := d.ParFile
+    
+    exist, err := par.Exist()
+    if err != nil {
+        return
+    }
+    
+    if exist {
+        p, err = par.Move(dir)
+        if err != nil {
+            return
+        }
+    }
+    
+    dm.ParFile, err = p.ToFile()
+    if err != nil {
+        return
+    }
+    
     
     dm.Ra, dm.Dtype = d.Ra, d.Dtype
     
@@ -129,7 +154,7 @@ func (d File) Move(dir string) (dm File, err error) {
 }
 
 func (d File) Exist() (b bool, err error) {
-    b, err = path.Exist(d.DatFile)
+    b, err = d.DatFile.Exist()
     return
 }
 
@@ -168,7 +193,8 @@ func SameShape(one common.Dims, two common.Dims) (err *ShapeMismatchError) {
 }
 
 type ShapeMismatchError struct {
-    dat1, dat2, dim string
+    dat1, dat2 path.File
+    dim string
     n1, n2 int
     err error
 }
@@ -211,7 +237,13 @@ type(
 
 
 func (d *File) Set(s string) (err error) {
-    err = common.LoadJson(s, d)
+    file, err := path.New(s).ToFile()
+    if err != nil {
+        return
+    }
+    
+    
+    err = common.LoadJson(file, d)
     return
 }
 

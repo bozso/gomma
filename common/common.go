@@ -1,11 +1,10 @@
 package common
 
 import (
+    "os"
     "fmt"
     "log"
     "math"
-    "path"
-    "strings"
     "encoding/json"
     "path/filepath"
     
@@ -34,10 +33,34 @@ const (
 var (
     Pols = [4]string{"vv", "hh", "hv", "vh"}
     
+    confpath = getConfigPath()
+    
     // TODO: get settings path from environment variable
-    Settings = loadSettings("/home/istvan/progs/gamma/bin/settings.json")
+    Settings = loadSettings(confpath)
     commands = makeCommands()
 )
+
+func Check(err error) {
+    if err != nil {
+        log.Fatalf("%s\n", err)
+    }
+}
+
+func getConfigPath() (f path.File) {
+    s, ok := os.LookupEnv("GOMMA_CONFIG")
+    
+    if !ok {
+        var err error
+        s, err = os.UserConfigDir()
+        Check(err)
+        return
+    }
+    
+    f, err := path.New(s).Join("gomma.json").ToFile()
+    Check(err)
+    
+    return
+}
 
 func Must(name string) (c Command) {
     return commands.Must(name)
@@ -50,7 +73,7 @@ func Select(name1, name2 string) (c Command) {
 func loadSettings(file path.File) (ret settings) {
     if err := LoadJson(file, &ret); err != nil {
         log.Fatalf("Failed to load Gamma settings from '%s'\nError:'%s'\n!",
-            path, err)
+            file, err)
     }
     
     return

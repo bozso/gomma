@@ -4,6 +4,7 @@ import (
     "fmt"
     
     "github.com/bozso/gamma/utils/params"    
+    "github.com/bozso/gotoolbox/path"
 )
 
 type ParamKeys struct {
@@ -20,18 +21,22 @@ var (
 )
 
 type Loader struct {
-    DatFile, ParFile string
+    Paths
     keys *ParamKeys
     p params.Parser
 }
 
-func FromDataPath(p, ext string) (l Loader) {
+func FromDataPath(file path.File, ext string) (l Loader) {
     if len(ext) == 0 {
         ext = "par"
     }
     
-    l.DatFile = p
-    l.ParFile = fmt.Sprintf("%s.%s", p, ext)
+    l.DatFile = file
+    
+    // okay for parfile to not exist
+    l.ParFile, _ = path.New(fmt.Sprintf("%s.%s", file, ext)).ToFile()
+
+
     l.keys = &DefaultKeys
     return
 }

@@ -4,7 +4,6 @@ package params
 // map
 import (
     "fmt"
-    "os"
     "io"
     "strings"
 
@@ -54,7 +53,7 @@ func FromFile(file path.File, sep string) (p Params, err error) {
     defer reader.Close()
     
     for reader.Scan() {
-        line := scanner.Text()
+        line := reader.Text()
         
         if len(line) == 0 || !strings.Contains(line, sep) {
             continue
@@ -121,9 +120,7 @@ func (p Params) SetVal(key, val string) {
 }
 
 func (p Params) Save() (err error) {
-    path := p.path
-    
-    w, err := os.Create(path)
+    w, err := p.file.Create()
     if err != nil {
         return
     }
