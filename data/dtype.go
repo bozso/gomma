@@ -3,6 +3,9 @@ package data
 import (
     "fmt"
     "strings"
+    
+    "github.com/bozso/gotoolbox/path"
+    "github.com/bozso/gotoolbox/cli"
 )
 
 type Type int
@@ -16,10 +19,9 @@ const (
     UChar
     Short
     Unknown
-    Any
-)
+    Any)
 
-func (d *Type) SetCli(c *utils.Cli) {
+func (d *Type) SetCli(c *cli.Cli) {
     c.Var(d, "dtype", "Datatype of datafile.")
 }
 
@@ -74,18 +76,19 @@ func (d Type) String() string {
 }
 
 type TypeMismatchError struct {
-    datafile, expected string
+    datafile path.Pather
+    expected string
     Type
-    Err error
+    err error
 }
 
 func (e TypeMismatchError) Error() string {
     return fmt.Sprintf("expected datatype(s) '%s' for datafile '%s', got '%s'",
-        e.expected, e.datafile, e.Type.String())
+        e.expected, e.datafile, e.Type)
 }
 
 func (e TypeMismatchError) Unwrap() error {
-    return e.Err
+    return e.err
 }
 
 type UnknownTypeError struct {

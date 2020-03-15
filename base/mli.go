@@ -6,7 +6,7 @@ import (
 )
 
 type MLI struct {
-    data.FloatFile `json:"MLI"`
+    data.FloatFileWithPar `json:"MLI"`
 }
 
 func (m MLI) Raster(opt plot.RasArgs) (err error) {

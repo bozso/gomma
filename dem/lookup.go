@@ -7,10 +7,31 @@ import (
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/plot"
     "github.com/bozso/gomma/utils/params"
+
+    "github.com/bozso/gotoolbox/errors"
+    "github.com/bozso/gotoolbox/splitted"
+    "github.com/bozso/gotoolbox/cli"
 )
+
+type Path struct {
+    data.Path
+}
+
+func (d File) NewLookup(p data.Path) (l Lookup, err error) {
+    l.File, err = d.File.WithShape(p, data.FloatCpx)
+    return
+}
 
 type Lookup struct {
     data.ComplexFile
+}
+
+func (l Lookup) Raster(opt plot.RasArgs) (err error) {
+    opt.Mode = plot.MagPhase
+    opt.Parse(l)
+
+    err = plot.Raster(l, opt)
+    return
 }
 
 var coord2sarpix = common.Must("coord_to_sarpix")
@@ -20,7 +41,7 @@ func ToRadar(ll common.LatLon, mpar, hgt, diffPar string) (ra common.RngAzi, err
     
     out, err := coord2sarpix.Call(mpar, "-", ll.Lat, ll.Lon, hgt, diffPar)
     if err != nil {
-        err = utils.WrapFmt(err, "failed to retreive radar coordinates")
+        err = errors.WrapFmt(err, "failed to retreive radar coordinates")
         return
     }
     
@@ -29,12 +50,11 @@ func ToRadar(ll common.LatLon, mpar, hgt, diffPar string) (ra common.RngAzi, err
     line, err := param.Param(par)
     
     if err != nil {
-        err = utils.WrapFmt(err, "failed to retreive range, azimuth")
+        err = errors.WrapFmt(err, "failed to retreive range, azimuth")
         return
     }
     
-    
-    split, err := utils.NewSplitParser(line, " ")
+    split, err := splitted.New(line, " ")
     if err != nil { return }
     
     if split.Len() < 2 {
@@ -49,14 +69,6 @@ func ToRadar(ll common.LatLon, mpar, hgt, diffPar string) (ra common.RngAzi, err
     if err != nil { return }
     
     return ra, nil
-}
-
-func (l Lookup) Raster(opt plot.RasArgs) (err error) {
-    opt.Mode = plot.MagPhase
-    opt.Parse(l)
-
-    err = plot.Raster(l, opt)
-    return
 }
 
 type InterpolationMode int
@@ -103,7 +115,7 @@ func (i *InterpolationMode) Set(s string) (err error) {
     case "Gauss":
         *i = Gauss
     default:
-        err = utils.UnrecognizedMode(s, "Interpolation Mode")
+        err = errors.UnrecognizedMode(s, "Interpolation Mode")
         return
     }
     
@@ -153,7 +165,7 @@ type CodeOpt struct {
     Order        int               `cli:"r,order" dft:"5"`
 }
 
-func (co *CodeOpt) SetCli(c *utils.Cli) {
+func (co *CodeOpt) SetCli(c *cli.Cli) {
     //c.Var()
     
 }
@@ -213,7 +225,7 @@ func (l Lookup) geo2radar(in, out data.Data, opt CodeOpt) (err error) {
     case Gauss:
         interp = 4
     default:
-        return utils.UnrecognizedMode(intm.String(), "Interpolation Mode")
+        return errors.UnrecognizedMode(intm.String(), "Interpolation Mode")
     }
     
     dt, dtype := 0, in.DataType()
@@ -280,7 +292,7 @@ func (l Lookup) radar2geo(in, out data.Data, opt CodeOpt) (err error) {
         case LanczosSqrt:
             interp = 7
         default:
-            return utils.UnrecognizedMode(intm.String(), "interpolation option")
+            return errors.UnrecognizedMode(intm.String(), "interpolation option")
         }
     }
     

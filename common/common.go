@@ -1,6 +1,7 @@
 package common
 
 import (
+    "os"
     "fmt"
     "log"
     "math"
@@ -32,13 +33,34 @@ const (
 var (
     Pols = [4]string{"vv", "hh", "hv", "vh"}
     
+    confpath = getConfigPath()
+    
     // TODO: get settings path from environment variable
-    
-    
-    
-    Settings = loadSettings("/home/istvan/progs/gamma/bin/settings.json")
+    Settings = loadSettings(confpath)
     commands = makeCommands()
 )
+
+func Check(err error) {
+    if err != nil {
+        log.Fatalf("%s\n", err)
+    }
+}
+
+func getConfigPath() (f path.ValidFile) {
+    s, ok := os.LookupEnv("GOMMA_CONFIG")
+    
+    if !ok {
+        var err error
+        s, err = os.UserConfigDir()
+        Check(err)
+        return
+    }
+    
+    f, err := path.New(s).Join("gomma.json").ToFile().ToValid()
+    Check(err)
+    
+    return
+}
 
 func Must(name string) (c Command) {
     return commands.Must(name)
@@ -48,10 +70,10 @@ func Select(name1, name2 string) (c Command) {
     return commands.Select(name1, name2)
 }
 
-func loadSettings(file path.File) (ret settings) {
+func loadSettings(file path.ValidFile) (ret settings) {
     if err := LoadJson(file, &ret); err != nil {
         log.Fatalf("Failed to load Gamma settings from '%s'\nError:'%s'\n!",
-            path, err)
+            file, err)
     }
     
     return
@@ -162,10 +184,10 @@ type Validator interface {
     Validate() error
 }
 
-func LoadJson(p path.File, val interface{}) (err error) {
-    d, err := p.ReadAll()
+func LoadJson(f path.ValidFile, val interface{}) (err error) {
+    d, err := f.ReadAll()
     if err != nil {
-        return errors.WrapFmt(err, "failed to read file '%s'", p)
+        return errors.WrapFmt(err, "failed to read file '%s'", f)
     }
     
     if err := json.Unmarshal(d, &val); err != nil {

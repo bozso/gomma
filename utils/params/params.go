@@ -4,7 +4,6 @@ package params
 // map
 import (
     "fmt"
-    "os"
     "io"
     "strings"
 
@@ -19,37 +18,41 @@ type (
     
     params []string
     
+    noPath struct {}
+    
     Params struct {
-        file path.Path
+        filepath path.Pather
         sep string
         p params
     }
 )
+
+var np = noPath{}
+
+func (np noPath) GetPath() string {
+    return "parameters were not read from file"
+}
 
 func (p Params) ToParser() (par Parser) {
     par.Retreiver = p
     return
 }
 
-func New(file path.Path, sep string) (p Params) {
-    p = WithLen(file, sep, 1)
+func New(sep string) (p Params) {
+    p = WithLen(sep, 1)
     return
 }
 
-func WithLen(file path.Path, sep string, count int) (p Params) {
-    p.file, p.sep = file, sep
-    
-    p.p = make(params, count)
-    
+func WithLen(sep string, count int) (p Params) {
+    p.sep, p.p, p.filepath = sep, make(params, count), &np
     return
 }
 
-func FromFile(file path.Path, sep string) (p Params, err error) {
-    p = New(file, sep)
+func FromFile(file path.ValidFile, sep string) (p Params, err error) {
+    p = New(sep)
+    p.filepath = file
     
-    f, err := file.ToFile()
-    
-    reader, err := f.Scanner()
+    reader, err := file.Scanner()
     if err != nil {
         return
     }
@@ -104,7 +107,7 @@ func (p Params) Param(key string) (s string, err error) {
         return
     }
 
-    err = NotFound{key:key, path:p.file.String()}
+    err = NotFound{key:key, path:p.filepath.GetPath()}
     return
 }
 
@@ -122,12 +125,7 @@ func (p Params) SetVal(key, val string) {
     p.p = append(p.p, s)
 }
 
-func (p Params) Save() (err error) {
-    file, err := p.file.ToFile()
-    if err != nil {
-        return
-    }
-    
+func (p Params) Save(file path.File) (err error) {
     w, err := file.Create()
     if err != nil {
         return

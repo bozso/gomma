@@ -42,7 +42,7 @@ func (arg *DisArgs) Parse(dat data.Data) {
     }
     
     if len(arg.Datfile) == 0 {
-        arg.Datfile = dat.DataPath()
+        arg.Datfile = dat.DataPath().String()
     }
     
     if arg.Rng == 0 {

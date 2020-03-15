@@ -15,11 +15,15 @@ import (
     "github.com/bozso/gomma/plot"
 )
 
-type File struct {
+type Paths struct {
     data.ComplexFile
-    DiffPar   string        `json:"diff_par"`
-    Quality   string        `json:"quality"`
-    SimUnwrap string        `json:"simulated_unwrap"`
+    DiffPar   path.File        `json:"diff_par"`
+    Quality   path.File        `json:"quality"`
+    SimUnwrap path.File        `json:"simulated_unwrap"`    
+}
+
+type File struct {
+    Paths
     DeltaT    time.Duration `json:"delta_time"`
 }
 

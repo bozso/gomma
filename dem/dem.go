@@ -1,8 +1,12 @@
 package dem
 
 import (
+    "fmt"
+
     "github.com/bozso/gomma/data"
     "github.com/bozso/gomma/plot"
+
+    "github.com/bozso/gotoolbox/path"
 )
 
 type File struct {
@@ -16,27 +20,25 @@ var Import = data.ParamKeys{
     DateKey: "",
 }
 
-type Loader struct {
-    data.Loader
+type PathWithPar struct {
+    data.PathWithPar
 }
 
-func FromDataPath(p string) (l Loader) {
-    l.Loader = data.FromDataPath(p, "dem_par").WithKeys(&Import)
+func NewWithPar(dat, par path.File) (p PathWithPar) {
+    p.PathWithPar = data.New(dat).WithParFile(par).WithKeys(&Import)
     return
 }
 
-func (l Loader) Load() (f File, err error) {
-    f, err = l.Load()
-    return
+func New(file path.File) (p PathWithPar) {
+    par := path.New(fmt.Sprintf("%s.dem_par", file)).ToFile()
+    
+    return NewWithPar(file, par)
 }
 
-func (d File) NewLookup(path string) (l Lookup) {
-    l.DatFile = path
-    l.Ra = d.Ra
-    l.Dtype = data.FloatCpx
+func (p PathWithPar) Load() (f File, err error) {
+    f, err = p.Load()
     return
 }
-
 func (f File) Raster(opt plot.RasArgs) (err error) {
     opt.Mode = plot.Power
     opt.Parse(f)

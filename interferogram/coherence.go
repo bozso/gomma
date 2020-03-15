@@ -5,6 +5,8 @@ import (
     
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/data"
+
+    "github.com/bozso/gotoolbox/errors"
 )
 
 type CoherenceWeight int
@@ -54,7 +56,7 @@ func (ifg File) Coherence(opt CoherenceOpt, c Coherence) (err error) {
     case Gaussian:
         weightFlag = 1
     default:
-        return utils.UnrecognizedMode(w.String(),
+        return errors.UnrecognizedMode(w.String(),
             "adaptive coherence calculation")
     }
     
