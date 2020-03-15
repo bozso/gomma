@@ -3,7 +3,7 @@ package data
 import (
     "fmt"
     
-    "github.com/bozso/gamma/utils/params"    
+    "github.com/bozso/gomma/utils/params"    
 )
 
 type ParamKeys struct {

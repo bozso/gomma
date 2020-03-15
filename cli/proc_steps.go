@@ -62,7 +62,7 @@ func (g *GeneralOpt) SetCli(c *Cli) {
     g.OutFile.SetCli(c, "outfile", "Input file.")
     
     c.StringVar(&g.OutputDir, "out", ".", "Output directory")
-    c.StringVar(&g.Pol, "pol", "vv", "POlarisation used.")
+    c.StringVar(&g.Pol, "pol", "vv", "Polarisation used.")
     c.StringVar(&g.MasterDate, "masterDate", "", "")
     c.StringVar(&g.CachePath, "cachePath", "", "Cache path.")
     c.Var(&g.Looks, "looks", "Range, azimuth looks.")

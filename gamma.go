@@ -4,7 +4,7 @@ import (
     "fmt"
     "os"
 
-    "github.com/bozso/gamma/cli"
+    "github.com/bozso/gomma/cli"
 )
 
 func main() {

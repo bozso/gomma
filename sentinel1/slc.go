@@ -9,9 +9,9 @@ import (
 
     "github.com/bozso/gotoolbox/cli/stream"
     
-    "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/base"
-    "github.com/bozso/gamma/date"
+    "github.com/bozso/gomma/common"
+    "github.com/bozso/gomma/base"
+    "github.com/bozso/gomma/date"
 )
 
 type SLC struct {

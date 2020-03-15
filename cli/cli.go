@@ -3,7 +3,7 @@ package cli
 import (
     "fmt"
     
-    "github.com/bozso/gamma/sentinel1"
+    "github.com/bozso/gomma/sentinel1"
 )
 
 const (

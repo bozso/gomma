@@ -3,9 +3,9 @@ package cli
 import (
     "strings"
     
-    "github.com/bozso/gamma/data"
-    "github.com/bozso/gamma/dem"
-    "github.com/bozso/gamma/geo"
+    "github.com/bozso/gomma/data"
+    "github.com/bozso/gomma/dem"
+    "github.com/bozso/gomma/geo"
 )
 
 type geoCode struct {

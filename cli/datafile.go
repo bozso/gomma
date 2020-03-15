@@ -1,7 +1,7 @@
 package cli
 
 import (
-    "github.com/bozso/gamma/data"
+    "github.com/bozso/gomma/data"
 )
 
 type like struct {

@@ -3,10 +3,10 @@ package base
 import (
     "fmt"
     
-    "github.com/bozso/gamma/data"
-    "github.com/bozso/gamma/plot"
-    "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/date"
+    "github.com/bozso/gomma/data"
+    "github.com/bozso/gomma/plot"
+    "github.com/bozso/gomma/common"
+    "github.com/bozso/gomma/date"
 )
 
 type SLC struct {

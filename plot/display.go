@@ -1,8 +1,8 @@
 package plot
 
 import (
-    "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/data"
+    "github.com/bozso/gomma/common"
+    "github.com/bozso/gomma/data"
 )
 
 type DisArgs struct {

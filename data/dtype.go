@@ -3,7 +3,6 @@ package data
 import (
     "fmt"
     "strings"
-    
 )
 
 type Type int

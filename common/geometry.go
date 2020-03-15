@@ -4,6 +4,7 @@ import (
     "fmt"
 
     "github.com/bozso/gotoolbox/errors"
+    "github.com/bozso/gotoolbox/splitted"
 )
 
 type LatLon struct {

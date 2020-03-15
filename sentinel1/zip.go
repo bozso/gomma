@@ -8,11 +8,11 @@ import (
     "strings"
     "time"
     
-    "github.com/bozso/gamma/data"
-    "github.com/bozso/gamma/date"
-    "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/utils/params"
-    "github.com/bozso/gamma/base"
+    "github.com/bozso/gomma/data"
+    "github.com/bozso/gomma/date"
+    "github.com/bozso/gomma/common"
+    "github.com/bozso/gomma/utils/params"
+    "github.com/bozso/gomma/base"
 
     "github.com/bozso/gotoolbox/path"
     "github.com/bozso/gotoolbox/cli/stream"

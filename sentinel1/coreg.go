@@ -6,10 +6,10 @@ import (
     "log"
     "path/filepath"
 
-    "github.com/bozso/gamma/base"
-    "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/date"
-    ifg "github.com/bozso/gamma/interferogram"
+    "github.com/bozso/gomma/base"
+    "github.com/bozso/gomma/common"
+    "github.com/bozso/gomma/date"
+    ifg "github.com/bozso/gomma/interferogram"
 )
 
 

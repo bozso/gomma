@@ -3,8 +3,8 @@ package plot
 import (
     "fmt"
     
-    "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/data"
+    "github.com/bozso/gomma/common"
+    "github.com/bozso/gomma/data"
 )
 
 type RasArgs struct {

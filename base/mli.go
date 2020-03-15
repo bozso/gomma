@@ -1,8 +1,8 @@
 package base
 
 import (
-    "github.com/bozso/gamma/data"
-    "github.com/bozso/gamma/plot"
+    "github.com/bozso/gomma/data"
+    "github.com/bozso/gomma/plot"
 )
 
 type MLI struct {

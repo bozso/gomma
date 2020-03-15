@@ -1,7 +1,9 @@
 package common
 
-//import (
-//)
+import (
+    "github.com/bozso/gotoolbox/errors"
+    "github.com/bozso/gotoolbox/splitted"
+)
 
 type(
     Minmax struct {

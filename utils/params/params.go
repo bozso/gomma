@@ -17,10 +17,10 @@ type (
     Key string
     Separator string
     
-    params = []string
+    params []string
     
     Params struct {
-        file path.File
+        file path.Path
         sep string
         p params
     }
@@ -31,12 +31,12 @@ func (p Params) ToParser() (par Parser) {
     return
 }
 
-func New(file path.File, sep string) (p Params) {
+func New(file path.Path, sep string) (p Params) {
     p = WithLen(file, sep, 1)
     return
 }
 
-func WithLen(file path.File, sep string, count int) (p Params) {
+func WithLen(file path.Path, sep string, count int) (p Params) {
     p.file, p.sep = file, sep
     
     p.p = make(params, count)
@@ -44,17 +44,19 @@ func WithLen(file path.File, sep string, count int) (p Params) {
     return
 }
 
-func FromFile(file path.File, sep string) (p Params, err error) {
+func FromFile(file path.Path, sep string) (p Params, err error) {
     p = New(file, sep)
     
-    reader, err := file.Scanner()
+    f, err := file.ToFile()
+    
+    reader, err := f.Scanner()
     if err != nil {
         return
     }
     defer reader.Close()
     
     for reader.Scan() {
-        line := scanner.Text()
+        line := reader.Text()
         
         if len(line) == 0 || !strings.Contains(line, sep) {
             continue
@@ -121,9 +123,12 @@ func (p Params) SetVal(key, val string) {
 }
 
 func (p Params) Save() (err error) {
-    path := p.path
+    file, err := p.file.ToFile()
+    if err != nil {
+        return
+    }
     
-    w, err := os.Create(path)
+    w, err := file.Create()
     if err != nil {
         return
     }

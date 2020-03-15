@@ -3,8 +3,8 @@ package interferogram
 import (
     "log"
     
-    "github.com/bozso/gamma/common"
-    "github.com/bozso/gamma/data"
+    "github.com/bozso/gomma/common"
+    "github.com/bozso/gomma/data"
 )
 
 type CoherenceWeight int

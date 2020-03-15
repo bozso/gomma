@@ -1,7 +1,7 @@
 package plot
 
 import (
-    "github.com/bozso/gamma/common"
+    "github.com/bozso/gomma/common"
 )
 
 type ScaleExp struct {

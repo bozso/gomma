@@ -3,8 +3,8 @@ package sentinel1
 import (
     "github.com/bozso/gotoolbox/path"
 
-    "github.com/bozso/gamma/data"
-    "github.com/bozso/gamma/utils/params"
+    "github.com/bozso/gomma/data"
+    "github.com/bozso/gomma/utils/params"
 )
 
 const maxIW = 3

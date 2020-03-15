@@ -4,8 +4,6 @@ import (
     "fmt"
     "log"
     "math"
-    "path"
-    "strings"
     "encoding/json"
     "path/filepath"
     
@@ -35,6 +33,9 @@ var (
     Pols = [4]string{"vv", "hh", "hv", "vh"}
     
     // TODO: get settings path from environment variable
+    
+    
+    
     Settings = loadSettings("/home/istvan/progs/gamma/bin/settings.json")
     commands = makeCommands()
 )
