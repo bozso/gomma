@@ -10,8 +10,22 @@ type Path struct {
     DatFile path.File
 }
 
-func New(file path.File) (p Path) {
-    p.DatFile = file
+func New(file path.Path) (p Path) {
+    p.DatFile = file.ToFile()
+    return
+}
+
+func (d File) WithShape(p Path) (f File, err error) {
+    f, err = d.WithShapeDType(p, d.Dtype)
+    return
+}
+
+func (d File) WithShapeDType(p Path, dtype Type) (f File, err error) {
+    if dtype == Unknown {
+        dtype = d.Dtype
+    }
+    
+    f, err = p.Load(d.Ra, dtype)
     return
 }
 

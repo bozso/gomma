@@ -2,8 +2,6 @@ package geo
 
 import (
     "log"
-    "os"
-    "path/filepath"
     
     "github.com/bozso/gotoolbox/path"
 
@@ -32,7 +30,7 @@ func (h Hgt) Raster(opt plot.RasArgs) (err error) {
 }
 
 type Geocode struct {
-    DiffPar, Offs, Offsets, Ccp, Coffs, Coffsets string
+    DiffPar, Offs, Offsets, Ccp, Coffs, Coffsets path.File
 }
 
 type (
@@ -88,14 +86,14 @@ type GeocodeOpt struct {
     Iter, NPoly, RngOversamp, nPixel, LanczosOrder int
     MLIOversamp int
     DEMOversamp common.LatLon
-    VrtPath string
+    VrtPath path.ValidFile
     CCThresh, AreaFactor, BandwithFrac float64
 }
 
-func (g* GeocodeOpt) Run(outDir string) (err error) {
-    geodir := filepath.Join(outDir, "geo")
+func (g* GeocodeOpt) Run(outDir path.Dir) (err error) {
+    geodir, _ := outDir.Join("geo").ToDir()
     
-    if err = path.Mkdir(geodir); err != nil {
+    if err = geodir.MkDir(); err != nil {
         return
     }
     
@@ -115,18 +113,13 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         npoly = 4
     }
     
-    demLoader := dem.FromDataPath(filepath.Join(geodir, "srtm.dem"))
+    demLoader := dem.New(geodir.Join("srtm.dem"))
     
     vrtPath := g.VrtPath
-    
-    if err = utils.NotEmpty("path to vrt files", vrtPath); err != nil {
-        return
-    }
 
-    ex, err := path.Exist(demLoader.DatFile)
+    ex, err := demLoader.DatFile.Exist()
     if err != nil {
-        return utils.WrapFmt(err,
-            "failed to check whether original DEM exists")
+        return
     }
     
     mli := g.MasterMLI
@@ -138,9 +131,9 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         _, err = vrt2dem.Call(vrtPath, mli.ParFile,
             demLoader.DatFile, demLoader.ParFile, 2, "-")
         
-        if err != nil { return }
-        
-        
+        if err != nil {
+            return
+        }
     } else {
         log.Println("DEM already imported.")
     }
@@ -150,7 +143,7 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         return
     }
 
-    if err = originalDem.Save(""); err != nil {
+    if err = originalDem.Save(); err != nil {
         return
     }
     
@@ -175,40 +168,38 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         Patch.Azi += 1
     }
     
-    demLoader = dem.FromDataPath(filepath.Join(geodir, "dem_seg.dem"))
+    demLoader = dem.New(geodir.Join("dem_seg.dem"))
 
-    gdir := path.NewJoiner(geodir)
-    
     Geo := Geocode{
-        Offs    : gdir.Join("offs"),
-        Offsets : gdir.Join("offsets"),
-        Ccp     : gdir.Join("ccp"),
-        Coffs   : gdir.Join("coffs"),
-        Coffsets: gdir.Join("coffsets"),
-        DiffPar : gdir.Join("diff_par"),
+        Offs    : geodir.Join("offs").ToFile(),
+        Offsets : geodir.Join("offsets").ToFile(),
+        Ccp     : geodir.Join("ccp").ToFile(),
+        Coffs   : geodir.Join("coffs").ToFile(),
+        Coffsets: geodir.Join("coffsets").ToFile(),
+        DiffPar : geodir.Join("diff_par").ToFile(),
     }
     
-    sigma0 := mli.WithShape(gdir.Join("sigma0"), data.Float)
-    gamma0 := mli.WithShape(gdir.Join("gamma0"), data.Float)
-    lsMap := mli.WithShape(gdir.Join("lsmap"), data.Float)
-    simSar := mli.WithShape(gdir.Join("sim_sar"), data.Float)
-    zenith := mli.WithShape(gdir.Join("zenith"), data.Float)
-    orient := mli.WithShape(gdir.Join("orient"), data.Float)
-    inc := mli.WithShape(gdir.Join("inclination"), data.Float)
-    proj := mli.WithShape(gdir.Join("projection"), data.Float)
-    pix := mli.WithShape(gdir.Join("pixel_area"), data.Float)
-    
+    sigma0 := data.New(geodir.Join("sigma0"))
+    gamma0 := data.New(geodir.Join("gamma0"))
+    lsMap := data.New(geodir.Join("lsmap"))
+    simSar := data.New(geodir.Join("sim_sar"))
+    zenith := data.New(geodir.Join("zenith"))
+    orient := data.New(geodir.Join("orient"))
+    inc := data.New(geodir.Join("inclination"))
+    proj := data.New(geodir.Join("projection"))
+    pix := data.New(geodir.Join("pixel_area"))
 
-    ex1, err := path.Exist(lookup.DatFile)
+    lookup := dem.NewLookup(geodir.Join("lookup"))
+    lookupOld := dem.NewLookup(geodir.Join("lookup_old"))
+    
+    ex1, err := lookup.DatFile.Exist()
     if err != nil {
-        return utils.WrapFmt(err,
-            "failed to check whether lookup table exists")
+        return
     }
     
-    ex2, err := path.Exist(demLoader.ParFile)
+    ex2, err := demLoader.ParFile.Exist()
     if err != nil {
-        return utils.WrapFmt(err,
-            "failed to check whether DEM parameter exists")
+        return
     }
     
     if !ex1 && !ex2 {
@@ -244,7 +235,9 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
             inc.DatFile, proj.DatFile, pix.DatFile,
             lsMap.DatFile, g.nPixel, 2, g.RngOversamp)
                 
-        if err != nil { return }      
+        if err != nil {
+            return
+        }      
     } else {
         log.Println("Initial lookup table already created.")
     }
@@ -253,10 +246,6 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     if err != nil {
         return
     }
-
-    lookup := segmentedDem.NewLookup(gdir.Join("lookup"))
-    lookupOld := segmentedDem.NewLookup(gdir.Join("lookup_old"))
-
     
     dra := segmentedDem.Ra
     
@@ -265,11 +254,15 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         lookup.DatFile, lsMap.DatFile,
         inc.DatFile, sigma0.DatFile, gamma0.DatFile, g.AreaFactor)
     
-    if err != nil { return }
+    if err != nil {
+        return
+    }
     
     _, err = createDiffPar.Call(mli.ParFile, nil, Geo.DiffPar, SLC_MLI, NonInter)
     
-    if err != nil { return }
+    if err != nil {
+        return
+    }
     
     log.Println("Refining lookup table.")
     
@@ -279,16 +272,14 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
         for ii := 0; ii < itr; ii++ {
             log.Printf("ITERATION %d / %d\n", ii + 1, itr)
             
-            if err = os.Remove(Geo.DiffPar); err != nil {
-                return utils.WrapFmt(err, "failed to remove file '%s'",
-                    Geo.DiffPar)
+            if err = Geo.DiffPar.Remove(); err != nil {
+                return
             }
 
             // copy previous lookup table
-            err = os.Rename(lookup.DatFile, lookupOld.DatFile)
+            err = lookup.DatFile.Rename(lookupOld.DatFile)
             if err != nil {
-                return utils.WrapFmt(err,
-                    "failed to move lookup file '%s'", lookup.DatFile)
+                return
             }
             
             _, err = createDiffPar.Call(mli.ParFile, nil, Geo.DiffPar,
@@ -329,15 +320,35 @@ func (g* GeocodeOpt) Run(outDir string) (err error) {
     }
     
     
-    toSave := []data.Saver{
-        &segmentedDem, &lookup, &sigma0, &gamma0, &lsMap, &simSar,
-        &zenith, &orient, &inc, &pix, &proj,
+    toLoad := []*data.Path{
+        &sigma0, &gamma0, &lsMap, &simSar, &zenith, &orient, &inc, &proj, &pix,
     }
     
-    for _, s := range toSave {
-        err = s.Save("")
+    toSave := make([]data.Saver, 0)
+    
+    for _, load := range toLoad {
+        loaded, Err := mli.WithShape(*load)
+        if err != nil {
+            err = Err
+            return
+        }
         
-        if err != nil { return }
+        toSave = append(toSave, loaded)
+    }
+    
+    lookupLoaded, err := segmentedDem.LoadLookup(lookup)
+    if err != nil {
+        return
+    }
+    
+    toSave = append(toSave, &segmentedDem, &lookupLoaded)
+    
+    for _, s := range toSave {
+        err = s.Save()
+        
+        if err != nil {
+            return
+        }
     }
     
     return nil

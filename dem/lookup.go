@@ -8,17 +8,23 @@ import (
     "github.com/bozso/gomma/plot"
     "github.com/bozso/gomma/utils/params"
 
+    "github.com/bozso/gotoolbox/path"
     "github.com/bozso/gotoolbox/errors"
     "github.com/bozso/gotoolbox/splitted"
     "github.com/bozso/gotoolbox/cli"
 )
 
-type Path struct {
+type LookupPath struct {
     data.Path
 }
 
-func (d File) NewLookup(p data.Path) (l Lookup, err error) {
-    l.File, err = d.File.WithShape(p, data.FloatCpx)
+func NewLookup(p path.Path) (l LookupPath) {
+    l.Path = data.New(p)
+    return
+}
+
+func (d File) LoadLookup(p LookupPath) (l Lookup, err error) {
+    l.File, err = d.File.WithShapeDType(p.Path, data.FloatCpx)
     return
 }
 

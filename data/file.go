@@ -63,15 +63,6 @@ func (d File) SaveWithPath(file path.File) (err error) {
     return common.SaveJson(file, d)
 }
 
-func (d File) WithShape(p Path, dtype Type) (f File, err error) {
-    if dtype == Unknown {
-        dtype = d.Dtype
-    }
-    
-    f, err = p.Load(d.Ra, dtype)
-    return
-}
-
 func (f File) Move(dir path.Dir) (fm File, err error) {
     fm = f
     fm.DatFile, err = f.DatFile.Move(dir)

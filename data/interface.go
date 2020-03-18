@@ -21,6 +21,7 @@ type (
     }
     
     Saver interface {
-        Save(path.File) error
+        Save() error
+        SaveWithPath(file path.File) (err error)
     }
 )
