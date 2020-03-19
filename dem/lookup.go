@@ -29,7 +29,11 @@ func (d File) LoadLookup(p LookupPath) (l Lookup, err error) {
 }
 
 type Lookup struct {
-    data.ComplexFile
+    data.File
+}
+
+func (l Lookup) Validate() (err error) {
+    return l.EnsureComplex()
 }
 
 func (l Lookup) Raster(opt plot.RasArgs) (err error) {

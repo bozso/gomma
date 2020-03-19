@@ -29,7 +29,7 @@ func (cw CoherenceWeight) String() string {
 
 type (
     Coherence struct {
-        data.FloatFile
+        data.File
     }
     
     CoherenceOpt struct {

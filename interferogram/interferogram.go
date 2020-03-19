@@ -3,104 +3,76 @@ package interferogram
 import (
     "time"
     "log"
-    "strings"
-    "strconv"
     
     "github.com/bozso/gotoolbox/path"
-    "github.com/bozso/gotoolbox/cli/stream"
+    "github.com/bozso/gotoolbox/splitted"
 
+    "github.com/bozso/gomma/base"
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/data"
-    "github.com/bozso/gomma/base"
+    "github.com/bozso/gomma/geo"
     "github.com/bozso/gomma/plot"
 )
 
-type Paths struct {
-    data.ComplexFile
-    DiffPar   path.File        `json:"diff_par"`
-    Quality   path.File        `json:"quality"`
-    SimUnwrap path.File        `json:"simulated_unwrap"`    
-}
-
 type File struct {
-    Paths
-    DeltaT    time.Duration `json:"delta_time"`
+    data.FileWithPar          `json:"complex_file"`
+    DiffPar   path.ValidFile  `json:"diff_par"`
+    Quality   path.File       `json:"quality"`
+    SimUnwrap path.File       `json:"simulated_unwrap"`
+    DeltaT    time.Duration   `json:"delta_time"`
 }
 
-func New(dat, off, diffpar string) (ifg File) {
-    ifg.File.DatFile, ifg.File.ParFile = dat, off
-
-    if len(diffpar) == 0 {
-        diffpar = dat + ".diff_par"
-    }
-    
-    ifg.DiffPar = diffpar
-    
-    return
+func (f File) Validate() (err error) {
+    return f.EnsureComplex()
 }
 
-// TODO: implement
-var Importer = data.ParamKeys{
-    
-}
-
-// TODO: implement
-func (f *File) Load() (err error) {
-    return nil
-}
-
-func (ifg File) WithShape(datafile, off, diffpar string) (out File) {
-    if len(off) == 0 {
-        diffpar = datafile + ".off"
-    }
-
-    if len(diffpar) == 0 {
-        diffpar = datafile + ".diff_par"
-    }
-    
-    out.File.DatFile, out.File.ParFile, out.DiffPar = datafile, off, diffpar
-    
-    return
-}
-
-func (i File) Move(dir string) (im File, err error) {
+func (i File) Move(dir path.Dir) (im File, err error) {
     if im.File, err = i.File.Move(dir); err != nil {
         return
     }
     
-    if im.DiffPar, err = path.Move(i.DiffPar, dir); err != nil {
+    if im.DiffPar, err = i.DiffPar.Move(dir); err != nil {
         return
     }
     
-    if len(i.SimUnwrap) > 0 {
-        if im.SimUnwrap, err = path.Move(i.SimUnwrap, dir); err != nil {
+    f, err := i.SimUnwrap.ToValid()
+    
+    if err != nil {
+        if im.SimUnwrap, err = i.SimUnwrap.Move(dir); err != nil {
+            return
+        }
+    }
+
+    f, err = i.Quality.ToValid()
+    
+    if err != nil {
+        if im.Quality, err = i.Quality.Move(dir); err != nil {
             return
         }
     }
     
-    if len(i.Quality) > 0 {
-        if im.Quality, err = path.Move(i.Quality, dir); err != nil {
-            return
-        }
-    }
-    
+    im.Meta, im.DeltaT = i.Meta, im.DeltaT    
     return
 }
 
 
 func (ifg File) CheckQuality() (b bool, err error) {
-    qual := ifg.Quality
-    
-    file := stream.In{}
-    if err = file.Set(qual); err != nil {
+    qual, err := ifg.Quality.ToValid()
+    if err != nil {
         return
     }
-    defer file.Close()
     
-    offs := 0.0
-    var diff float64
+    scan, err := qual.Scanner()
+    if err != nil {
+        return
+    }
+    defer scan.Close()
+    
+    var (
+        diff float64
+        offs = 0.0
+    )
 
-    scan := file.Scanner()
     for scan.Scan() {
         line := scan.Text()
         
@@ -108,15 +80,22 @@ func (ifg File) CheckQuality() (b bool, err error) {
             continue
         }
         
-        split := strings.Fields(line)
+        split, Err := splitted.NewFields(line)
+        if err != nil {
+            err = Err
+            return
+        }
         
-        if split[0] == "azimuth_pixel_offset" {
-            s := split[1]
-            diff, err = strconv.ParseFloat(s, 64)
-            
+        first, Err := split.Idx(0)
+        if err != nil {
+            err = Err
+            return
+        }
+        
+        if first == "azimuth_pixel_offset" {
+            diff, Err := split.Float(1)
             if err != nil {
-                err = utils.WrapFmt(err,
-                    "failed to parse: '%s' into float64", s)
+                err = Err
                 return
             }
             
@@ -141,7 +120,8 @@ type (
     IfgOpt struct {
         Looks common.RngAzi
         interact bool
-        hgt, datapath, off, diff string
+        hgt geo.Hgt
+        datapath, off, diff path.File
         algo OffsetAlgo
         ref *base.SLC
     }
@@ -169,17 +149,17 @@ func FromSLC(slc1, slc2 base.SLC, opt IfgOpt) (out File, err error) {
     
     par1, par2 := slc1.ParFile, slc2.ParFile
     
-    out = New(opt.datapath, opt.off, opt.diff)
+    pout = New(opt.datapath)
     
     // TODO: check arguments!
-    _, err = createOffset.Call(par1, par2, out.ParFile, opt.algo,
+    _, err = createOffset.Call(par1, par2, pout.ParFile, opt.algo,
         rng, azi, inter)
     if err != nil { return }
     
     slcRefPar := "-"
     
     if ref := opt.ref; ref != nil {
-        slcRefPar = ref.ParFile
+        slcRefPar = ref.ParFile.GetPath()
     }
     
     _, err = phaseSimOrb.Call(par1, par2, out.ParFile, opt.hgt,

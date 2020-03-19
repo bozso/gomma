@@ -10,7 +10,11 @@ import (
 )
 
 type SLC struct {
-    data.ComplexFileWithPar `json:"SLC"`
+    data.FileWithPar `json:"SLC"`
+}
+
+func (s SLC) Validate() (err error) {
+    return s.EnsureComplex()
 }
 
 var multiLook = common.Must("multi_look")

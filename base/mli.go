@@ -6,7 +6,11 @@ import (
 )
 
 type MLI struct {
-    data.FloatFileWithPar `json:"MLI"`
+    data.FileWithPar `json:"MLI"`
+}
+
+func (m MLI) Validate() (err error) {
+    return m.EnsureFloat()
 }
 
 func (m MLI) Raster(opt plot.RasArgs) (err error) {

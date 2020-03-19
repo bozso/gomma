@@ -7,27 +7,9 @@ import (
 
     "github.com/bozso/gomma/data"
     "github.com/bozso/gomma/dem"
-    "github.com/bozso/gomma/plot"
     "github.com/bozso/gomma/base"
     "github.com/bozso/gomma/common"
 )
-
-
-type Hgt struct {
-    data.File
-}
-
-func (h *Hgt) Set(s string) (err error) {
-    return
-}
-
-func (h Hgt) Raster(opt plot.RasArgs) (err error) {
-    opt.Mode = plot.Height
-    opt.Parse(h)
-    
-    err = plot.Raster(h, opt)
-    return nil
-}
 
 type Geocode struct {
     DiffPar, Offs, Offsets, Ccp, Coffs, Coffsets path.File
@@ -93,7 +75,7 @@ type GeocodeOpt struct {
 func (g* GeocodeOpt) Run(outDir path.Dir) (err error) {
     geodir, _ := outDir.Join("geo").ToDir()
     
-    if err = geodir.MkDir(); err != nil {
+    if err = geodir.Mkdir(); err != nil {
         return
     }
     

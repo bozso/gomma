@@ -10,7 +10,11 @@ import (
 )
 
 type File struct {
-    data.FloatFileWithPar
+    data.FileWithPar
+}
+
+func (f File) Validate() (err error) {
+    return f.EnsureFloat()
 }
 
 var Keys = data.ParamKeys{
