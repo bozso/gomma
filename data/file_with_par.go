@@ -2,21 +2,17 @@ package data
 
 import (
     "github.com/bozso/gotoolbox/path"
-
-    "github.com/bozso/gomma/common"
 )
 
+type Parameter struct {
+    ParFile path.ValidFile `json:"parfile"`    
+}
+
 type FileWithPar struct {
-    ParFile path.ValidFile
+    Parameter
     File
 }
 
 func (f *FileWithPar) Set(s string) (err error) {
-    file, err := path.New(s).ToFile().ToValid()
-    if err != nil {
-        return
-    }
-    
-    err = common.LoadJson(file, f)
-    return
+    return LoadJson(s, f)
 }

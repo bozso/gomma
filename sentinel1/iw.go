@@ -10,12 +10,12 @@ import (
 const maxIW = 3
 
 type(
-    IWLoader struct {
-        data.Loader
-        TOPS_par string
+    IWPath struct {
+        data.Path
+        TOPS_par path.File
     }
     
-    IWLoaders [maxIW]IWLoader
+    IWPaths [maxIW]IWPath
 )
 
 func NewIW(dat, par, TOPS_par string) (l IWLoader) {
@@ -61,7 +61,7 @@ func (l IWLoader) Load() (iw IW, err error) {
 
 type(  
     IW struct {
-        data.ComplexFile
+        data.ComplexWithPar
         TOPS_par string
     }
 

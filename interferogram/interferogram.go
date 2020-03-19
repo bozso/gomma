@@ -15,15 +15,11 @@ import (
 )
 
 type File struct {
-    data.FileWithPar          `json:"complex_file"`
+    data.ComplexWithPar       `json:"complex_file"`
     DiffPar   path.ValidFile  `json:"diff_par"`
     Quality   path.File       `json:"quality"`
     SimUnwrap path.File       `json:"simulated_unwrap"`
     DeltaT    time.Duration   `json:"delta_time"`
-}
-
-func (f File) Validate() (err error) {
-    return f.EnsureComplex()
 }
 
 func (i File) Move(dir path.Dir) (im File, err error) {
@@ -38,23 +34,30 @@ func (i File) Move(dir path.Dir) (im File, err error) {
     f, err := i.SimUnwrap.ToValid()
     
     if err != nil {
-        if im.SimUnwrap, err = i.SimUnwrap.Move(dir); err != nil {
+        f, err = f.Move(dir)
+        
+        if err != nil {
             return
         }
+        
+        im.SimUnwrap = f.ToFile()
     }
 
     f, err = i.Quality.ToValid()
     
     if err != nil {
-        if im.Quality, err = i.Quality.Move(dir); err != nil {
+        f, err = f.Move(dir)
+        
+        if err != nil {
             return
         }
+        
+        im.Quality = f.ToFile()
     }
     
     im.Meta, im.DeltaT = i.Meta, im.DeltaT    
     return
 }
-
 
 func (ifg File) CheckQuality() (b bool, err error) {
     qual, err := ifg.Quality.ToValid()
@@ -68,10 +71,7 @@ func (ifg File) CheckQuality() (b bool, err error) {
     }
     defer scan.Close()
     
-    var (
-        diff float64
-        offs = 0.0
-    )
+    offs := 0.0
 
     for scan.Scan() {
         line := scan.Text()
@@ -145,16 +145,17 @@ func FromSLC(slc1, slc2 base.SLC, opt IfgOpt) (out File, err error) {
         inter = 1
     }
     
-    rng, azi := opt.Looks.Rng, opt.Looks.Azi
+    par1, par2, ra := slc1.ParFile, slc2.ParFile, opt.Looks
     
-    par1, par2 := slc1.ParFile, slc2.ParFile
-    
-    pout = New(opt.datapath)
+    p := New(opt.datapath.Path)
     
     // TODO: check arguments!
-    _, err = createOffset.Call(par1, par2, pout.ParFile, opt.algo,
-        rng, azi, inter)
-    if err != nil { return }
+    _, err = createOffset.Call(par1, par2, p.ParFile, opt.algo,
+        ra.Rng, ra.Azi, inter)
+    
+    if err != nil {
+        return
+    }
     
     slcRefPar := "-"
     
@@ -167,71 +168,21 @@ func FromSLC(slc1, slc2 base.SLC, opt IfgOpt) (out File, err error) {
     if err != nil { return }
 
     dat1, dat2 := slc1.DatFile, slc2.DatFile
-    _, err = slcDiffIntf.Call(dat1, dat2, par1, par2, out.ParFile,
-        out.SimUnwrap, out.DiffPar, rng, azi, 0, 0)
-    if err != nil { return }
     
-    if err = out.Load(); err != nil {
+    _, err = slcDiffIntf.Call(dat1, dat2, par1, par2, out.ParFile,
+        out.SimUnwrap, out.DiffPar, ra.Rng, ra.Azi, 0, 0)
+    
+    if err != nil {
+        return
+    }
+    
+    out, err = p.Load()
+    if err != nil {
         return
     }
     
     // TODO: Check date difference order
     out.DeltaT = slc1.Time.Sub(slc2.Time)
-    
-    return
-}
-
-type CpxToReal int
-
-const (
-    Real CpxToReal = iota
-    Imaginary
-    Intensity
-    Magnitude
-    Phase
-)
-
-func (c CpxToReal) String() string {
-    switch c {
-    case Real:
-        return "Real"
-    case Imaginary:
-        return "Imaginary"
-    case Intensity:
-        return "Intensity"
-    case Magnitude:
-        return "Magnitude"
-    case Phase:
-        return "Phase"
-    default:
-        return "Unknown"
-    }
-}
-
-var cpxToReal = common.Must("cpx_to_real")
-
-func (ifg File) ToReal(mode CpxToReal, d data.FloatFile) (err error) {
-    d.Ra = ifg.Ra
-    
-    Mode := 0
-    
-    switch (mode) {
-    case Real:
-        Mode = 0
-    case Imaginary:
-        Mode = 1
-    case Intensity:
-        Mode = 2
-    case Magnitude:
-        Mode = 3
-    case Phase:
-        Mode = 4
-    default:
-        err = utils.UnrecognizedMode(mode.String(), "interferogram.ToReal")
-        return
-    }
-    
-    _, err = cpxToReal.Call(ifg.DatFile, d.DataPath(), d.Rng(), Mode)
     
     return
 }

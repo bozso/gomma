@@ -6,6 +6,9 @@ import (
     "log"
     "path/filepath"
 
+    "github.com/bozso/gotoolbox/cli"
+    "github.com/bozso/gotoolbox/errors"
+
     "github.com/bozso/gomma/base"
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/date"
@@ -32,7 +35,7 @@ type (
 
 var coregFun = common.Must("S1_coreg_TOPS")
 
-func (s1 *CoregOpt) SetCli(c *utils.Cli) {
+func (s1 *CoregOpt) SetCli(c *cli.Cli) {
 
     c.StringVar(&s1.IfgPath, "ifg",
         "Output interferogram metadata file", "")
@@ -138,7 +141,7 @@ func (sc *CoregOpt) Coreg(slc, ref *SLC) (c CoregOut, err error) {
     }
     
     if c.Ifg, err = ifg.Move(sc.IfgPath); err != nil {
-        err = utils.WrapFmt(err,
+        err = errors.WrapFmt(err,
             "failed to move interferogram '%s' to IFG directory",
             ifg.Dat)
         return
@@ -149,14 +152,14 @@ func (sc *CoregOpt) Coreg(slc, ref *SLC) (c CoregOut, err error) {
         pattern := filepath.Join(sc.OutDir, slc1ID + "*")
         
         if glob, err = filepath.Glob(pattern); err != nil {
-            err = utils.WrapFmt(err,
+            err = errors.WrapFmt(err,
                 "globbing for leftover files from coregistration failed")
             return
         }
         
         for _, file := range glob {
             if err = os.Remove(file); err != nil {
-                err = utils.WrapFmt(err, "failed to remove file '%s'",
+                err = errors.WrapFmt(err, "failed to remove file '%s'",
                     file)
                 return
             }
@@ -165,14 +168,14 @@ func (sc *CoregOpt) Coreg(slc, ref *SLC) (c CoregOut, err error) {
         pattern = filepath.Join(sc.OutDir, slc2ID + "*")
         
         if glob, err = filepath.Glob(pattern); err != nil {
-            err = utils.WrapFmt(err,
+            err = errors.WrapFmt(err,
                 "globbing for leftover files from coregistration failed")
             return
         }
         
         for _, file := range glob {
             if err = os.Remove(file); err != nil {
-                err = utils.WrapFmt(err, "failed to remove file '%s'",
+                err = errors.WrapFmt(err, "failed to remove file '%s'",
                     file)
                 return
             }

@@ -255,19 +255,31 @@ func (g* GeocodeOpt) Run(outDir path.Dir) (err error) {
             log.Printf("ITERATION %d / %d\n", ii + 1, itr)
             
             if err = Geo.DiffPar.Remove(); err != nil {
-                return
+                return err
+            }
+
+            l1, err := lookup.DatFile.ToValid()
+            if err != nil {
+                return err
+            }
+
+            l2, err := lookupOld.DatFile.ToValid()
+            if err != nil {
+                return err
             }
 
             // copy previous lookup table
-            err = lookup.DatFile.Rename(lookupOld.DatFile)
+            _, err = l1.Rename(l2)
             if err != nil {
-                return
+                return err 
             }
             
             _, err = createDiffPar.Call(mli.ParFile, nil, Geo.DiffPar,
                                    SLC_MLI, NonInter)
             
-            if err != nil { return }
+            if err != nil {
+                return err
+            }
             
             _, err = offsetPwrm.Call(sigma0.DatFile, mli.DatFile,
                 Geo.DiffPar, Geo.Offs, Geo.Ccp, Patch.Rng, Patch.Azi,
@@ -275,19 +287,25 @@ func (g* GeocodeOpt) Run(outDir path.Dir) (err error) {
                 offsetWin.Azi, g.CCThresh, g.LanczosOrder,
                 g.BandwithFrac)
             
-            if err != nil { return }
+            if err != nil {
+                return err
+            }
             
             _, err = offsetFitm.Call(Geo.Offs, Geo.Ccp, Geo.DiffPar,
                 Geo.Coffs, Geo.Coffsets, g.CCThresh, npoly, NonInter)
             
-            if err != nil { return }
+            if err != nil {
+                return err
+            }
 
             // update previous lookup table
             // TODO: magic number 1
             _, err = gcMapFine.Call(lookupOld.DatFile, dra.Rng,
                 Geo.DiffPar, lookup.DatFile, 1)
             
-            if err != nil { return }
+            if err != nil {
+                return err
+            }
 
             // create new simulated ampliutides with the new lookup table
             _, err = pixelArea.Call(mli.ParFile,
@@ -295,7 +313,9 @@ func (g* GeocodeOpt) Run(outDir path.Dir) (err error) {
                 lookup.DatFile, lsMap.DatFile, inc.DatFile,
                 sigma0.DatFile, gamma0.DatFile, g.AreaFactor)
             
-            if err != nil { return }
+            if err != nil {
+                return err
+            }
 
         }
         log.Println("ITERATION DONE.")

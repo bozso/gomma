@@ -43,7 +43,9 @@ func (p Paths) WithSimUnwrap(file path.Path) (pp Paths) {
 
 // TODO: implement
 func (p Paths) Load() (f File, err error) {
-    f.FileWithPar, err = p.Load()
+    fw, err := p.PathWithPar.Load()
+    f.File, f.Parameter = fw.File, fw.Parameter
+    
     return
 }
 

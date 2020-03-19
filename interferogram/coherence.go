@@ -2,52 +2,33 @@ package interferogram
 
 import (
     "log"
+    "strings"
+    
+    "github.com/bozso/gotoolbox/errors"
+    "github.com/bozso/gotoolbox/path"
     
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/data"
-
-    "github.com/bozso/gotoolbox/errors"
 )
 
-type CoherenceWeight int
-
-const (
-    Constant CoherenceWeight = iota
-    Gaussian
-)
-
-func (cw CoherenceWeight) String() string {
-    switch cw {
-    case Constant:
-        return "constant"
-    case Gaussian:
-        return "gaussian"
-    default:
-        return "unknown"
-    }
+type Coherence struct {
+    data.Complex
 }
 
-type (
-    Coherence struct {
-        data.File
-    }
-    
-    CoherenceOpt struct {
-        Box                    common.Minmax
-        SlopeCorrelationThresh float64
-        SlopeWindow            int
-        DatFile string
-        Weight CoherenceWeight
-    }
-)
-
+type CoherenceOpt struct {
+    Box                    common.Minmax
+    SlopeCorrelationThresh float64
+    SlopeWindow            int
+    DatFile path.Path
+    Weight CoherenceWeight
+}
 
 var (
     phaseSlope = common.Must("phase_slope")
     ccAdaptive = common.Must("cc_ad")
 )
 
-func (ifg File) Coherence(opt CoherenceOpt, c Coherence) (err error) {
+func (ifg File) Coherence(opt CoherenceOpt) (c Coherence, err error) {
     weightFlag := 0
     
     switch w := opt.Weight; w {
@@ -56,8 +37,9 @@ func (ifg File) Coherence(opt CoherenceOpt, c Coherence) (err error) {
     case Gaussian:
         weightFlag = 1
     default:
-        return errors.UnrecognizedMode(w.String(),
+        err = errors.UnrecognizedMode(w.String(),
             "adaptive coherence calculation")
+        return
     }
     
     //log.info("CALCULATING COHERENCE AND CREATING QUICKLOOK IMAGES.")
@@ -84,4 +66,34 @@ func (ifg File) Coherence(opt CoherenceOpt, c Coherence) (err error) {
         c.DatFile, width, opt.Box.Min, opt.Box.Max, weightFlag)
     
     return
+}
+
+type CoherenceWeight int
+
+const (
+    Constant CoherenceWeight = iota
+    Gaussian
+)
+
+func (cw *CoherenceWeight) Set(s string) (err error) {
+    cs := strings.ToLower(s)
+    
+    switch cs {
+    case "constant":
+        *cw = Constant
+    case "gaussian":
+        *cw = Gaussian
+    }
+    return
+}
+
+func (cw CoherenceWeight) String() string {
+    switch cw {
+    case Constant:
+        return "constant"
+    case Gaussian:
+        return "gaussian"
+    default:
+        return "unknown"
+    }
 }

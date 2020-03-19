@@ -9,28 +9,31 @@ import (
     "regexp"
 
     "github.com/bozso/gotoolbox/path"
-    "github.com/bozso/gotoolbox/cli/stream"
+    "github.com/bozso/gotoolbox/errors"
+    
+    "github.com/bozso/gomma/common"
 )
 
 type Extractor struct {
-    pol, dst string
-    path *string
-    templates *templates
+    pol common.Polarization
+    dst path.Path
+    path path.Valid
+    templates templates
     *zip.ReadCloser
     err error
 }
 
-func (s1 *Zip) newExtractor(dst string) (ex Extractor) {
-    ex.path      = &s1.Path
-    ex.templates = &s1.Templates
+func (s1 Zip) newExtractor(dst path.Path) (ex Extractor) {
+    ex.path      = s1.Path
+    ex.templates = s1.Templates
     ex.pol       = s1.pol
     ex.dst       = dst
-    ex.ReadCloser, ex.err = zip.OpenReader(*ex.path)
+    ex.ReadCloser, ex.err = zip.OpenReader(ex.path.GetPath())
 
     return
 }
 
-func (ex Extractor) Wrap() error {
+func (ex Extractor) Err() error {
     if ex.err == nil {
         return nil
     }
@@ -58,7 +61,7 @@ func (ex *Extractor) Extract(mode tplType, iw int) (s string) {
     return
 }
 
-func (ex Extractor) extract(template, dst string) (s string, err error) {
+func (ex Extractor) extract(template string, dst path.Dir) (s string, err error) {
     //log.Fatalf("%s %s", root, template)
     var matched, exist bool
     
@@ -67,7 +70,7 @@ func (ex Extractor) extract(template, dst string) (s string, err error) {
         name := zipfile.Name
         
         if matched, err = regexp.MatchString(name, template); err != nil {
-            err = utils.WrapFmt(err,
+            err = errors.WrapFmt(err,
                 "failed to check whether zipped file '%s' matches templates",
                 name)
             return
@@ -83,8 +86,7 @@ func (ex Extractor) extract(template, dst string) (s string, err error) {
         //fmt.Printf("\n\nCurrent: %s\nTemplate: %s\nMatched: %v\n",
         //    name, template, matched)
         
-        if exist, err = path.Exist(s); err != nil {
-            err = utils.WrapFmt(err, "stat failed on file '%s'", name)
+        if exist, err = s.Exist(); err != nil {
             return
         }
         
@@ -99,27 +101,28 @@ func (ex Extractor) extract(template, dst string) (s string, err error) {
     return s, nil
 }
 
-func extractFile(src *zip.File, dst string) (err error) {
-    srcName := src.Name
-    
-    in, err := stream.Open(srcName)
-    
-    if err != nil { return }
+func extractFile(src *zip.File, dst path.Path) (err error) {
+    in, err := src.Open()
+    if err != nil {
+        return
+    }
     defer in.Close()
     
-    dir := filepath.Dir(dst)
-    if err = path.Mkdir(dir); err != nil {
+    dir := dst.Dir(dst)
+    if err = dir.Make(); err != nil {
         return
     }
     
-    out, err := stream.Create(dst)
-    if err != nil { return }
+    out, err := dst.Create()
+    if err != nil {
+        return
+    }
     defer out.Close()
     
     log.Printf("Extracting '%s' into '%s'", srcName, dst)
     
     if _, err = io.Copy(out, in); err != nil {
-        return utils.WrapFmt(err,
+        return errors.WrapFmt(err,
             "failed to copy contents of '%s' into '%s'", srcName, dst)
     }
 

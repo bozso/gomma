@@ -5,6 +5,7 @@ import (
     "time"
     
     "github.com/bozso/gotoolbox/path"
+
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/utils/params"
 )
@@ -15,13 +16,7 @@ type File struct {
 }
 
 func (f *File) Set(s string) (err error) {
-    file, err := path.New(s).ToFile().ToValid()
-    if err != nil {
-        return
-    }
-    
-    err = common.LoadJson(file, f)
-    return
+    return LoadJson(s, f)
 }
 
 func (f File) TypeCheck(dtypes... Type) (err error) {
@@ -84,4 +79,14 @@ const (
 
 func NewGammaParams(file path.ValidFile) (p params.Params, err error) {
     return params.FromFile(file, separator)
+}
+
+func LoadJson(s string, val interface{}) (err error) {
+    file, err := path.New(s).ToFile().ToValid()
+    if err != nil {
+        return
+    }
+    
+    err = common.LoadJson(file, val)
+    return    
 }
