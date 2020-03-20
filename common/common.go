@@ -204,3 +204,32 @@ func LoadJson(f path.ValidFile, val interface{}) (err error) {
     
     return
 }
+
+func ParseFail(p path.Pather, err error) FileParseError {
+    return FileParseError{p, "", err}
+}
+
+type FileParseError struct {
+    p path.Pather
+    toRetreive string
+    err error
+}
+
+func (e FileParseError) ToRetreive(s string) error {
+    e.toRetreive = s
+    return e
+}
+
+func (e FileParseError) Error() string {
+    str := fmt.Sprintf("failed to parse file '%s'", e.p.GetPath())
+    
+    if tr := e.toRetreive; len(tr) > 0 {
+        str = fmt.Sprintf("%s to retreive %s", str, tr)
+    }
+    
+    return errors.Wrap(e.err, str)
+}
+
+func (e FileParseError) Unwrap() error {
+    return e.err
+}

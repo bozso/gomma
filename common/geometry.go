@@ -39,18 +39,3 @@ func (ll *LatLon) Set(s string) (err error) {
     return nil
 }
 
-type Point struct {
-    X, Y float64
-}
-
-func (p Point) InRect(r Rectangle) bool {
-    return (p.X < r.Max.X && p.X > r.Min.X &&
-            p.Y < r.Max.Y && p.Y > r.Min.Y)
-}
-
-type Rectangle struct {
-    Max, Min Point
-}
-
-type AOI [4]Point
-

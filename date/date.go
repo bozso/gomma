@@ -5,13 +5,7 @@ import (
     "time"
 )
 
-type (
-    Dater interface {
-        Date() time.Time
-    }
-    
-    ParseFmt string
-)
+type ParseFmt string
 
 const (
     Short ParseFmt = "20060102"

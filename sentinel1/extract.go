@@ -18,7 +18,7 @@ type Extractor struct {
     pol common.Polarization
     dst path.Path
     path path.Valid
-    templates templates
+    templates
     *zip.ReadCloser
     err error
 }
@@ -39,8 +39,8 @@ func (ex Extractor) Err() error {
     }
     
     return fmt.Errorf(
-        "failure during the extraction from zipfile '%s': %w", *ex.path,
-        ex.err)
+        "failure during the extraction from zipfile '%s': %w",
+        ex.path.GetPath(), ex.err)
 }
 
 func (ex *Extractor) Extract(mode tplType, iw int) (s string) {
@@ -48,13 +48,7 @@ func (ex *Extractor) Extract(mode tplType, iw int) (s string) {
         return
     }
     
-    var tpl string
-    
-    if fmtNeeded[mode] {
-        tpl = fmt.Sprintf(ex.templates[mode], iw, ex.pol)
-    } else {
-        tpl = ex.templates[mode]
-    }
+    tpl := ex.templates[mode].Format(iw, ex.pol)
     
     s, ex.err = ex.extract(tpl, ex.dst)
     
