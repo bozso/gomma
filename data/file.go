@@ -12,7 +12,7 @@ import (
 
 type File struct {
     DatFile path.ValidFile `json:"datafile"`
-    Meta
+    Meta                   `json:"metadata"`
 }
 
 func (f *File) Set(s string) (err error) {

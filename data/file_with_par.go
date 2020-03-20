@@ -9,8 +9,8 @@ type Parameter struct {
 }
 
 type FileWithPar struct {
-    Parameter
-    File
+    Parameter `json:"parameter"`
+    File      `json:"file"`
 }
 
 func (f *FileWithPar) Set(s string) (err error) {

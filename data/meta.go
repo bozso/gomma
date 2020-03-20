@@ -16,7 +16,7 @@ const DateFmt date.ParseFmt = "2016 12 05"
 type Meta struct {
     Dtype     Type            `json:"data_type"`
     Ra        common.RngAzi   `json:"rng_azi"`
-    time.Time    
+    time.Time                 `json:"time"`
 }
 
 func (m Meta) TypeCheck(filepath path.Pather, dtypes... Type) (err error) {

@@ -8,7 +8,7 @@ import (
 )
 
 type Complex struct {
-    File
+    File `json:"file"`
 }
 
 func (c Complex) Validate() (err error) {
@@ -75,8 +75,8 @@ func (c Complex) ToReal(mode CpxToReal, file path.Path) (d File, err error) {
 }
 
 type ComplexWithPar struct {
-    Complex
-    Parameter    
+    Complex   `json:"complex"`
+    Parameter `json:"parameter"`
 }
 
 func (c *ComplexWithPar) Set(s string) (err error) {

@@ -25,6 +25,11 @@ type PathWithPar struct {
     keys *ParamKeys
 }
 
+func (p PathWithPar) WithPar(file path.Path) (pp PathWithPar) {
+    p.ParFile = file.ToFile()
+    return p
+}
+
 func (p Path) WithParFile(file path.Path) (pp PathWithPar) {
     return PathWithPar{
         Path: p,
