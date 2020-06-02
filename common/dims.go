@@ -18,8 +18,8 @@ func (ra RngAzi) String() string {
 }
 
 func (ra *RngAzi) Set(s string) (err error) {
-    
-    if err = errors.NotEmpty(s, "RngAzi"); err != nil {
+    const field errors.NotEmpty = "RngAzi"
+    if err = field.Check(s); err != nil {
         return
     }
     

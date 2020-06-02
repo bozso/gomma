@@ -7,14 +7,14 @@ import (
     "github.com/bozso/gomma/cli"
 )
 
-func main() {
-    cli := utils.NewCli("gamma",
+func Main() error {
+    c := cli.New("gamma",
         "Wrapper program for the GAMMA SAR processing software.")
-    cli.SetupGammaCli(cli)
-    
-    if err := cli.Run(os.Args[1:]); err != nil {
-        fmt.Fprintf(os.Stderr, "Error occurred in main while running: %s\n",
-            err)
-        os.Exit(1)
-    }
+        
+    c.SetupGammaCli(cli)
+    return c.Run(os.Args[1:])
+}
+
+func main() {
+    cli.Run(Main)
 }

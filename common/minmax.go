@@ -18,7 +18,9 @@ type(
 )
 
 func (mm *IMinmax) Set(s string) (err error) {
-    if err = errors.NotEmpty(s, "IMinmax"); err != nil {
+    const field errors.NotEmpty = "IMinmax"
+    
+    if err = field.Check(s); err != nil {
         return
     }
     

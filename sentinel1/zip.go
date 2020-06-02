@@ -2,9 +2,6 @@ package sentinel1
 
 import (
     "fmt"
-    "math"
-    "os"
-    "path/filepath"
     "strings"
     "time"
     
@@ -13,8 +10,7 @@ import (
     "github.com/bozso/gomma/data"
     "github.com/bozso/gomma/date"
     "github.com/bozso/gomma/common"
-    "github.com/bozso/gomma/utils/params"
-    "github.com/bozso/gomma/base"
+    "github.com/bozso/gomma/mli"
 )
 
 var dirPaths = [4]string{"slc", "rslc", "mli", "rmli"}
@@ -23,7 +19,6 @@ type (
     Zip struct {
         Path path.ValidFile
         
-        Path          string
         Root          string
         zipBase       string
         mission       string
@@ -34,7 +29,7 @@ type (
         Safe          string
         level         string
         productClass  string
-        pol           string
+        pol           common.Pol
         absoluteOrbit string
         DTID          string
         UID           string
@@ -123,7 +118,7 @@ func (s1 Zip) SLC(pol string) (s SLC, err error) {
     return
 }
 
-func (s1 Zip) MLI(mode, pol string, out *base.MLI, opt *base.MLIOpt) (err error) {
+func (s1 Zip) MLI(mode, pol string, out *mli.MLI, opt *mli.Options) (err error) {
     slc, err := s1.SLC(pol)
     if err != nil {
         return

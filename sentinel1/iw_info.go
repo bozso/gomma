@@ -1,8 +1,8 @@
 package sentinel1
 
 import (
-    "github.com/bozso/gotoolbox/errors"
-
+    "github.com/bozso/gotoolbox/path"
+    
     "github.com/bozso/gomma/common"
 )
 

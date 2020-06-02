@@ -14,7 +14,8 @@ func NewRange(start, stop time.Time) (r Range) {
     r.center = stop.Add(delta)
 
     r.start = start
-    r.stop = stop    
+    r.stop = stop
+    return
 }
 
 func (df ParseFmt) NewRange(start, stop string) (d Range, err error) {

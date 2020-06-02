@@ -1,7 +1,9 @@
 package common
 
 import (
+    "github.com/bozso/gotoolbox/errors"
 
+    "strings"
 )
 
 type Pol int
@@ -14,6 +16,8 @@ const (
 )
 
 func (p *Pol) Set(s string) (err error) {
+    
+    const mode errors.Mode = "polarization"
     ps := strings.ToLower(s)
     
     switch ps {
@@ -23,10 +27,10 @@ func (p *Pol) Set(s string) (err error) {
         *p = VH
     case "hv":
         *p = HV
-    case "vv":
-        *p = VV
+    case "hh":
+        *p = HH
     default:
-        err = errors.UnrecognizedMode(s, "polarization")
+        err = mode.Error(s)
     }
     return
 }

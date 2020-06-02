@@ -10,14 +10,13 @@ type ParamKeys struct {
     Rng, Azi, Type, Date string
 }
 
-var (
-    DefaultKeys = ParamKeys{
-        Rng: "range_samples",
-        Azi: "azimuth_lines",
-        Type: "image_format",
-        Date: "date",
-    }
-)
+var DefaultKeys = &ParamKeys{
+    Rng: "range_samples",
+    Azi: "azimuth_lines",
+    Type: "image_format",
+    Date: "date",
+}
+
 
 type PathWithPar struct {
     Path
@@ -34,7 +33,7 @@ func (p Path) WithParFile(file path.Path) (pp PathWithPar) {
     return PathWithPar{
         Path: p,
         ParFile: file.ToFile(),
-        keys: &DefaultKeys,
+        keys: DefaultKeys,
     }
 }
 
@@ -63,14 +62,13 @@ func (pp PathWithPar) Load() (f FileWithPar, err error) {
 }
 
 func (pp PathWithPar) LoadWithParser(pr params.Parser) (f FileWithPar, err error) {
-    k := pp.keys
     
     f.ParFile, err = pp.ParFile.ToValid()
     if err != nil {
         return
     }
     
-    ra := common.RngAzi{}
+    ra, k := common.RngAzi{}, pp.keys
     
     ra.Rng, err = pr.Int(k.Rng, 0)
     if err != nil {

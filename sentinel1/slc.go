@@ -5,18 +5,19 @@ import (
     "log"
     "time"
     "strings"
-    "path/filepath"
 
     "github.com/bozso/gotoolbox/cli/stream"
+    "github.com/bozso/gotoolbox/path"
     
     "github.com/bozso/gomma/common"
-    "github.com/bozso/gomma/base"
+    "github.com/bozso/gomma/slc"
+    "github.com/bozso/gomma/mli"
     "github.com/bozso/gomma/date"
 )
 
 type SLC struct {
     nIW int
-    Tab string
+    Tab path.ValidFile
     time.Time
     IWs
 }
@@ -62,11 +63,10 @@ func FromTabfile(tab string) (s1 SLC, err error) {
 }
 
 
-
-func (s1 SLC) Move(dir string) (ms1 SLC, err error) {
+func (s1 SLC) Move(dir path.Dir) (ms1 SLC, err error) {
     ms1 = s1
     
-    newtab := filepath.Join(dir, filepath.Base(s1.Tab))
+    newtab := dir.Join(s1.Tab.Base())
     
     file, err := stream.Create(newtab)
     if err != nil {
@@ -116,7 +116,7 @@ type MosaicOpts struct {
 
 var mosaic = common.Must("SLC_mosaic_S1_TOPS")
 
-func (s1 SLC) Mosaic(out base.SLC, opts MosaicOpts) (err error) {
+func (s1 SLC) Mosaic(out slc.SLC, opts MosaicOpts) (err error) {
     opts.Looks.Default()
     
     bflg := 0
@@ -192,11 +192,13 @@ func (s1 SLC) DerampSlave(ref *SLC, looks common.RngAzi, keep bool) (ret SLC, er
     return ret, nil
 }
 
-func (s1 SLC) RSLC(outDir string) (ret SLC, err error) {
-    tab := strings.ReplaceAll(filepath.Base(s1.Tab), "SLC_tab", "RSLC_tab")
-    tab = filepath.Join(outDir, tab)
+func (s1 SLC) RSLC(outDir path.Dir) (ret SLC, err error) {
+    tab := strings.ReplaceAll(s1.Tab.Base().String(),
+        "SLC_tab", "RSLC_tab")
+    
+    tab = outDir.Join(tab).ToFile()
 
-    file, err := stream.Create(tab)
+    file, err := tab.Create(tab)
     if err != nil {
         return
     }
@@ -205,8 +207,9 @@ func (s1 SLC) RSLC(outDir string) (ret SLC, err error) {
     for ii := 0; ii < s1.nIW; ii++ {
         IW := s1.IWs[ii]
         
-        dat := filepath.Join(outDir,
-            strings.ReplaceAll(filepath.Base(IW.DatFile), "slc", "rslc"))
+        dat := outDir.Join(
+            strings.ReplaceAll(IW.DatFile.Base(), "slc", "rslc"))
+        
         par, TOPS_par := dat + ".par", dat + ".TOPS_par"
         
         ret.IWs[ii] = NewIW(dat, par, TOPS_par)
@@ -233,7 +236,7 @@ func (s1 SLC) RSLC(outDir string) (ret SLC, err error) {
 
 var MLIFun = common.Select("multi_look_ScanSAR", "multi_S1_TOPS")
 
-func (s1 *SLC) MLI(mli *base.MLI, opt *base.MLIOpt) (err error) {
+func (s1 *SLC) MLI(mli *mli.MLI, opt *mli.Options) (err error) {
     opt.Parse()
     
     wflag := 0

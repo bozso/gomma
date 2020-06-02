@@ -4,6 +4,7 @@ import (
     "path/filepath"
 
     "github.com/bozso/gotoolbox/path"
+    "github.com/bozso/gomma/common"
 )
 
 type tplType int
@@ -32,7 +33,7 @@ var calibPath = filepath.Join("annotation", "calibration")
 const nTemplate = 6
 
 type Template interface {
-    Render(ii int) string
+    Render(ii int, pol common.Pol) string
 }
 
 type templates [nTemplate]Template
@@ -41,7 +42,7 @@ type noFormat struct {
     tpl string
 }
 
-func (n noFormat) Render(ii int, pol common.Pol) string {
+func (n noFormat) Render(_ int, _ common.Pol) string {
     return n.tpl
 }
 

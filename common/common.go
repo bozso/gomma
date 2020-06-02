@@ -227,7 +227,7 @@ func (e FileParseError) Error() string {
         str = fmt.Sprintf("%s to retreive %s", str, tr)
     }
     
-    return errors.Wrap(e.err, str)
+    return fmt.Sprintf("%s\n%s", e.err, str)
 }
 
 func (e FileParseError) Unwrap() error {

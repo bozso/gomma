@@ -61,7 +61,7 @@ func (p IWPath) Load() (iw IW, err error) {
 type(  
     IW struct {
         data.ComplexWithPar
-        TOPSpar data.ValidFile
+        TOPSPar path.ValidFile
     }
 
     IWs [maxIW]IW

@@ -17,8 +17,9 @@ class Project(object):
         
         subdirs = {path.join(root, elem)
             for elem in {
-                "base", "cli", "common", "date", "data", "dem", "geo", 
-                "interferogram", "plot", "sentinel1", "utils", 
+                "cli", "common", "date", "data", "dem", "geo",
+                "interferogram", "plot", "sentinel1", "utils",
+                "slc", "mli",
                 path.join("utils", "params"),
             }
         }

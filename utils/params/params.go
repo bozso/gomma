@@ -18,7 +18,7 @@ type (
     
     params []string
     
-    noPath struct {}
+    noPath struct{}
     
     Params struct {
         filepath path.Pather

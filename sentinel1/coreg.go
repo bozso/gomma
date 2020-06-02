@@ -4,12 +4,12 @@ import (
     "os"
     "fmt"
     "log"
-    "path/filepath"
 
     "github.com/bozso/gotoolbox/cli"
     "github.com/bozso/gotoolbox/errors"
+    "github.com/bozso/gotoolbox/path"
 
-    "github.com/bozso/gomma/base"
+    "github.com/bozso/gomma/slc"
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/date"
     ifg "github.com/bozso/gomma/interferogram"
@@ -18,14 +18,16 @@ import (
 
 type (
     CoregOut struct {
-        RSLC base.SLC
+        RSLC slc.SLC
         Rslc SLC
         Ifg ifg.File
     }
     
     CoregOpt struct {
-        Tab, ID, IfgPath, RslcPath      string
-        OutDir, Hgt, Poly1, Poly2, Mli  string
+        IfgPath, RslcPath               path.Dir
+        Tab, ID                         string
+        OutDir                          path.Dir
+        Hgt, Poly1, Poly2, Mli          string
         CoherenceThresh, FractionThresh float64
         PhaseStdevThresh                float64
         Clean, UseInter                 bool  
@@ -37,11 +39,10 @@ var coregFun = common.Must("S1_coreg_TOPS")
 
 func (s1 *CoregOpt) SetCli(c *cli.Cli) {
 
-    c.StringVar(&s1.IfgPath, "ifg",
-        "Output interferogram metadata file", "")
+    c.Var(&s1.IfgPath, "ifg", "Output interferogram metadata file")
         
-    c.StringVar(&s1.RslcPath, "rslc", "", "Output RSLC metadata file")
-    c.StringVar(&s1.OutDir, "outDir", "", "Output directory")
+    c.Var(&s1.RslcPath, "rslc", "Output RSLC metadata file")
+    c.Var(&s1.OutDir, "outDir", "Output directory")
 
     c.StringVar(&s1.Poly1, "poly1", "", "Polynom 1")
     c.StringVar(&s1.Poly2, "poly2", "", "Polynom 2")
@@ -63,7 +64,7 @@ func (s1 *CoregOpt) SetCli(c *cli.Cli) {
     c.StringVar(&s1.Mli, "mli", "", "Output? MLI metadata file.")
 }
 
-func (sc *CoregOpt) Coreg(slc, ref *SLC) (c CoregOut, err error) {
+func (sc *CoregOpt) Coreg(Slc, ref *SLC) (c CoregOut, err error) {
     cleaning, flag1 := 0, 0
     
     if sc.Clean {
@@ -75,12 +76,12 @@ func (sc *CoregOpt) Coreg(slc, ref *SLC) (c CoregOut, err error) {
     }
     
     slc1Tab, slc1ID := sc.Tab, sc.ID
-    slc2Tab, slc2ID := slc.Tab, date.Short.Format(slc)
+    slc2Tab, slc2ID := Slc.Tab, date.Short.Format(Slc)
     
     // TODO: parse opt.hgt
     hgt := sc.Hgt
     
-    if c.Rslc, err = slc.RSLC(sc.OutDir); err != nil {
+    if c.Rslc, err = Slc.RSLC(sc.OutDir); err != nil {
         return
     }
     
@@ -123,58 +124,60 @@ func (sc *CoregOpt) Coreg(slc, ref *SLC) (c CoregOut, err error) {
         return
     }
     
-    if c.RSLC, err = NewSLC(slc2ID + ".rslc", ""); err != nil {
+    if c.RSLC, err = slc.New(slc2ID + ".rslc", ""); err != nil {
         return
     }
     
-    ID := fmt.Sprintf("%s_%s", slc1ID, slc2ID)
+    ID := path.New(fmt.Sprintf("%s_%s", slc1ID, slc2ID))
     
-    ifg, err := NewIFG(ID + ".diff", ID + ".off", ID + ".diff_par")
+    loader := ifg.New(ID.AddExt("diff")).WithParFile(ID.AddExt("off"))
+    loader = loader.WithDiffPar(ID.AddExt("diff_par"))
+    loader = loader.WithQuality(ID.AddExt("results"))
+    loader = loader.WithSimUnwrap(ID.AddExt("sim"))
+    
+    c.Ifg, err = loader.Load()
     if err != nil {
         return
     }
     
-    ifg.Quality = ID + ".results"
-        
     if c.Rslc, err = c.Rslc.Move(sc.RslcPath); err != nil {
         return
     }
     
-    if c.Ifg, err = ifg.Move(sc.IfgPath); err != nil {
+    if c.Ifg, err = c.Ifg.Move(sc.IfgPath); err != nil {
         err = errors.WrapFmt(err,
             "failed to move interferogram '%s' to IFG directory",
-            ifg.Dat)
+            c.Ifg.DatFile)
         return
     }
 
     if sc.Clean {
-        var glob []string
-        pattern := filepath.Join(sc.OutDir, slc1ID + "*")
+        glob, Err := sc.OutDir.Join(slc1ID + "*").Glob()
         
-        if glob, err = filepath.Glob(pattern); err != nil {
-            err = errors.WrapFmt(err,
+        if Err != nil {
+            err = errors.WrapFmt(Err,
                 "globbing for leftover files from coregistration failed")
             return
         }
         
         for _, file := range glob {
-            if err = os.Remove(file); err != nil {
-                err = errors.WrapFmt(err, "failed to remove file '%s'",
+            if Err = os.Remove(file.String()); err != nil {
+                err = errors.WrapFmt(Err, "failed to remove file '%s'",
                     file)
                 return
             }
         }
         
-        pattern = filepath.Join(sc.OutDir, slc2ID + "*")
+        glob, Err = sc.OutDir.Join(slc2ID + "*").Glob()
         
-        if glob, err = filepath.Glob(pattern); err != nil {
-            err = errors.WrapFmt(err,
+        if Err != nil {
+            err = errors.WrapFmt(Err,
                 "globbing for leftover files from coregistration failed")
             return
         }
         
         for _, file := range glob {
-            if err = os.Remove(file); err != nil {
+            if err = os.Remove(file.String()); err != nil {
                 err = errors.WrapFmt(err, "failed to remove file '%s'",
                     file)
                 return

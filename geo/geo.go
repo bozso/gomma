@@ -7,7 +7,7 @@ import (
 
     "github.com/bozso/gomma/data"
     "github.com/bozso/gomma/dem"
-    "github.com/bozso/gomma/base"
+    "github.com/bozso/gomma/mli"
     "github.com/bozso/gomma/common"
 )
 
@@ -63,7 +63,7 @@ var (
 )
 
 type GeocodeOpt struct {
-    MasterMLI base.MLI
+    MasterMLI mli.MLI
     DEMOverlap, OffsetWindows common.RngAzi
     Iter, NPoly, RngOversamp, nPixel, LanczosOrder int
     MLIOversamp int
@@ -73,9 +73,9 @@ type GeocodeOpt struct {
 }
 
 func (g* GeocodeOpt) Run(outDir path.Dir) (err error) {
-    geodir, _ := outDir.Join("geo").ToDir()
+    geodir := outDir.Join("geo")
     
-    if err = geodir.Mkdir(); err != nil {
+    if _, err = geodir.Mkdir(); err != nil {
         return
     }
     

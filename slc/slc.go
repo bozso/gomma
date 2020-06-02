@@ -1,4 +1,4 @@
-package base
+package slc
 
 import (
     "fmt"
@@ -7,6 +7,7 @@ import (
     "github.com/bozso/gomma/plot"
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/date"
+    "github.com/bozso/gomma/mli"
 )
 
 type SLC struct {
@@ -19,28 +20,7 @@ func (s SLC) Validate() (err error) {
 
 var multiLook = common.Must("multi_look")
 
-type (
-    // TODO: add loff, nlines
-    MLIOpt struct {
-        //Subset
-        RefTab string
-        Looks common.RngAzi
-        WindowFlag bool
-        plot.ScaleExp
-    }
-)
-
-func (opt *MLIOpt) Parse() {
-    opt.ScaleExp.Parse()
-    
-    if len(opt.RefTab) == 0 {
-        opt.RefTab = "-"
-    }
-    
-    opt.Looks.Default()
-}
-
-func (s SLC) MLI(out MLI, opt MLIOpt) (err error) {
+func (s SLC) MLI(out mli.MLI, opt mli.Options) (err error) {
     opt.Parse()
     
     _, err = multiLook.Call(s.DatFile, s.ParFile, out.DatFile, out.ParFile,
@@ -113,7 +93,7 @@ const (
 
 var ssiInt = common.Must("SSI_INT")
 
-func (ref SLC) SplitSpectrumIfg(slave SLC, mli MLI, opt SSIOpt) (ret SSIOut, err error) {
+func (ref SLC) SplitSpectrumIfg(slave SLC, mli mli.MLI, opt SSIOpt) (ret SSIOut, err error) {
     mode := 1
     
     if opt.Mode == IfgUnwrapped {

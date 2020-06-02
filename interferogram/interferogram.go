@@ -7,7 +7,7 @@ import (
     "github.com/bozso/gotoolbox/path"
     "github.com/bozso/gotoolbox/splitted"
 
-    "github.com/bozso/gomma/base"
+    "github.com/bozso/gomma/slc"
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/data"
     "github.com/bozso/gomma/geo"
@@ -123,7 +123,7 @@ type (
         hgt geo.Hgt
         datapath, off, diff path.File
         algo OffsetAlgo
-        ref *base.SLC
+        ref *slc.SLC
     }
 )
 
@@ -138,7 +138,7 @@ var (
     slcDiffIntf   = common.Must("SLC_diff_intf")
 )
 
-func FromSLC(slc1, slc2 base.SLC, opt IfgOpt) (out File, err error) {
+func FromSLC(slc1, slc2 slc.SLC, opt IfgOpt) (out File, err error) {
     inter := 0
     
     if opt.interact {

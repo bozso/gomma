@@ -17,7 +17,8 @@ func (ll LatLon) String() string {
 }
 
 func (ll *LatLon) Set(s string) (err error) {
-    if err = errors.NotEmpty(s, "LatLon"); err != nil {
+    const field errors.NotEmpty = "LatLon"
+    if err = field.Check(s); err != nil {
         return
     }
     

@@ -1,6 +1,8 @@
 package common
 
 import (
+    "github.com/bozso/gotoolbox/errors"
+
     "github.com/bozso/gomma/utils/params"
 )
 
@@ -44,7 +46,7 @@ func (mode MinOrMax) ParsePoint(info params.Parser) (p Point, err error) {
         return
     }
 
-    return p
+    return
 }
 
 type ParseError struct {
@@ -52,8 +54,10 @@ type ParseError struct {
     err error
 }
 
-func (e ParseError) Error() error {
-    return errors.WrapFmt(err, "failed to retreive %s value", e.coordinate)
+func (e ParseError) Error() string {
+    const msg errors.String = "failed to retreive %s value"
+    
+    return msg.WrapFmt(e.err, e.coordinate).Error()
 }
 
 func (e ParseError) Unwrap() error {

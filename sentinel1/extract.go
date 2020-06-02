@@ -15,15 +15,15 @@ import (
 )
 
 type Extractor struct {
-    pol common.Polarization
-    dst path.Path
-    path path.Valid
+    pol common.Pol
+    dst path.Dir
+    path path.ValidFile
     templates
     *zip.ReadCloser
     err error
 }
 
-func (s1 Zip) newExtractor(dst path.Path) (ex Extractor) {
+func (s1 Zip) newExtractor(dst path.Dir) (ex Extractor) {
     ex.path      = s1.Path
     ex.templates = s1.Templates
     ex.pol       = s1.pol
@@ -33,14 +33,15 @@ func (s1 Zip) newExtractor(dst path.Path) (ex Extractor) {
     return
 }
 
-func (ex Extractor) Err() error {
-    if ex.err == nil {
-        return nil
+func (ex Extractor) Err() (err error) {
+    err = ex.err
+    if err != nil {
+        err = fmt.Errorf(
+            "failure during the extraction from zipfile '%s': %w",
+            ex.path, err)
     }
     
-    return fmt.Errorf(
-        "failure during the extraction from zipfile '%s': %w",
-        ex.path.GetPath(), ex.err)
+    return err
 }
 
 func (ex *Extractor) Extract(mode tplType, iw int) (s string) {
@@ -48,7 +49,7 @@ func (ex *Extractor) Extract(mode tplType, iw int) (s string) {
         return
     }
     
-    tpl := ex.templates[mode].Format(iw, ex.pol)
+    tpl := ex.templates[mode].Render(iw, ex.pol)
     
     s, ex.err = ex.extract(tpl, ex.dst)
     
