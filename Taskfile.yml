@@ -1,0 +1,14 @@
+# https://taskfile.dev
+
+version: '2'
+
+tasks:
+  vet:
+    cmds:
+      - go vet
+  build:
+    cmds:
+      - go install
+  defualt:
+    cmds:
+      - task: build
