@@ -3,16 +3,20 @@ package cli
 import (
     "fmt"
     
-    "github.com/bozso/gomma/sentinel1"
+    "github.com/bozso/gotoolbox/errors"
+    "github.com/bozso/gotoolbox/cli"
+
+    s1 "github.com/bozso/gomma/sentinel1"
+    "github.com/bozso/gomma/plot"
 )
 
 const (
-    ParseError utils.CWerror = "failed to parse command line arguments"
-    ParseErr utils.CWerror = "failed to parse command line arguments"
+    ParseError errors.String = "failed to parse command line arguments"
+    ParseErr errors.String = "failed to parse command line arguments"
 )
 
 
-func SetupGammaCli(c *utils.Cli) {
+func SetupGammaCli(c *cli.Cli) {
     c.AddAction("like",
         "Initialize Gamma datafile with given datatype and shape.",
         &like{})
@@ -38,17 +42,17 @@ type MetaFile struct {
     Meta string
 }
 
-func (m *MetaFile) SetCli(c *utils.Cli) {
+func (m *MetaFile) SetCli(c *cli.Cli) {
     c.StringVar(&m.Meta, "meta", "", "Metadata json file")
 }
 
 type coreg struct {
     Master, Slave, Ref string 
-    sentinel1.S1CoregOpt
+    s1.CoregOpt
 }
 
-func (co *coreg) SetCli(c *Cli) {
-    co.S1CoregOpt.SetCli(c)
+func (co *coreg) SetCli(c *cli.Cli) {
+    co.CoregOpt.SetCli(c)
     
     c.StringVar(&co.Master, "master", "", "Master image.")
     c.StringVar(&co.Slave, "slave", "", "Slave image.")
@@ -56,36 +60,34 @@ func (co *coreg) SetCli(c *Cli) {
 }
 
 func (c coreg) Run() (err error) {
-    var ferr = merr.Make("coregFn")
-    
     sm, ss, sr := c.Master, c.Slave, c.Ref
     
-    var ref *S1SLC
+    var ref *s1.SLC
     
     if len(sr) == 0 {
         ref = nil
     } else {
-        var ref_ S1SLC
-        if ref_, err = FromTabfile(sr); err != nil {
-            return ferr.Wrap(err)
+        var ref_ s1.SLC
+        if ref_, err = s1.FromTabfile(sr); err != nil {
+            return
         }
         ref = &ref_
     }
     
-    var s, m S1SLC
-    if s, err = FromTabfile(ss); err != nil {
-        return ferr.Wrap(err)
+    var s, m s1.SLC
+    if s, err = s1.FromTabfile(ss); err != nil {
+        return
     }
     
-    if m, err = FromTabfile(sm); err != nil {
-        return ferr.Wrap(err)
+    if m, err = s1.FromTabfile(sm); err != nil {
+        return
     }
     
     c.Tab, c.ID = m.Tab, m.Format(DateShort)
     
-    var out S1CoregOut
+    var out s1.CoregOut
     if out, err = c.Coreg(&s, ref); err != nil {
-        return ferr.Wrap(err)
+        return
     }
     
     if err = SaveJson("", &out.Ifg); err != nil {
@@ -178,9 +180,9 @@ func splitIfgFn(ctx *cli.Context) (err error) {
 */
 
 type Plotter struct {
-    RasArgs
-    Infile string `pos:"0"`
-    PlotMode string `name:"mode"`
+    plot.RasArgs
+    Infile string
+    PlotMode string
 }
 
 /*

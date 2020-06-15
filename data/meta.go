@@ -19,6 +19,26 @@ type Meta struct {
     time.Time                 `json:"time"`
 }
 
+func (m *Meta) SetMeta(meta Meta) {
+    *m = meta
+}
+
+func (m Meta) Rng() int {
+    return m.Ra.Rng
+}
+
+func (m Meta) Azi() int {
+    return m.Ra.Azi
+}
+
+func (m Meta) Date() time.Time {
+    return m.Time
+}
+
+func (m Meta) DataType() Type {
+    return m.Dtype
+}
+
 func (m Meta) TypeCheck(filepath path.Pather, dtypes... Type) (err error) {
     D := m.Dtype
     

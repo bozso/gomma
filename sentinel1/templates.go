@@ -1,6 +1,7 @@
 package sentinel1
 
 import (
+    "fmt"
     "path/filepath"
 
     "github.com/bozso/gotoolbox/path"
@@ -51,7 +52,7 @@ type format struct {
 }
 
 func (f format) Render(ii int, pol common.Pol) string {
-    return fmt.Sprintf(n.tpl, ii, pol)
+    return fmt.Sprintf(f.tpl, ii, pol)
 }
 
 func newTemplates(safe path.File, tpl string) templates {

@@ -5,7 +5,6 @@ import (
     "log"
     "fmt"
     "archive/zip"
-    "path/filepath"
     "regexp"
 
     "github.com/bozso/gotoolbox/path"
@@ -44,30 +43,34 @@ func (ex Extractor) Err() (err error) {
     return err
 }
 
-func (ex *Extractor) Extract(mode tplType, iw int) (s string) {
+func (ex *Extractor) Extract(mode tplType, iw int) (vf path.ValidFile) {
     if ex.err != nil {
         return
     }
     
     tpl := ex.templates[mode].Render(iw, ex.pol)
-    
-    s, ex.err = ex.extract(tpl, ex.dst)
-    
+    vf = ex.extract(tpl)
     return
 }
 
-func (ex Extractor) extract(template string, dst path.Dir) (s string, err error) {
+func (ex *Extractor) extract(template string) (vf path.ValidFile) {
+    if ex.err != nil {
+        return
+    }
+
     //log.Fatalf("%s %s", root, template)
-    var matched, exist bool
+    dst := ex.dst
     
     // go through files in the zipfile
     for _, zipfile := range ex.ReadCloser.File {
         name := zipfile.Name
         
-        if matched, err = regexp.MatchString(name, template); err != nil {
+        matched, err := regexp.MatchString(name, template)
+        if err != nil {
             err = errors.WrapFmt(err,
                 "failed to check whether zipped file '%s' matches templates",
                 name)
+            ex.err = err
             return
         }
         
@@ -75,36 +78,45 @@ func (ex Extractor) extract(template string, dst path.Dir) (s string, err error)
             continue
         }
         
-        s = filepath.Join(dst, name)
+        outFile := dst.Join(name).ToFile()
         
         //fmt.Printf("Matched: %s\n", dst)
         //fmt.Printf("\n\nCurrent: %s\nTemplate: %s\nMatched: %v\n",
         //    name, template, matched)
         
-        if exist, err = s.Exist(); err != nil {
+        exist, err := outFile.Exist()
+        if err != nil {
+            ex.err = err
             return
         }
         
-        if !exist {
-            if err = extractFile(zipfile, s); err != nil {
-                err = ExtractError{name, err}
-                return
-            }
+        if exist {
+            vf, ex.err = outFile.ToValid()
+            return
         }
-        return s, nil
+        
+        if err := extractFile(zipfile, outFile); err != nil {
+            ex.err = ExtractError{name, err}
+            return
+        }
+        
+        
+        return
     }
-    return s, nil
+    return
 }
 
-func extractFile(src *zip.File, dst path.Path) (err error) {
+func extractFile(src *zip.File, dst path.File) (err error) {
+    srcName := src.Name
+    
     in, err := src.Open()
     if err != nil {
         return
     }
     defer in.Close()
     
-    dir := dst.Dir(dst)
-    if err = dir.Make(); err != nil {
+    dir := dst.Dir()
+    if _, err = dir.Mkdir(); err != nil {
         return
     }
     

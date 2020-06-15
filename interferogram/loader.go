@@ -67,13 +67,17 @@ func (p Paths) Load() (f File, err error) {
 
     parser := params.NewTeeParser(ppar, pDiffPar)
 
-    
-    fw, err := p.LoadWithParser(parser.ToParser())
+    err = p.WithParser(parser.ToParser()).Load(&f)
     if err != nil {
         return
     }
     
-    f.DatFile, f.ParFile = fw.DatFile, par
+    f.DatFile, err = p.DatFile.ToValid()
+    if err != nil {
+        return
+    }
+
+    f.ParFile = par
     f.DiffPar, f.Quality, f.SimUnwrap = diffPar, p.Quality, p.SimUnwrap
     
     err = f.Validate()

@@ -1,15 +1,20 @@
 package cli
 
-
 import (
     "log"
     "io"
     "bufio"
+    
+    "github.com/bozso/gotoolbox/cli/stream"
+    "github.com/bozso/gotoolbox/cli"
+
+    "github.com/bozso/gomma/common"
+    s1 "github.com/bozso/gomma/sentinel1"
 )
 
-type checkerFun func(*S1Zip) bool
+type checkerFun func(*s1.Zip) bool
 
-func parseS1(zip, pol, dst string) (s1 *S1Zip, IWs IWInfos, err error) {
+func parseS1(zip, pol, dst string) (s1 *s1.Zip, IWs s1.IWInfos, err error) {
     if s1, err = NewS1Zip(zip, pol); err != nil {
         err = Handle(err, "failed to parse S1Zip data from '%s'", zip)
         return
@@ -25,7 +30,7 @@ func parseS1(zip, pol, dst string) (s1 *S1Zip, IWs IWInfos, err error) {
     return s1, IWs, nil
 }
 
-func loadS1(reader io.Reader, pol string) (s1 S1Zips, err error) {
+func loadS1(reader io.Reader, pol string) (s1 s1.Zips, err error) {
     file := bufio.NewScanner(reader)
     
     for file.Scan() {
@@ -52,12 +57,12 @@ func loadS1(reader io.Reader, pol string) (s1 S1Zips, err error) {
 type GeneralOpt struct {
     //DataPath   string     `cli:"" usage:""`
     OutputDir, Pol, MasterDate, CachePath  string
-    Looks      RngAzi
-    InFile     Reader
-    OutFile    Writer
+    Looks      common.RngAzi
+    InFile     stream.In
+    OutFile    stream.Out
 }
 
-func (g *GeneralOpt) SetCli(c *Cli) {
+func (g *GeneralOpt) SetCli(c *cli.Cli) {
     g.InFile.SetCli(c, "infile", "Input file.")
     g.OutFile.SetCli(c, "outfile", "Input file.")
     
@@ -70,15 +75,15 @@ func (g *GeneralOpt) SetCli(c *Cli) {
 
 type dataSelect struct {
     GeneralOpt
-    DataFiles  Files `cli:"d,data" usage:"List of datafiles to process"`
+    DataFiles  cli.Paths `cli:"d,data" usage:"List of datafiles to process"`
     DateStart  string   `cli:"b,start" usage:"Start of date range"`
     DateStop   string   `cli:"e,stop" usage:"End of date range"`
-    LowerLeft  LatLon   `cli:"ll,lowerLeft" usage:"Rectangle coordinates"`
-    UpperRight LatLon   `cli:"ur,upperRight" usage:"Rectangle coordinates"`
+    LowerLeft  common.LatLon   `cli:"ll,lowerLeft" usage:"Rectangle coordinates"`
+    UpperRight common.LatLon   `cli:"ur,upperRight" usage:"Rectangle coordinates"`
     CheckZips  bool     `cli:"c,checkZips" usage:"Check zipfile integrity"`  
 }
 
-func (d *dataSelect) SetCli(c *Cli) {
+func (d *dataSelect) SetCli(c *cli.Cli) {
     d.GeneralOpt.SetCli(c)
     
     c.Var(&d.DataFiles, "dataFiles",
@@ -300,11 +305,6 @@ func dataImport(ctx *cli.Context) (err error) {
                 ziplist)
         }
         
-        // 0 = FCOMPLEX, 0 = swath_flag - as listed in burst_number_table_ref
-        // "." = OPOD dir, 1 = intermediate files are deleted
-        // 1 = apply noise correction
-        _, err = s1Import(ziplist, burst_table, pol, 0, 0, ".", 1, 1)
-        
         if err != nil {
             return Handle(err, "failed to import zipfile '%s'", s1zip.Path)
         }
@@ -489,31 +489,12 @@ func stepCoreg(self *Config) (err error) {
 }
 */
 
-func toZiplist(name string, one, two *S1Zip) (err error) {
-    file := NewWriterFile(name)
-    if err = file.Wrap(); err != nil {
-        return
-    }
-    defer file.Close()
-    
-    if two == nil {
-        file.WriteString(one.Path)
-    } else {
-        after := two.date.center.After(one.date.center)
-        
-        if after {
-            file.WriteString(one.Path + "\n")
-            file.WriteString(two.Path + "\n")
-        } else {
-            file.WriteString(two.Path + "\n")
-            file.WriteString(one.Path + "\n")
-        }
-    }
+func toZiplist(name string, one, two *s1.Zip) (err error) {
 
     return file.Wrap()
 }
 
-func Search(s1 *S1Zip, zips []*S1Zip) *S1Zip {
+func Search(s1 *s1.Zip, zips s1.Zips) *s1.Zip {
     
     date1 := date2str(s1, DShort)
     

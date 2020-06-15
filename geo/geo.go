@@ -62,7 +62,7 @@ var (
     //gcMap = common.Must("gc_map2")
 )
 
-type GeocodeOpt struct {
+type CodeOpt struct {
     MasterMLI mli.MLI
     DEMOverlap, OffsetWindows common.RngAzi
     Iter, NPoly, RngOversamp, nPixel, LanczosOrder int
@@ -72,7 +72,7 @@ type GeocodeOpt struct {
     CCThresh, AreaFactor, BandwithFrac float64
 }
 
-func (g* GeocodeOpt) Run(outDir path.Dir) (err error) {
+func (g* CodeOpt) Run(outDir path.Dir) (err error) {
     geodir := outDir.Join("geo")
     
     if _, err = geodir.Mkdir(); err != nil {

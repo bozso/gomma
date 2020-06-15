@@ -7,10 +7,10 @@ import (
     
     "github.com/bozso/gotoolbox/path"
 
-    "github.com/bozso/gomma/data"
+    //"github.com/bozso/gomma/data"
     "github.com/bozso/gomma/date"
     "github.com/bozso/gomma/common"
-    "github.com/bozso/gomma/mli"
+    //"github.com/bozso/gomma/mli"
 )
 
 var dirPaths = [4]string{"slc", "rslc", "mli", "rmli"}
@@ -18,35 +18,34 @@ var dirPaths = [4]string{"slc", "rslc", "mli", "rmli"}
 type (
     Zip struct {
         Path path.ValidFile
+        Safe          path.File
+        pol           common.Pol
+        Templates     templates
+        date          date.Range
         
-        Root          string
-        zipBase       string
         mission       string
         dateStr       string
         mode          string
         productType   string
         resolution    string
-        Safe          string
         level         string
         productClass  string
-        pol           common.Pol
         absoluteOrbit string
         DTID          string
         UID           string
-        Templates     templates
-        date          date.Range
     }
     
     Zips []*Zip
 )
 
-func NewZip(zipPath path.ValidFile, pol common.Pol) (s1 *Zip, err error) {
+func NewZip(zipPath path.ValidFile) (s1 *Zip, err error) {
     const rexTemplate = "%s-iw%%d-slc-%%s-.*"
-
     
-    s1.Path, s1.zipBase, s1.pol = zipPath, zipPath.Base(), pol
-    zipBase := s1.zipBase.GetPath()
-
+    s1 = &Zip{
+        Path: zipPath,
+    }
+    zipBase := zipPath.Base().String()
+    
     s1.mission = strings.ToLower(zipBase[:3])
     s1.dateStr = zipBase[17:48]
 
@@ -59,83 +58,33 @@ func NewZip(zipPath path.ValidFile, pol common.Pol) (s1 *Zip, err error) {
     }
 
     s1.mode = zipBase[4:6]
-    safe := path.New(strings.ReplaceAll(zipBase, ".zip", ".SAFE"))
+    safe := path.New(strings.ReplaceAll(zipBase, ".zip", ".SAFE")).ToFile()
     tpl := fmt.Sprintf(rexTemplate, s1.mission)
 
     s1.Templates = newTemplates(safe, tpl)
 
     s1.Safe = safe
+
+    err = s1.pol.Set(zipBase[14:16])
+    if err != nil {
+        return
+    }
+
     s1.productType = zipBase[7:10]
     s1.resolution = string(zipBase[10])
     s1.level = string(zipBase[12])
     s1.productClass = string(zipBase[13])
-    s1.pol = zipBase[14:16]
     s1.absoluteOrbit = zipBase[49:55]
     s1.DTID = strings.ToLower(zipBase[56:62])
     s1.UID = zipBase[63:67]
 
-    return s1, nil
-}
-
-func (s1 Zip) Names(mode, pol common.Pol) (p data.PathWithPar) {
-    path := s1.Root.Join(mode)
-    
-    p.DatFile = path.Join(fmt.Sprintf("%s.%s", pol, mode)).ToFile()
-    p.ParFile = dat.AddExt("par").ToFile()
-    
-    return 
-}
-
-func (s1 Zip) GetIW(mode string, pol common.Pol, ii int) (p IWPath) {
-    slcPath := s1.Root.Join(mode)
-    
-    p = NewIW(slcPath.Join(fmt.Sprintf("iw%d_%s.%s", ii, pol, mode)))
-
     return
 }
 
-func (s1 Zip) SLC(pol string) (s SLC, err error) {
-    const mode = "slc"
-    tab := s1.tabName(mode, pol)
-
-    exist, err := tab.Exist()
-    if err != nil {
-        return
-    }
-
-    if !exist {
-        err = errors.WrapFmt(err, "tabfile '%s' does not exist", tab)
-        return
-    }
-
-    for ii := 1; ii < 4; ii++ {
-        iwp := s1.GetIW(mode, pol, ii)
-        s.IWs[ii-1], err = iwp.Load()
-    }
-
-    s.Tab, s.nIW = tab, 3
-
-    return
-}
-
-func (s1 Zip) MLI(mode, pol string, out *mli.MLI, opt *mli.Options) (err error) {
-    slc, err := s1.SLC(pol)
-    if err != nil {
-        return
-    }
-    
-    err = slc.MLI(out, opt)
-    
-    return
-}
-
-func (s1 Zip) tabName(mode, pol common.Pol) path.Path {
-    return s1.Root.Join(mode, fmt.Sprintf("%s.tab", pol))
-}
-
+/*
 var parS1SLC = common.Must("par_S1_SLC")
 
-func (s1 Zip) ImportSLC(dst string) (err error) {
+func (s1 Zip) ImportSLC(dst path.Dir) (err error) {
     var _annot, _calib, _tiff, _noise string
     
     ext := s1.newExtractor(dst)
@@ -182,8 +131,9 @@ func (s1 Zip) ImportSLC(dst string) (err error) {
 
     return
 }
+*/
 
-func (s1 Zip) Quicklook(dst string) (s string, err error) {
+func (s1 Zip) Quicklook(dst path.Dir) (s path.ValidFile, err error) {
     var ext = s1.newExtractor(dst)
     if err = ext.Err(); err != nil {
         return

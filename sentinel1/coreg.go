@@ -64,7 +64,7 @@ func (s1 *CoregOpt) SetCli(c *cli.Cli) {
     c.StringVar(&s1.Mli, "mli", "", "Output? MLI metadata file.")
 }
 
-func (sc *CoregOpt) Coreg(Slc, ref *SLC) (c CoregOut, err error) {
+func (sc *CoregOpt) Coreg(Slc, ref *SLC) (co CoregOut, err error) {
     cleaning, flag1 := 0, 0
     
     if sc.Clean {
@@ -81,40 +81,31 @@ func (sc *CoregOpt) Coreg(Slc, ref *SLC) (c CoregOut, err error) {
     // TODO: parse opt.hgt
     hgt := sc.Hgt
     
-    if c.Rslc, err = Slc.RSLC(sc.OutDir); err != nil {
+    rslc, err := Slc.RSLC(sc.OutDir)
+    if err != nil {
         return
     }
     
-    exist := false
-    if exist, err = c.Rslc.Exist(); err != nil {
-        return
-    }
-    
-    if exist {
+    Rslc, err := rslc.Load()
+    if err == nil {
         log.Printf("Coregistered RSLC already exists, moving it to directory.")
-        
-        if c.Rslc, err = c.Rslc.Move(sc.RslcPath); err != nil {
-            return
-        }
-        
-        return c, nil
+        co.Rslc, err = Rslc.Move(sc.RslcPath)
+        return
     }
     
     args := []interface{}{
-        slc1Tab, slc1ID, slc2Tab, slc2ID, c.Rslc.Tab, hgt,
+        slc1Tab, slc1ID, slc2Tab, slc2ID, rslc.Tab, hgt,
         sc.Looks.Rng, sc.Looks.Azi, sc.Poly1, sc.Poly2,
         sc.CoherenceThresh, sc.FractionThresh, sc.PhaseStdevThresh,
         cleaning, flag1,
     }
     
     if ref == nil {
-        log.Printf("Coregistering: '%s'", slc2Tab)
-        
+        log.Printf("Coregistering: '%s'.", slc2Tab)
     } else {
         rslcRefTab, rslcRefID := ref.Tab, date.Short.Format(ref)
         
-        log.Printf("Coregistering: '%s'. Reference: '%s'", slc2Tab,
-            rslcRefTab)
+        log.Printf(" Reference: '%s'.", rslcRefTab)
         
         args = append(args, rslcRefTab, rslcRefID)
     }
@@ -124,30 +115,32 @@ func (sc *CoregOpt) Coreg(Slc, ref *SLC) (c CoregOut, err error) {
         return
     }
     
-    if c.RSLC, err = slc.New(slc2ID + ".rslc", ""); err != nil {
+    co.RSLC, err = slc.New(path.New(slc2ID).AddExt("rslc").ToFile()).Load()
+    if err != nil {
         return
     }
     
     ID := path.New(fmt.Sprintf("%s_%s", slc1ID, slc2ID))
     
-    loader := ifg.New(ID.AddExt("diff")).WithParFile(ID.AddExt("off"))
-    loader = loader.WithDiffPar(ID.AddExt("diff_par"))
-    loader = loader.WithQuality(ID.AddExt("results"))
-    loader = loader.WithSimUnwrap(ID.AddExt("sim"))
+    loader := ifg.New(ID.AddExt("diff")).
+        WithParFile(ID.AddExt("off")).
+        WithDiffPar(ID.AddExt("diff_par")).
+        WithQuality(ID.AddExt("results")).
+        WithSimUnwrap(ID.AddExt("sim"))
     
-    c.Ifg, err = loader.Load()
+    co.Ifg, err = loader.Load()
     if err != nil {
         return
     }
     
-    if c.Rslc, err = c.Rslc.Move(sc.RslcPath); err != nil {
+    if co.Rslc, err = co.Rslc.Move(sc.RslcPath); err != nil {
         return
     }
     
-    if c.Ifg, err = c.Ifg.Move(sc.IfgPath); err != nil {
+    if co.Ifg, err = co.Ifg.Move(sc.IfgPath); err != nil {
         err = errors.WrapFmt(err,
             "failed to move interferogram '%s' to IFG directory",
-            c.Ifg.DatFile)
+            co.Ifg.DatFile)
         return
     }
 

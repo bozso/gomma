@@ -1,6 +1,9 @@
 package cli
 
 import (
+    "github.com/bozso/gotoolbox/cli"
+    "github.com/bozso/gotoolbox/path"
+
     "github.com/bozso/gomma/data"
 )
 
@@ -10,7 +13,7 @@ type like struct {
     Dtype data.Type
 }
 
-func (l *like) SetCli(c* utils.Cli) {
+func (l *like) SetCli(c* cli.Cli) {
     c.Var(&l.indat, "in", "Reference metadata file")
     c.StringVar(&l.out, "out", "", "Output metadata file")
     c.Var(&l.Dtype, "dtype", "Output file datatype")
@@ -53,7 +56,7 @@ type move struct {
     MetaFile
 }
 
-func (m *move) SetCli(c *utils.Cli) {
+func (m *move) SetCli(c *cli.Cli) {
     m.MetaFile.SetCli(c)
     c.StringVar(&m.outDir, "out", ".", "Output directory")
 }
@@ -87,56 +90,34 @@ func (m move) Run() (err error) {
 }
 
 type create struct {
-    Dat utils.File
-    Ftype, Ext, Par string
+    Data path.ValidFile
+    Param path.File
+    Ftype, Ext string
     MetaFile
     data.Type
 }
 
-func (cr *create) SetCli(c *utils.Cli) {
+func (cr *create) SetCli(c *cli.Cli) {
     cr.MetaFile.SetCli(c)
     cr.DType.SetCli(c)
     
-    c.Var(&cr.Dat, "dat", "Datafile path.")
-    c.StringVar(&cr.Par, "par", "", "Parameterfile path.")
+    c.Var(&cr.Dat, "dat", "", "Datafile path.")
+    c.Var(&cr.Par, "par", "", "Parameterfile path.")
     c.StringVar(&cr.Ftype, "ftype", "", "Filetype.")
     c.StringVar(&cr.Ext, "ext", "par", "Extension of parameterfile.")
 }
 
 func (c create) Run() (err error) {
-    var ferr = merr.Make("create.Run")
-    
-    var dat Path
-    if dat, err = c.Dat.Abs(); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    par := c.Par
-    
-    if len(par) > 0 {
-        if par, err = filepath.Abs(par); err != nil {
-            return ferr.Wrap(err)
-        }
-    }
-    
-    datf, err := NewDatParFile(dat.String(), par, c.Ext, c.DType)
+    data, err := data.New(c.Data.ToFile()).WithPar(c.Param).Load()
     if err != nil {
-        return ferr.Wrap(err)
+        return
     }
     
-    if err = datf.Parse(); err != nil {
-        return ferr.Wrap(err)
+    if err = SaveJson(c.Meta, &data); err != nil {
+        return
     }
     
-    if datf.DType, err = datf.ParseDtype(); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if err = SaveJson(c.Meta, &datf); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
+    return
 }
 
 /*

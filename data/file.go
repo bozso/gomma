@@ -2,7 +2,6 @@ package data
 
 import (
     "fmt"
-    "time"
     
     "github.com/bozso/gotoolbox/path"
 
@@ -13,6 +12,10 @@ import (
 type File struct {
     DatFile path.ValidFile `json:"datafile"`
     Meta                   `json:"metadata"`
+}
+
+func (f *File) SetDataFile(vf path.ValidFile) {
+    f.DatFile = vf
 }
 
 func (f *File) Set(s string) (err error) {
@@ -30,24 +33,8 @@ func (f File) JsonName() (file path.File) {
     return
 }
 
-func (d File) Rng() int {
-    return d.Ra.Rng
-}
-
-func (d File) Azi() int {
-    return d.Ra.Azi
-}
-
 func (d File) DataPath() path.ValidFile {
     return d.DatFile
-}
-
-func (d File) Date() time.Time {
-    return d.Time
-}
-
-func (d File) DataType() Type {
-    return d.Dtype
 }
 
 func (d File) Save() (err error) {

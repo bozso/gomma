@@ -1,7 +1,6 @@
 package data
 
 import (
-    "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/utils/params"
     "github.com/bozso/gotoolbox/path"
 )
@@ -42,6 +41,11 @@ func (pp PathWithPar) WithKeys(keys *ParamKeys) PathWithPar {
     return pp
 }
 
+func (pp PathWithPar) WithParser(p params.Parser) (wp WithParser) {
+    wp.PathWithPar, wp.parser = pp, p
+    return
+}
+
 func (pp PathWithPar) GetParser() (p params.Params, err error) {
     par, err := pp.ParFile.ToValid()
     if err != nil {
@@ -52,30 +56,50 @@ func (pp PathWithPar) GetParser() (p params.Params, err error) {
     return
 }
 
-func (pp PathWithPar) Load() (f FileWithPar, err error) {
+type Loadable interface {
+    SetDataFile(path.ValidFile)
+    SetParFile(path.ValidFile)
+    SetMeta(Meta)
+    Validate() error
+}
+
+func (pp PathWithPar) Load(l Loadable) (err error) {
     p, err := pp.GetParser()
     if err != nil {
         return
     }
     
-    return pp.LoadWithParser(p.ToParser())
+    return pp.WithParser(p.ToParser()).Load(l)
 }
 
-func (pp PathWithPar) LoadWithParser(pr params.Parser) (f FileWithPar, err error) {
+type WithParser struct {
+    PathWithPar
+    parser params.Parser
+}
+
+func (pp WithParser) Load(l Loadable) (err error) {
+    f, err := pp.DatFile.ToValid()
+    if err != nil {
+        return
+    }
+    l.SetDataFile(f)
+
+    f, err = pp.ParFile.ToValid()
+    if err != nil {
+        return
+    }
+    l.SetParFile(f)
     
-    f.ParFile, err = pp.ParFile.ToValid()
+    
+    pr, k := pp.parser, pp.keys
+    
+    meta := Meta{}
+    meta.Ra.Rng, err = pr.Int(k.Rng, 0)
     if err != nil {
         return
     }
     
-    ra, k := common.RngAzi{}, pp.keys
-    
-    ra.Rng, err = pr.Int(k.Rng, 0)
-    if err != nil {
-        return
-    }
-    
-    ra.Azi, err = pr.Int(k.Azi, 0)
+    meta.Ra.Azi, err = pr.Int(k.Azi, 0)
     if err != nil {
         return
     }
@@ -85,8 +109,7 @@ func (pp PathWithPar) LoadWithParser(pr params.Parser) (f FileWithPar, err error
         return
     }
     
-    var dt Type
-    err = dt.Set(s)
+    err = meta.Dtype.Set(s)
     if err != nil {
         return
     }
@@ -97,9 +120,11 @@ func (pp PathWithPar) LoadWithParser(pr params.Parser) (f FileWithPar, err error
             return
         }
         
-        f.Time, err = DateFmt.Parse(s)
+        meta.Time, err = DateFmt.Parse(s)
     }
-
-    f.File, err = pp.Path.Load(ra, dt)
+    
+    l.SetMeta(meta)
+    
+    err = l.Validate()
     return
 }

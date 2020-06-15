@@ -1,9 +1,14 @@
 package sentinel1
 
 import (
+    "fmt"
+    "math"
+    
     "github.com/bozso/gotoolbox/path"
     
     "github.com/bozso/gomma/common"
+    "github.com/bozso/gomma/data"
+    "github.com/bozso/gomma/utils/params"
 )
 
 const (
@@ -30,23 +35,32 @@ func iwInfo(file path.ValidFile) (iw IWInfo, err error) {
     
     // Check(err, "Failed to retreive IW number from %s", path);
 
-    par := "tmp"
-    TOPS_par := par + ".TOPS_par"
+    pPar := path.New("tmp").ToFile()
+    pTOPSPar := pPar.AddExt("TOPS_par").ToFile()
     
-    defer os.Remove(par)
-    defer os.Remove(TOPS_par)
-
-    _, err = parCmd.Call(nil, file.GetPath(), nil, nil, par, nil, TOPS_par)
+    _, err = parCmd.Call(nil, file, nil, nil, pPar, nil, pTOPSPar)
     if err != nil {
         return
     }
 
-    _info, err := burstCorners.Call(par, TOPS_par)
+    _info, err := burstCorners.Call(pPar, pTOPSPar)
     if err != nil {
         return
     }
+    
+    par, err := pPar.ToValid()
+    if err != nil {
+        return
+    }
+    defer par.Remove()
+    
+    TOPSPar, err := pTOPSPar.ToValid()
+    if err != nil {
+        return
+    }
+    defer TOPSPar.Remove()
 
-    _TOPS, err := data.NewGammaParams(TOPS_par)
+    _TOPS, err := data.NewGammaParams(TOPSPar)
     if err != nil {
         return
     }
@@ -86,16 +100,15 @@ func iwInfo(file path.ValidFile) (iw IWInfo, err error) {
     }, nil
 }
 
-func (s1 Zip) Info(dst string) (iws IWInfos, err error) {
+func (s1 Zip) Info(dst path.Dir) (iws IWInfos, err error) {
     ext := s1.newExtractor(dst)
     if err = ext.Err(); err != nil {
         return
     }
     defer ext.Close()
 
-    var Annot string
     for ii := 1; ii < 4; ii++ {
-        Annot = ext.Extract(annot, ii)
+        Annot := ext.Extract(annot, ii)
         
         if err = ext.Err(); err != nil {
             return
@@ -114,7 +127,7 @@ func (s1 Zip) Info(dst string) (iws IWInfos, err error) {
 
 func inIWs(p common.Point, IWs IWInfos) bool {
     for _, iw := range IWs {
-        if p.InRect(iw.extent) {
+        if p.InRectangle(iw.extent) {
             return true
         }
     }

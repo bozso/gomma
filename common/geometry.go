@@ -8,8 +8,8 @@ import (
 )
 
 type LatLon struct {
-    Lat float64 `name:"lan" default:"1.0"`
-    Lon float64 `name:"lot" default:"1.0"`
+    Lat float64 `json:"lan"`
+    Lon float64 `json:"lot"`
 }
 
 func (ll LatLon) String() string {

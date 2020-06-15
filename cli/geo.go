@@ -3,6 +3,8 @@ package cli
 import (
     "strings"
     
+    "github.com/bozso/gotoolbox/cli"
+
     "github.com/bozso/gomma/data"
     "github.com/bozso/gomma/dem"
     "github.com/bozso/gomma/geo"
@@ -15,7 +17,7 @@ type geoCode struct {
     geo.CodeOpt
 }
 
-func (g *geoCode) SetCli(c *Cli) {
+func (g *geoCode) SetCli(c *cli.Cli) {
     c.Var(&g.Lookup, "lookup", "Lookup table file.")
     
     c.Var(&g.InFile, "infile", "Input datafile to geocode.")

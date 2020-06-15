@@ -3,6 +3,8 @@ package slc
 import (
     "fmt"
     
+    "github.com/bozso/gotoolbox/path"
+
     "github.com/bozso/gomma/data"
     "github.com/bozso/gomma/plot"
     "github.com/bozso/gomma/common"
@@ -10,12 +12,28 @@ import (
     "github.com/bozso/gomma/mli"
 )
 
-type SLC struct {
-    data.FileWithPar `json:"SLC"`
+
+type Path struct {
+    data.PathWithPar
 }
 
-func (s SLC) Validate() (err error) {
-    return s.EnsureComplex()
+func New(data path.File) (p Path) {
+    p.DatFile, p.ParFile = data, data.AddExt("par").ToFile()
+    return
+}
+
+func (p Path) WithParfile(par path.File) (pp Path) {
+    p.ParFile = par
+    return p
+}
+
+func (p Path) Load() (s SLC, err error) {
+    err = p.PathWithPar.Load(&s)
+    return
+}
+
+type SLC struct {
+    data.ComplexWithPar `json:"SLC"`
 }
 
 var multiLook = common.Must("multi_look")

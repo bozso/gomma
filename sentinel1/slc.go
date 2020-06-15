@@ -1,13 +1,14 @@
 package sentinel1
 
 import (
-    "fmt"
     "log"
     "time"
     "strings"
+    "bufio"
 
-    "github.com/bozso/gotoolbox/cli/stream"
     "github.com/bozso/gotoolbox/path"
+    "github.com/bozso/gotoolbox/splitted"
+    "github.com/bozso/gotoolbox/errors"
     
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/slc"
@@ -15,10 +16,14 @@ import (
     "github.com/bozso/gomma/date"
 )
 
-type SLC struct {
+type SLCMeta struct {
     nIW int
-    Tab path.ValidFile
     time.Time
+}
+
+type SLC struct {
+    Tab path.ValidFile
+    SLCMeta
     IWs
 }
 
@@ -26,10 +31,10 @@ func (s SLC) Date() time.Time {
     return s.Time
 }
 
-func FromTabfile(tab string) (s1 SLC, err error) {
+func FromTabfile(tab path.ValidFile) (s1 SLC, err error) {
     log.Printf("Parsing tabfile: '%s'.\n", tab)
     
-    file, err := stream.Open(tab)
+    file, err := tab.Open()
     if err != nil {
         return
     }
@@ -37,23 +42,50 @@ func FromTabfile(tab string) (s1 SLC, err error) {
 
     s1.nIW = 0
     
-    scan := file.Scanner()
+    scan := bufio.NewScanner(file)
     
     for scan.Scan() {
         line := scan.Text()
-        split := strings.Split(line, " ")
+        split, err := splitted.New(line, " ")
+        if err != nil {
+            return s1, err
+        }
         
         log.Printf("Parsing IW%d\n", s1.nIW + 1)
         
-        l := NewIW(split[0], split[1], split[2])
+        var f path.File
         
+        err = split.ValueAt(&f, 0)
+        if err != nil {
+            return s1, err
+        }
         
+        l := NewIW(f)
+
+        err = split.ValueAt(&f, 1)
+        if err != nil {
+            return s1, err
+        }
+        
+        l = l.WithPar(f)
+
+        err = split.ValueAt(&f, 2)
+        if err != nil {
+            return s1, err
+        }
+        
+        l = l.WithTOPS(f)
+
         s1.IWs[s1.nIW], err = l.Load()
         if err != nil {
-            return
+            return s1, err
         }
         
         s1.nIW++
+    }
+    
+    if err = scan.Err(); err != nil {
+        return
     }
     
     s1.Tab = tab
@@ -66,9 +98,9 @@ func FromTabfile(tab string) (s1 SLC, err error) {
 func (s1 SLC) Move(dir path.Dir) (ms1 SLC, err error) {
     ms1 = s1
     
-    newtab := dir.Join(s1.Tab.Base())
+    newTab := dir.Join(s1.Tab.Base().GetPath())
     
-    file, err := stream.Create(newtab)
+    file, err := newTab.Create()
     if err != nil {
         return
     }
@@ -82,21 +114,19 @@ func (s1 SLC) Move(dir path.Dir) (ms1 SLC, err error) {
         
         iw := ms1.IWs[ii]
         
-        line := fmt.Sprintf("%s %s %s\n",
-            iw.DatFile, iw.ParFile, iw.TOPS_par)
-        
-        if _, err = file.WriteString(line); err != nil {
+        if _, err = file.WriteString(iw.Tabline()); err != nil {
             return 
         }
     }
     
+    ms1.Tab, err = newTab.ToFile().ToValid()
     return
 }
 
 func (s1 SLC) Exist() (b bool, err error) {
     for _, iw := range s1.IWs {
         if b, err = iw.Exist(); err != nil {
-            err = utils.WrapFmt(err,
+            err = errors.WrapFmt(err,
                 "failed to determine whether IW datafile exists")
             return
         }
@@ -131,8 +161,8 @@ func (s1 SLC) Mosaic(out slc.SLC, opts MosaicOpts) (err error) {
         ref = opts.RefTab
     }
     
-    _, err = mosaic.Call(s1.Tab, out.DatFile, out.ParFile, opts.Looks.Rng,
-        opts.Looks.Azi, bflg, ref)
+    _, err = mosaic.Call(s1.Tab, out.DatFile, out.ParFile,
+        opts.Looks.Rng, opts.Looks.Azi, bflg, ref)
     
     return
 }
@@ -143,15 +173,18 @@ func (s1 SLC) DerampRef() (ds1 SLC, err error) {
     tab := s1.Tab
     
     if _, err = derampRef.Call(tab); err != nil {
-        err = utils.WrapFmt(err, "failed to deramp reference SLC '%s'",
+        err = errors.WrapFmt(err, "failed to deramp reference SLC '%s'",
             tab)
         return
     }
     
-    tab += ".deramp"
+    tab, err = tab.AddExt("deramp").ToFile().ToValid()
+    if err != nil {
+        return
+    }
     
     if ds1, err = FromTabfile(tab); err != nil {
-        err = utils.WrapFmt(err, "failed to import SLC from tab '%s'",
+        err = errors.WrapFmt(err, "failed to import SLC from tab '%s'",
             tab)
         return
     }
@@ -176,15 +209,18 @@ func (s1 SLC) DerampSlave(ref *SLC, looks common.RngAzi, keep bool) (ret SLC, er
         clean)
     
     if err != nil {
-        err = utils.WrapFmt(err,
+        err = errors.WrapFmt(err,
             "failed to deramp slave SLC '%s', reference: '%s'", tab, reftab)
         return
     }
     
-    tab += ".deramp"
+    tab, err = tab.AddExt("deramp").ToFile().ToValid()
+    if err != nil {
+        return
+    }
     
     if ret, err = FromTabfile(tab); err != nil {
-        err = utils.WrapFmt(err, "failed to import SLC from tab '%s'",
+        err = errors.WrapFmt(err, "failed to import SLC from tab '%s'",
             tab)
         return
     }
@@ -192,45 +228,27 @@ func (s1 SLC) DerampSlave(ref *SLC, looks common.RngAzi, keep bool) (ret SLC, er
     return ret, nil
 }
 
-func (s1 SLC) RSLC(outDir path.Dir) (ret SLC, err error) {
+// TODO: Figure out what is happening here.
+func (s1 SLC) RSLC(outDir path.Dir) (sp SLCPath, err error) {
+    nIW := s1.nIW
+    
+    for ii := 0; ii < nIW; ii++ {
+        dat := outDir.Join(strings.ReplaceAll(
+            s1.IWs[ii].DatFile.Base().String(), "slc", "rslc"))
+        
+        sp.IWPaths[ii] = NewIW(dat.ToFile())
+    }
+    
     tab := strings.ReplaceAll(s1.Tab.Base().String(),
         "SLC_tab", "RSLC_tab")
-    
-    tab = outDir.Join(tab).ToFile()
 
-    file, err := tab.Create(tab)
+    sp.SLCMeta, sp.Tab = s1.SLCMeta, outDir.Join(tab).ToFile()
+    
+    err = sp.CreateTabfile()
     if err != nil {
         return
     }
-    defer file.Close()
-
-    for ii := 0; ii < s1.nIW; ii++ {
-        IW := s1.IWs[ii]
-        
-        dat := outDir.Join(
-            strings.ReplaceAll(IW.DatFile.Base(), "slc", "rslc"))
-        
-        par, TOPS_par := dat + ".par", dat + ".TOPS_par"
-        
-        ret.IWs[ii] = NewIW(dat, par, TOPS_par)
-        
-        //if err != nil {
-            //err = DataCreateErr.Wrap(err, "IW")
-            ////err = Handle(err, "failed to create new IW")
-            //return
-        //}
-        
-        line := fmt.Sprintf("%s %s %s\n", dat, par, TOPS_par)
-
-        _, err = file.WriteString(line)
-
-        if err != nil {
-            return
-        }
-    }
-
-    ret.Tab, ret.nIW = tab, s1.nIW
-
+    
     return
 }
 
