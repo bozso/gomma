@@ -78,7 +78,3 @@ type ComplexWithPar struct {
     Complex   `json:"complex"`
     Parameter `json:"parameter"`
 }
-
-func (c *ComplexWithPar) Set(s string) (err error) {
-    return LoadJson(s, c)
-}

@@ -10,8 +10,8 @@ type Path struct {
     DatFile path.File
 }
 
-func New(file path.Path) (p Path) {
-    p.DatFile = file.ToFile()
+func New(file path.Pather) (p Path) {
+    p.DatFile = file.AsPath().ToFile()
     return
 }
 

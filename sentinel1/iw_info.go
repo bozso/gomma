@@ -5,6 +5,7 @@ import (
     "math"
     
     "github.com/bozso/gotoolbox/path"
+    "github.com/bozso/gotoolbox/geometry"
     
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/data"
@@ -18,7 +19,7 @@ const (
 type(
     IWInfo struct {
         nburst int
-        extent common.Rectangle
+        extent common.LatLonRegion
         bursts [nMaxBurst]float64
     }
     
@@ -88,7 +89,7 @@ func iwInfo(file path.ValidFile) (iw IWInfo, err error) {
     
     info := params.FromString(_info, ":").ToParser()
     
-    rect, err := common.ParseRectangle(info)
+    rect, err := common.ParseRegion(info)
     if err != nil {
         return
     }
@@ -125,9 +126,9 @@ func (s1 Zip) Info(dst path.Dir) (iws IWInfos, err error) {
     return
 }
 
-func inIWs(p common.Point, IWs IWInfos) bool {
+func inIWs(p geometry.LatLon, IWs IWInfos) bool {
     for _, iw := range IWs {
-        if p.InRectangle(iw.extent) {
+        if iw.extent.Contains(p) {
             return true
         }
     }

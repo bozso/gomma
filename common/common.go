@@ -162,8 +162,15 @@ func (sl Slice) Contains(s string) bool {
     return false
 }
 
+type SavePather interface {
+    SavePath(ext string) path.File
+}
 
-func SaveJson(pth path.File, val interface{}) (err error) {
+func SaveJson(val SavePather) (err error) {
+    return SaveJsonTo(val.SavePath("json"), val)
+}
+
+func SaveJsonTo(pth path.File, val interface{}) (err error) {
     out, err := json.MarshalIndent(val, "", "    ")
     if err != nil {
         return errors.WrapFmt(err, "failed to json encode struct: %v", val)
@@ -221,7 +228,7 @@ func (e FileParseError) ToRetreive(s string) error {
 }
 
 func (e FileParseError) Error() string {
-    str := fmt.Sprintf("failed to parse file '%s'", e.p.GetPath())
+    str := fmt.Sprintf("failed to parse file '%s'", e.p.AsPath())
     
     if tr := e.toRetreive; len(tr) > 0 {
         str = fmt.Sprintf("%s to retreive %s", str, tr)

@@ -2,12 +2,16 @@ package cli
 
 import (
     "fmt"
+    gerrors "errors"
     
     "github.com/bozso/gotoolbox/errors"
     "github.com/bozso/gotoolbox/cli"
+    "github.com/bozso/gotoolbox/path"
 
     s1 "github.com/bozso/gomma/sentinel1"
     "github.com/bozso/gomma/plot"
+    "github.com/bozso/gomma/date"
+    "github.com/bozso/gomma/common"
 )
 
 const (
@@ -17,18 +21,6 @@ const (
 
 
 func SetupGammaCli(c *cli.Cli) {
-    c.AddAction("like",
-        "Initialize Gamma datafile with given datatype and shape.",
-        &like{})
-    
-    c.AddAction("move",
-        "Move a datafile and metadatafile to a given directory.",
-        &move{})
-
-    c.AddAction("make",
-        "Create metafile for an existing datafile.",
-        &create{})
-
     c.AddAction("coreg",
         "Coregister two Sentinel-1 SAR images.",
         &coreg{})    
@@ -47,55 +39,58 @@ func (m *MetaFile) SetCli(c *cli.Cli) {
 }
 
 type coreg struct {
-    Master, Slave, Ref string 
+    Master, Slave path.ValidFile
+    Ref path.File
     s1.CoregOpt
 }
 
 func (co *coreg) SetCli(c *cli.Cli) {
     co.CoregOpt.SetCli(c)
     
-    c.StringVar(&co.Master, "master", "", "Master image.")
-    c.StringVar(&co.Slave, "slave", "", "Slave image.")
-    c.StringVar(&co.Ref, "ref", "", "Reference image.")
+    c.Var(&co.Master, "master", "Master image.")
+    c.Var(&co.Slave, "slave", "Slave image.")
+    c.Var(&co.Ref, "ref", "Reference image.")
 }
 
 func (c coreg) Run() (err error) {
-    sm, ss, sr := c.Master, c.Slave, c.Ref
+    pm, ps, pr := c.Master, c.Slave, c.Ref
     
-    var ref *s1.SLC
+    var ref *s1.SLC = nil
     
-    if len(sr) == 0 {
-        ref = nil
+    vr, err := pr.ToValid()
+    
+    if !gerrors.Is(err, path.Error) {
+        return
     } else {
         var ref_ s1.SLC
-        if ref_, err = s1.FromTabfile(sr); err != nil {
+        if ref_, err = s1.FromTabfile(vr); err != nil {
             return
         }
         ref = &ref_
     }
     
     var s, m s1.SLC
-    if s, err = s1.FromTabfile(ss); err != nil {
+    if s, err = s1.FromTabfile(ps); err != nil {
         return
     }
     
-    if m, err = s1.FromTabfile(sm); err != nil {
+    if m, err = s1.FromTabfile(pm); err != nil {
         return
     }
     
-    c.Tab, c.ID = m.Tab, m.Format(DateShort)
+    c.Tab, c.ID = m.Tab, date.Short.Format(m)
     
     var out s1.CoregOut
     if out, err = c.Coreg(&s, ref); err != nil {
         return
     }
     
-    if err = SaveJson("", &out.Ifg); err != nil {
-        return ferr.Wrap(err)
+    if err = common.SaveJson(&out.Ifg); err != nil {
+        return
     }
     
     fmt.Printf("Created RSLC: %s", out.Rslc.Tab)
-    fmt.Printf("Created Interferogram: %s", out.Ifg.jsonName())
+    fmt.Printf("Created Interferogram: %s", out.Ifg.SaveName("json"))
     
     return nil
 }
@@ -236,9 +231,9 @@ func raster(args Args) (err error) {
 }
 */
 
-var PlotCmdFiles = map[string]Slice{
-    "pwr": Slice{"pix_sigma0", "pix_gamma0", "sbi_pwr", "cc", "rmli", "mli"},
-    "SLC": Slice{"slc", "rslc"},
-    "mph": Slice{"sbi", "sm", "diff", "lookup", "lt"},
-    "hgt": Slice{"hgt", "rdc"},
+var PlotCmdFiles = map[string][]string{
+    "pwr": []string{"pix_sigma0", "pix_gamma0", "sbi_pwr", "cc", "rmli", "mli"},
+    "SLC": []string{"slc", "rslc"},
+    "mph": []string{"sbi", "sm", "diff", "lookup", "lt"},
+    "hgt": []string{"hgt", "rdc"},
 }

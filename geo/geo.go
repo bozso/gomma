@@ -125,7 +125,7 @@ func (g* CodeOpt) Run(outDir path.Dir) (err error) {
         return
     }
 
-    if err = originalDem.Save(); err != nil {
+    if err = common.SaveJson(originalDem); err != nil {
         return
     }
     

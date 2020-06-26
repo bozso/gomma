@@ -7,88 +7,6 @@ import (
     "github.com/bozso/gomma/data"
 )
 
-type like struct {
-    indat data.File
-    in, out, ext string 
-    Dtype data.Type
-}
-
-func (l *like) SetCli(c* cli.Cli) {
-    c.Var(&l.indat, "in", "Reference metadata file")
-    c.StringVar(&l.out, "out", "", "Output metadata file")
-    c.Var(&l.Dtype, "dtype", "Output file datatype")
-    c.StringVar(&l.ext, "ext", "dat", "Extension of datafile")
-}
-
-func (l like) Run() (err error) {
-    out, indat := l.out, l.indat
-    
-    //var indat DatFile
-    //if err = Load(in, &indat); err != nil {
-        //return ferr.Wrap(err)
-    //}
-    
-    dtype := l.Dtype
-
-    if dtype == Unknown {
-        dtype = indat.Dtype()
-    }
-    
-    if out, err = filepath.Abs(out); err != nil {
-        return
-    }
-    
-    outdat := data.File{
-        Dat: fmt.Sprintf("%s.%s", out, l.ext),
-        Ra: indat.Ra,
-        DType: dtype,
-    }
-    
-    if err = outdat.Save(out); err != nil {
-        return
-    }
-    
-    return nil
-}
-
-type move struct {
-    outDir   string
-    MetaFile
-}
-
-func (m *move) SetCli(c *cli.Cli) {
-    m.MetaFile.SetCli(c)
-    c.StringVar(&m.outDir, "out", ".", "Output directory")
-}
-
-func (m move) Run() (err error) {
-    var ferr = merr.Make("move.Run")
-
-    path := m.Meta
-    
-    var dat DatParFile
-    if err = LoadJson(path, &dat); err != nil {
-        return ferr.WrapFmt(err,
-            "failed to parse json metadatafile '%s'", path) 
-    }
-    
-    out := m.outDir
-    
-    if dat, err = dat.Move(out); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if path, err = Move(path, out); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    if err = SaveJson(path, dat); err != nil {
-        return ferr.WrapFmt(err, "failed to refresh json metafile")
-    }
-    
-    return nil
-}
-
 type create struct {
     Data path.ValidFile
     Param path.File
@@ -99,21 +17,21 @@ type create struct {
 
 func (cr *create) SetCli(c *cli.Cli) {
     cr.MetaFile.SetCli(c)
-    cr.DType.SetCli(c)
+    cr.Type.SetCli(c)
     
-    c.Var(&cr.Dat, "dat", "", "Datafile path.")
-    c.Var(&cr.Par, "par", "", "Parameterfile path.")
+    c.Var(&cr.Data, "dat", "Datafile path.")
+    c.Var(&cr.Param, "par", "Parameterfile path.")
     c.StringVar(&cr.Ftype, "ftype", "", "Filetype.")
     c.StringVar(&cr.Ext, "ext", "par", "Extension of parameterfile.")
 }
 
 func (c create) Run() (err error) {
-    data, err := data.New(c.Data.ToFile()).WithPar(c.Param).Load()
+    dat, err := data.New(c.Data.ToPath()).WithParFile(c.Param).Load()
     if err != nil {
         return
     }
     
-    if err = SaveJson(c.Meta, &data); err != nil {
+    if err = common.SaveJson(c.Meta, &dat); err != nil {
         return
     }
     

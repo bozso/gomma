@@ -21,7 +21,7 @@ type (
     noPath struct{}
     
     Params struct {
-        filepath path.Pather
+        filepath fmt.Stringer
         sep string
         p params
     }
@@ -29,7 +29,7 @@ type (
 
 var np = noPath{}
 
-func (np noPath) GetPath() string {
+func (np noPath) String() string {
     return "parameters were not read from file"
 }
 
@@ -107,7 +107,7 @@ func (p Params) Param(key string) (s string, err error) {
         return
     }
 
-    err = NotFound{key:key, path:p.filepath.GetPath()}
+    err = NotFound{key:key, path:p.filepath.String()}
     return
 }
 
