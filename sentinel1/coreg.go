@@ -25,7 +25,8 @@ type (
     
     CoregOpt struct {
         IfgPath, RslcPath               path.Dir
-        Tab, ID                         string
+        Tab                             
+        ID                              string
         OutDir                          path.Dir
         Hgt, Poly1, Poly2, Mli          string
         CoherenceThresh, FractionThresh float64
