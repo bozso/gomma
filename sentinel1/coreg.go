@@ -5,65 +5,90 @@ import (
     "fmt"
     "log"
 
-    "github.com/bozso/gotoolbox/cli"
     "github.com/bozso/gotoolbox/errors"
     "github.com/bozso/gotoolbox/path"
 
     "github.com/bozso/gomma/slc"
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/date"
+    "github.com/bozso/gomma/mli"
+    "github.com/bozso/gomma/geo"
     ifg "github.com/bozso/gomma/interferogram"
 )
 
+type CoregOut struct {
+    RSLC slc.SLC
+    Rslc SLC
+    Ifg ifg.File
+}
 
-type (
-    CoregOut struct {
-        RSLC slc.SLC
-        Rslc SLC
-        Ifg ifg.File
+type BurstOverlapThresholds struct {
+    // Coherence threshold in overlapping bursts
+    Coherence              float64 `json:"coherence_thresh"`
+    
+    // Minimum fraction of coherent pixels in overlapping bursts
+    MinCoherentPicFraction float64 `json:"min_coherent_pixels_fraction"`
+    
+    // Maximum allowed phase standard deviation
+    MaxPhaseStdev         float64  `json:"max_phase_stdev"`
+}
+
+type Common struct {
+    // Whether to clean temporary files
+    Clean    bool           `json:"clean_temp_files"`
+    
+    // Wether to use previously calculated intermediate files
+    UseInter bool           `json:"use_inter_files"`  
+    
+    Looks    common.RngAzi  `json:"looks"`    
+
+    BurstOverlapThresh BurstOverlapThresholds `json:"burst_overlap_thresh"`
+}
+
+type CoregMeta struct {
+    MasterMLI       path.ValidFile  `json:"master_mli"`
+    MasterHeight    path.ValidFile  `json:"heights"`
+    
+    // Optional polynom file
+    Poly1 path.File       `json:"poly1"`
+
+    // Optional polynom file
+    Poly2 path.File       `json:"poly2"`
+    Common
+}
+
+func (cm CoregMeta) Parse() (co CoregOpt, err error) {
+    if err = common.LoadJson(cm.MasterMLI, &co.MasterMLI); err != nil {
+        return
+    }
+
+    if err = common.LoadJson(cm.MasterHeight, &co.MasterHeight); err != nil {
+        return
     }
     
-    CoregOpt struct {
-        IfgPath, RslcPath               path.Dir
-        Tab                             
-        ID                              string
-        OutDir                          path.Dir
-        Hgt, Poly1, Poly2, Mli          string
-        CoherenceThresh, FractionThresh float64
-        PhaseStdevThresh                float64
-        Clean, UseInter                 bool  
-        Looks                           common.RngAzi
+    co.Poly1, err = cm.Poly1.IfExists()
+    if err != nil {
+        return 
     }
-)
+
+    co.Poly2, err = cm.Poly2.IfExists()
+    if err != nil {
+        return 
+    }
+    
+    co.Common = cm.Common
+    return
+}
+
+type CoregOpt struct {
+    MasterMLI       mli.MLI
+    MasterHeight    geo.Height
+    Poly1           *path.ValidFile
+    Poly2           *path.ValidFile
+    Common
+}
 
 var coregFun = common.Must("S1_coreg_TOPS")
-
-func (s1 *CoregOpt) SetCli(c *cli.Cli) {
-
-    c.Var(&s1.IfgPath, "ifg", "Output interferogram metadata file")
-        
-    c.Var(&s1.RslcPath, "rslc", "Output RSLC metadata file")
-    c.Var(&s1.OutDir, "outDir", "Output directory")
-
-    c.StringVar(&s1.Poly1, "poly1", "", "Polynom 1")
-    c.StringVar(&s1.Poly2, "poly2", "", "Polynom 2")
-    
-    c.Var(&s1.Looks, "looks", "Number of looks.")
-    
-    c.BoolVar(&s1.Clean, "clean", false, "Cleanup temporary files.")
-    c.BoolVar(&s1.UseInter, "useInter", false, "Use intermediate files.")
-    
-    c.Float64Var(&s1.CoherenceThresh, "cohThresh", 0.8,
-        "Coherence threshold in overlapping bursts.")
-
-    c.Float64Var(&s1.FractionThresh, "fracThresh", 0.01,
-        "Fraction of coherent pixels in overlapping bursts.")
-
-    c.Float64Var(&s1.PhaseStdevThresh, "stdThresh", 0.8,
-        "Maximum allowed phase standard deviation.")
-    
-    c.StringVar(&s1.Mli, "mli", "", "Output? MLI metadata file.")
-}
 
 func (sc *CoregOpt) Coreg(Slc, ref *SLC) (co CoregOut, err error) {
     cleaning, flag1 := 0, 0
@@ -94,10 +119,12 @@ func (sc *CoregOpt) Coreg(Slc, ref *SLC) (co CoregOut, err error) {
         return
     }
     
+    bot := sc.BurstOverlapThresh
+    
     args := []interface{}{
         slc1Tab, slc1ID, slc2Tab, slc2ID, rslc.Tab, hgt,
         sc.Looks.Rng, sc.Looks.Azi, sc.Poly1, sc.Poly2,
-        sc.CoherenceThresh, sc.FractionThresh, sc.PhaseStdevThresh,
+        bot.Coherence, bot.MinCoherentPicFraction, bot.MaxPhaseStdev,
         cleaning, flag1,
     }
     

@@ -114,18 +114,16 @@ func (ifg File) CheckQuality() (b bool, err error) {
     return
 }
 
-type ( 
-    OffsetAlgo int
+type OffsetAlgo int
 
-    IfgOpt struct {
-        Looks common.RngAzi
-        interact bool
-        hgt geo.Hgt
-        datapath, off, diff path.File
-        algo OffsetAlgo
-        ref *slc.SLC
-    }
-)
+type IfgOpt struct {
+    Looks common.RngAzi
+    interact bool
+    hgt geo.Height
+    datapath, off, diff path.File
+    algo OffsetAlgo
+    ref *slc.SLC
+}
 
 const (
     IntensityCoherence OffsetAlgo = iota

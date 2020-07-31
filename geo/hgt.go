@@ -6,22 +6,22 @@ import (
 )
 
 
-type Hgt struct {
+type Height struct {
     data.File
 }
 
-func (h Hgt) Validate() (err error) {
+func (h Height) Validate() (err error) {
     return h.EnsureFloat()
 }
 
-func (h *Hgt) Set(s string) (err error) {
+func (h *Height) Set(s string) (err error) {
     return
 }
 
-func (h Hgt) Raster(opt plot.RasArgs) (err error) {
+func (h Height) Raster(opt plot.RasArgs) (err error) {
     opt.Mode = plot.Height
     opt.Parse(h)
     
     err = plot.Raster(h, opt)
-    return nil
+    return
 }
