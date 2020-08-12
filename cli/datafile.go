@@ -1,7 +1,7 @@
 package cli
 
 import (
-    "github.com/bozso/gotoolbox/cli"
+    //"github.com/bozso/gotoolbox/cli"
     "github.com/bozso/gotoolbox/path"
 
     "github.com/bozso/gomma/data"
@@ -15,6 +15,7 @@ type create struct {
     data.Type
 }
 
+/*
 func (cr *create) SetCli(c *cli.Cli) {
     cr.MetaFile.SetCli(c)
     cr.Type.SetCli(c)
@@ -37,6 +38,8 @@ func (c create) Run() (err error) {
     
     return
 }
+
+*/
 
 /*
 type (

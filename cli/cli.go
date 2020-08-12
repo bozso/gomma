@@ -1,17 +1,17 @@
 package cli
 
 import (
-    "fmt"
-    gerrors "errors"
+    //"fmt"
+    //gerrors "errors"
     
     "github.com/bozso/gotoolbox/errors"
     "github.com/bozso/gotoolbox/cli"
-    "github.com/bozso/gotoolbox/path"
+    //"github.com/bozso/gotoolbox/path"
 
-    s1 "github.com/bozso/gomma/sentinel1"
+    //s1 "github.com/bozso/gomma/sentinel1"
     "github.com/bozso/gomma/plot"
-    "github.com/bozso/gomma/date"
-    "github.com/bozso/gomma/common"
+    //"github.com/bozso/gomma/date"
+    //"github.com/bozso/gomma/common"
 )
 
 const (
@@ -21,9 +21,11 @@ const (
 
 
 func SetupGammaCli(c *cli.Cli) {
+    /*
     c.AddAction("coreg",
         "Coregister two Sentinel-1 SAR images.",
-        &coreg{})    
+        &coreg{})
+    */
 
     c.AddAction("select",
         "Select Sentinel-1 SAR zipfiles for processing.",
@@ -36,63 +38,6 @@ type MetaFile struct {
 
 func (m *MetaFile) SetCli(c *cli.Cli) {
     c.StringVar(&m.Meta, "meta", "", "Metadata json file")
-}
-
-type coreg struct {
-    Master, Slave path.ValidFile
-    Ref path.File
-    s1.CoregOpt
-}
-
-func (co *coreg) SetCli(c *cli.Cli) {
-    co.CoregOpt.SetCli(c)
-    
-    c.Var(&co.Master, "master", "Master image.")
-    c.Var(&co.Slave, "slave", "Slave image.")
-    c.Var(&co.Ref, "ref", "Reference image.")
-}
-
-func (c coreg) Run() (err error) {
-    pm, ps, pr := c.Master, c.Slave, c.Ref
-    
-    var ref *s1.SLC = nil
-    
-    vr, err := pr.ToValid()
-    
-    if !gerrors.Is(err, path.Error) {
-        return
-    } else {
-        var ref_ s1.SLC
-        if ref_, err = s1.FromTabfile(vr); err != nil {
-            return
-        }
-        ref = &ref_
-    }
-    
-    var s, m s1.SLC
-    if s, err = s1.FromTabfile(ps); err != nil {
-        return
-    }
-    
-    if m, err = s1.FromTabfile(pm); err != nil {
-        return
-    }
-    
-    c.Tab, c.ID = m.Tab, date.Short.Format(m)
-    
-    var out s1.CoregOut
-    if out, err = c.Coreg(&s, ref); err != nil {
-        return
-    }
-    
-    if err = common.SaveJson(&out.Ifg); err != nil {
-        return
-    }
-    
-    fmt.Printf("Created RSLC: %s", out.Rslc.Tab)
-    fmt.Printf("Created Interferogram: %s", out.Ifg.SaveName("json"))
-    
-    return nil
 }
 
 /*

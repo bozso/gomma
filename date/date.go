@@ -5,6 +5,28 @@ import (
     "time"
 )
 
+type Time struct {
+    t time.Time
+}
+
+func (t Time) AsTime() (T time.Time) {
+    return t.t
+}
+
+func FromJson(b []byte, p ParseFmt) (t Time, err error) {
+    t.t, err = p.Parse(string(b))
+    return
+}
+
+type ShortTime struct {
+    time.Time
+}
+
+func (st *ShortTime) UnmarshalJSON(b []byte) (err error) {
+    st.Time.t, err = FromJson(b, Short)
+    return
+}
+
 type ParseFmt string
 
 const (
@@ -39,4 +61,4 @@ func (p ParseError) Error() string {
 
 func (p ParseError) Unwrap() error {
     return p.err
-} 
+}

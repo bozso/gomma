@@ -228,7 +228,6 @@ func (s1 SLC) DerampSlave(ref *SLC, looks common.RngAzi, keep bool) (ret SLC, er
     return ret, nil
 }
 
-// TODO: Figure out what is happening here.
 func (s1 SLC) RSLC(outDir path.Dir) (sp SLCPath, err error) {
     nIW := s1.nIW
     

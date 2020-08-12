@@ -6,12 +6,15 @@ import (
     
     "github.com/bozso/gotoolbox/errors"
     "github.com/bozso/gotoolbox/path"
+    "github.com/bozso/gotoolbox/math"
     
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/data"
 )
 
-type Coherence struct {
+type Coherence math.Fraction
+
+type CoherenceData struct {
     data.Complex
 }
 
@@ -28,7 +31,7 @@ var (
     ccAdaptive = common.Must("cc_ad")
 )
 
-func (ifg File) Coherence(opt CoherenceOpt) (c Coherence, err error) {
+func (ifg File) Coherence(opt CoherenceOpt) (c CoherenceData, err error) {
     weightFlag := 0
     
     switch w := opt.Weight; w {

@@ -202,7 +202,7 @@ type AdaptFiltOpt struct {
 
 var adf = common.Must("adf")
 
-func (ifg File) AdaptFilt(opt AdaptFiltOpt, Ifg File, cc Coherence) (err error) {
+func (ifg File) AdaptFilt(opt AdaptFiltOpt, Ifg File, cc CoherenceData) (err error) {
     step := float64(opt.FFTWindow) / 8.0
     
     if opt.step > 0.0 {

@@ -1,15 +1,16 @@
 package cli
 
 import (
-    "strings"
+    //"strings"
     
-    "github.com/bozso/gotoolbox/cli"
+    //"github.com/bozso/gotoolbox/cli"
 
-    "github.com/bozso/gomma/data"
-    "github.com/bozso/gomma/dem"
-    "github.com/bozso/gomma/geo"
+    //"github.com/bozso/gomma/data"
+    //"github.com/bozso/gomma/dem"
+    //"github.com/bozso/gomma/geo"
 )
 
+/*
 type geoCode struct {
     InFile, OutFile data.File
     Mode            string
@@ -42,3 +43,4 @@ func (c geoCode) Run() (err error) {
     
     return
 }
+*/

@@ -1,51 +1,59 @@
 package cli
 
 import (
+    "fmt"
     "log"
     "io"
     "bufio"
     
     "github.com/bozso/gotoolbox/cli/stream"
     "github.com/bozso/gotoolbox/cli"
+    "github.com/bozso/gotoolbox/path"
 
     "github.com/bozso/gomma/common"
+    "github.com/bozso/gomma/date"
     s1 "github.com/bozso/gomma/sentinel1"
 )
 
 type checkerFun func(*s1.Zip) bool
 
-func parseS1(zip, pol, dst string) (s1 *s1.Zip, IWs s1.IWInfos, err error) {
-    if s1, err = NewS1Zip(zip, pol); err != nil {
-        err = Handle(err, "failed to parse S1Zip data from '%s'", zip)
+func parseS1(zip path.ValidFile, pol, dst string) (S1 *s1.Zip, IWs s1.IWInfos, err error) {
+    if S1, err = s1.NewZip(zip); err != nil {
         return
     }
-    log.Printf("Parsing IW Information for S1 zipfile '%s'", s1.Path)
+    log.Printf("Parsing IW Information for S1 zipfile '%s'", S1.Path)
     
-    if IWs, err = s1.Info(dst); err != nil {
-        err = Handle(err, "failed to parse IW information for zip '%s'",
-            s1.Path)
+    if IWs, err = S1.Info(dst); err != nil {
         return
     }
     
-    return s1, IWs, nil
+    return
 }
 
-func loadS1(reader io.Reader, pol string) (s1 s1.Zips, err error) {
+func loadS1(reader io.Reader, pol string) (S1 s1.Zips, err error) {
     file := bufio.NewScanner(reader)
     
     for file.Scan() {
-        line := file.Text()
-        
-        var s1zip *S1Zip
-        if s1zip, err = NewS1Zip(line, pol); err != nil {
-            err = Handle(err, "failed to parse zipfile '%s'", line)
+        p, Err := path.New(file.Text()).ToValid()
+        if Err != nil {
+            err = Err
             return
         }
         
-        s1 = append(s1, s1zip)
+        if err = file.Err(); err != nil {
+            return
+        }
+        
+        
+        var s1zip *s1.Zip
+        if s1zip, err = s1.NewZip(p); err != nil {
+            return
+        }
+        
+        S1 = append(S1, s1zip)
     }
     
-    return s1, nil
+    return
 }
 
 
@@ -54,143 +62,6 @@ func loadS1(reader io.Reader, pol string) (s1 s1.Zips, err error) {
         //root: filepath.Join(s.CachePath, satellite)}
 //}
 
-type GeneralOpt struct {
-    //DataPath   string     `cli:"" usage:""`
-    OutputDir, Pol, MasterDate, CachePath  string
-    Looks      common.RngAzi
-    InFile     stream.In
-    OutFile    stream.Out
-}
-
-func (g *GeneralOpt) SetCli(c *cli.Cli) {
-    g.InFile.SetCli(c, "infile", "Input file.")
-    g.OutFile.SetCli(c, "outfile", "Input file.")
-    
-    c.StringVar(&g.OutputDir, "out", ".", "Output directory")
-    c.StringVar(&g.Pol, "pol", "vv", "Polarisation used.")
-    c.StringVar(&g.MasterDate, "masterDate", "", "")
-    c.StringVar(&g.CachePath, "cachePath", "", "Cache path.")
-    c.Var(&g.Looks, "looks", "Range, azimuth looks.")
-}
-
-type dataSelect struct {
-    GeneralOpt
-    DataFiles  cli.Paths `cli:"d,data" usage:"List of datafiles to process"`
-    DateStart  string   `cli:"b,start" usage:"Start of date range"`
-    DateStop   string   `cli:"e,stop" usage:"End of date range"`
-    LowerLeft  common.LatLon   `cli:"ll,lowerLeft" usage:"Rectangle coordinates"`
-    UpperRight common.LatLon   `cli:"ur,upperRight" usage:"Rectangle coordinates"`
-    CheckZips  bool     `cli:"c,checkZips" usage:"Check zipfile integrity"`  
-}
-
-func (d *dataSelect) SetCli(c *cli.Cli) {
-    d.GeneralOpt.SetCli(c)
-    
-    c.Var(&d.DataFiles, "dataFiles",
-        "Comma separated filpaths to Sentinel-1 data.")
-    
-    c.StringVar(&d.DateStart, "start", "", "Start of date range.")
-    c.StringVar(&d.DateStop, "stop", "", "End of date range.")
-    c.Var(&d.LowerLeft, "lowerLeft", "Rectangle coordinates.")
-    c.Var(&d.UpperRight, "upperRight", "Rectangle coordinates.")
-    c.BoolVar(&d.CheckZips, "checkZips", false, "Check zipfile integrity.")
-}
-
-func (sel dataSelect) Run() (err error) {
-    var ferr = merr.Make("dataSelect.Run")
-    
-    dataFiles := sel.DataFiles
-    if len(dataFiles) == 0 {
-        return ferr.Fmt("At least one datafile must be specified!")
-    }
-    
-    var startCheck, stopCheck checkerFun
-    checker := func(s1zip *S1Zip) bool {
-        return true
-    }
-    
-    dateStart, dateStop := sel.DateStart, sel.DateStop
-
-    if len(dateStart) != 0 {
-        _dateStart, err := ParseDate(DShort, dateStart)
-        
-        if err != nil {
-            return ferr.Wrap(err)
-        }
-        
-        startCheck = func(s1zip *S1Zip) bool {
-            return s1zip.Start().After(_dateStart)
-        }
-    }
-    
-    if len(dateStop) != 0 {
-        _dateStop, err := ParseDate(DShort, dateStop)
-        
-        if err != nil {
-            return ferr.Wrap(err)
-        }
-        
-        stopCheck = func(s1zip *S1Zip) bool {
-            return s1zip.Stop().Before(_dateStop)
-        }
-    }
-    
-    if startCheck != nil && stopCheck != nil {
-        checker = func(s1zip *S1Zip) bool {
-            return startCheck(s1zip) && stopCheck(s1zip)
-        }
-    } else if startCheck != nil {
-        checker = startCheck
-    } else if stopCheck != nil {
-        checker = stopCheck
-    }
-    
-    
-    // TODO: implement checkZip
-    //if Select.CheckZips {
-    //    checker = func(s1zip S1Zip) bool {
-    //        return checker(s1zip) && s1zip.checkZip()
-    //    }
-    //    check = true
-    //
-    //}
-    
-    // nzip := len(zipfiles)
-    
-    
-    var (
-        s1zip *S1Zip
-        IWs IWInfos
-        
-        ll, ur = sel.LowerLeft, sel.UpperRight
-        
-        aoi = AOI{
-            Point{X: ll.Lon, Y: ll.Lat}, Point{X: ll.Lon, Y: ur.Lat},
-            Point{X: ur.Lon, Y: ur.Lat}, Point{X: ur.Lon, Y: ll.Lat},
-        }
-    )
-    
-    writer := sel.OutFile
-    defer writer.Close()
-    
-    for _, zip := range dataFiles {
-        s1zip, IWs, err = parseS1(zip.String(), sel.Pol, sel.CachePath)
-        
-        if err != nil {
-            return ferr.Wrap(err)
-        }
-        
-        if IWs.contains(aoi) && checker(s1zip) {
-            writer.WriteString(s1zip.Path)
-        }
-    }
-    
-    if err = writer.Wrap(); err != nil {
-        return ferr.Wrap(err)
-    }
-    
-    return nil
-}
 
 /*
 type dataImporter struct {

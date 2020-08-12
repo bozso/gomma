@@ -7,6 +7,7 @@ import (
 
     "github.com/bozso/gotoolbox/errors"
     "github.com/bozso/gotoolbox/path"
+    "github.com/bozso/gotoolbox/math"
 
     "github.com/bozso/gomma/slc"
     "github.com/bozso/gomma/common"
@@ -24,48 +25,75 @@ type CoregOut struct {
 
 type BurstOverlapThresholds struct {
     // Coherence threshold in overlapping bursts
-    Coherence              float64 `json:"coherence_thresh"`
+    Coherence              ifg.Coherence `json:"coherence"`
     
     // Minimum fraction of coherent pixels in overlapping bursts
-    MinCoherentPicFraction float64 `json:"min_coherent_pixels_fraction"`
+    MinCoherentPixFraction math.Fraction `json:"min_coherent_pixels_fraction"`
     
     // Maximum allowed phase standard deviation
-    MaxPhaseStdev         float64  `json:"max_phase_stdev"`
+    MaxPhaseStdev          float64 `json:"max_phase_stdev"`
+}
+
+type OutPaths struct {
+    RSLC path.EmptyDir `json:"rslc"`
+    Ifg  path.EmptyDir `json:"ifg"`
 }
 
 type Common struct {
     // Whether to clean temporary files
     Clean    bool           `json:"clean_temp_files"`
     
-    // Wether to use previously calculated intermediate files
+    // Whether to use previously calculated intermediate files
     UseInter bool           `json:"use_inter_files"`  
     
     Looks    common.RngAzi  `json:"looks"`    
 
     BurstOverlapThresh BurstOverlapThresholds `json:"burst_overlap_thresh"`
+    
+    OutPaths OutPaths `json:"out_paths"`
+}
+
+type MasterFilePaths struct {
+    MLI    path.ValidFile `json:"master_mli"`
+    Height path.ValidFile `json:"height"`
+    SLC    path.ValidFile `json:"slc"`
+}
+
+type MasterFiles struct {
+    MLI    mli.MLI    `json:"mli"`
+    Height geo.Height `json:"height"`
+    SLC    SLC        `json:"slc"`
+}
+
+func (m MasterFilePaths) Parse() (mf MasterFiles, err error) {
+    if err = common.LoadJson(m.MLI, &mf.MLI); err != nil {
+        return
+    }
+
+    if err = common.LoadJson(m.Height, &mf.Height); err != nil {
+        return
+    }
+    
+    err = common.LoadJson(m.SLC, &mf.SLC)
+    return
 }
 
 type CoregMeta struct {
-    MasterMLI       path.ValidFile  `json:"master_mli"`
-    MasterHeight    path.ValidFile  `json:"heights"`
+    Master MasterFilePaths `json:"master_filepaths"`
     
     // Optional polynom file
-    Poly1 path.File       `json:"poly1"`
+    Poly1  path.File       `json:"poly1"`
 
     // Optional polynom file
-    Poly2 path.File       `json:"poly2"`
+    Poly2  path.File       `json:"poly2"`
     Common
 }
 
 func (cm CoregMeta) Parse() (co CoregOpt, err error) {
-    if err = common.LoadJson(cm.MasterMLI, &co.MasterMLI); err != nil {
+    if co.Master, err = cm.Master.Parse(); err != nil {
         return
     }
 
-    if err = common.LoadJson(cm.MasterHeight, &co.MasterHeight); err != nil {
-        return
-    }
-    
     co.Poly1, err = cm.Poly1.IfExists()
     if err != nil {
         return 
@@ -81,50 +109,44 @@ func (cm CoregMeta) Parse() (co CoregOpt, err error) {
 }
 
 type CoregOpt struct {
-    MasterMLI       mli.MLI
-    MasterHeight    geo.Height
-    Poly1           *path.ValidFile
-    Poly2           *path.ValidFile
+    Master MasterFiles
+    Poly1  *path.ValidFile
+    Poly2  *path.ValidFile
     Common
 }
 
 var coregFun = common.Must("S1_coreg_TOPS")
 
-func (sc *CoregOpt) Coreg(Slc, ref *SLC) (co CoregOut, err error) {
+func (c *CoregOpt) Coreg(Slc, ref *SLC) (co CoregOut, err error) {
     cleaning, flag1 := 0, 0
     
-    if sc.Clean {
+    if c.Clean {
         cleaning = 1
     }
     
-    if sc.UseInter {
+    if c.UseInter {
         flag1 = 1
     }
     
-    slc1Tab, slc1ID := sc.Tab, sc.ID
+    m := c.Master.SLC
+    
+    slc1Tab, slc1ID := m.Tab, date.Short.Format(m)
     slc2Tab, slc2ID := Slc.Tab, date.Short.Format(Slc)
     
     // TODO: parse opt.hgt
-    hgt := sc.Hgt
+    hgt := c.Master.Height
     
-    rslc, err := Slc.RSLC(sc.OutDir)
+    rslc, err := Slc.RSLC(c.OutPaths.RSLC.Dir)
     if err != nil {
         return
     }
     
-    Rslc, err := rslc.Load()
-    if err == nil {
-        log.Printf("Coregistered RSLC already exists, moving it to directory.")
-        co.Rslc, err = Rslc.Move(sc.RslcPath)
-        return
-    }
-    
-    bot := sc.BurstOverlapThresh
+    bot := c.BurstOverlapThresh
     
     args := []interface{}{
         slc1Tab, slc1ID, slc2Tab, slc2ID, rslc.Tab, hgt,
-        sc.Looks.Rng, sc.Looks.Azi, sc.Poly1, sc.Poly2,
-        bot.Coherence, bot.MinCoherentPicFraction, bot.MaxPhaseStdev,
+        c.Looks.Rng, c.Looks.Azi, c.Poly1, c.Poly2,
+        bot.Coherence, bot.MinCoherentPixFraction, bot.MaxPhaseStdev,
         cleaning, flag1,
     }
     
@@ -133,7 +155,7 @@ func (sc *CoregOpt) Coreg(Slc, ref *SLC) (co CoregOut, err error) {
     } else {
         rslcRefTab, rslcRefID := ref.Tab, date.Short.Format(ref)
         
-        log.Printf(" Reference: '%s'.", rslcRefTab)
+        log.Printf(" Reference: '%s'.\n", rslcRefTab)
         
         args = append(args, rslcRefTab, rslcRefID)
     }
@@ -143,7 +165,8 @@ func (sc *CoregOpt) Coreg(Slc, ref *SLC) (co CoregOut, err error) {
         return
     }
     
-    co.RSLC, err = slc.New(path.New(slc2ID).AddExt("rslc").ToFile()).Load()
+    co.RSLC, err = slc.New(
+        path.New(slc2ID).AddExt("rslc").ToFile()).Load()
     if err != nil {
         return
     }
@@ -161,19 +184,19 @@ func (sc *CoregOpt) Coreg(Slc, ref *SLC) (co CoregOut, err error) {
         return
     }
     
-    if co.Rslc, err = co.Rslc.Move(sc.RslcPath); err != nil {
+    if co.Rslc, err = co.Rslc.Move(c.OutPaths.RSLC.Dir); err != nil {
         return
     }
     
-    if co.Ifg, err = co.Ifg.Move(sc.IfgPath); err != nil {
+    if co.Ifg, err = co.Ifg.Move(c.OutPaths.Ifg.Dir); err != nil {
         err = errors.WrapFmt(err,
             "failed to move interferogram '%s' to IFG directory",
             co.Ifg.DatFile)
         return
     }
 
-    if sc.Clean {
-        glob, Err := sc.OutDir.Join(slc1ID + "*").Glob()
+    if c.Clean {
+        glob, Err := path.New(slc1ID + "*").Glob()
         
         if Err != nil {
             err = errors.WrapFmt(Err,
@@ -189,7 +212,7 @@ func (sc *CoregOpt) Coreg(Slc, ref *SLC) (co CoregOut, err error) {
             }
         }
         
-        glob, Err = sc.OutDir.Join(slc2ID + "*").Glob()
+        glob, Err = path.New(slc2ID + "*").Glob()
         
         if Err != nil {
             err = errors.WrapFmt(Err,
