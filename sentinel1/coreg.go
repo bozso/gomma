@@ -7,7 +7,7 @@ import (
 
     "github.com/bozso/gotoolbox/errors"
     "github.com/bozso/gotoolbox/path"
-    "github.com/bozso/gotoolbox/math"
+    "github.com/bozso/emath/limits"
 
     "github.com/bozso/gomma/slc"
     "github.com/bozso/gomma/common"
@@ -28,7 +28,7 @@ type BurstOverlapThresholds struct {
     Coherence              ifg.Coherence `json:"coherence"`
     
     // Minimum fraction of coherent pixels in overlapping bursts
-    MinCoherentPixFraction math.Fraction `json:"min_coherent_pixels_fraction"`
+    MinCoherentPixFraction limits.Fraction `json:"min_coherent_pixels_fraction"`
     
     // Maximum allowed phase standard deviation
     MaxPhaseStdev          float64 `json:"max_phase_stdev"`

@@ -25,11 +25,11 @@ func SetupGammaCli(c *cli.Cli) {
     c.AddAction("coreg",
         "Coregister two Sentinel-1 SAR images.",
         &coreg{})
-    */
 
     c.AddAction("select",
         "Select Sentinel-1 SAR zipfiles for processing.",
         &dataSelect{})    
+    */
 }
 
 type MetaFile struct {

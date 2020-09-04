@@ -6,13 +6,13 @@ import (
     
     "github.com/bozso/gotoolbox/errors"
     "github.com/bozso/gotoolbox/path"
-    "github.com/bozso/gotoolbox/math"
+    "github.com/bozso/emath/limits"
     
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/data"
 )
 
-type Coherence math.Fraction
+type Coherence limits.Fraction
 
 type CoherenceData struct {
     data.Complex

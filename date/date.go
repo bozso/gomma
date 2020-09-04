@@ -5,26 +5,45 @@ import (
     "time"
 )
 
-type Time struct {
-    t time.Time
+type ToTime interface {
+    AsTime() (time.Time)
 }
 
-func (t Time) AsTime() (T time.Time) {
-    return t.t
-}
-
-func FromJson(b []byte, p ParseFmt) (t Time, err error) {
-    t.t, err = p.Parse(string(b))
-    return
-}
-
-type ShortTime struct {
+type OptionalTime struct {
+    set bool
     time.Time
 }
 
-func (st *ShortTime) UnmarshalJSON(b []byte) (err error) {
-    st.Time.t, err = FromJson(b, Short)
+func (ot *OptionalTime) Parse(b []byte, p ParseFmt) (err error) {
+    if len(b) == 0 {
+        ot.set = false
+    }
+    
+    ot.Time, err = p.Parse(string(b))
+    if err == nil {
+        ot.set = true
+    }
     return
+}
+
+func (ot OptionalTime) IsSet() (b bool) {
+    return ot.set
+}
+
+type ShortTime struct {
+    OptionalTime
+}
+
+func (st *ShortTime) UnmarshalJSON(b []byte) (err error) {
+    return st.OptionalTime.Parse(b, Short)
+}
+
+type LongTime struct {
+    OptionalTime
+}
+
+func (lt *LongTime) UnmarshalJSON(b []byte) (err error) {
+    return lt.OptionalTime.Parse(b, Long)
 }
 
 type ParseFmt string

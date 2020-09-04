@@ -1,6 +1,7 @@
 package sentinel1
 
 import (
+    "io"
     "fmt"
     "bytes"
     
@@ -59,7 +60,7 @@ func (im Importer) Import(one, two *Zip) (err error) {
         return
     } 
     
-    _, err = s1Import.Call(im.ZiplistFile.String(), im.burstTable.String(),
+    _, err = s1Import.Call(im.ZiplistFile, im.burstTable,
         im.opArgs)
     return
 }
@@ -71,17 +72,13 @@ func (im Importer) WriteZiplist(one, two *Zip) (err error) {
     }
     defer zipList.Close()
     
-    _, err = zipList.Write(im.MakeZiplist(one, two))
+    err = im.WriteZiplistTo(zipList, one, two)
     return 
 }
 
-func (im Importer) MakeZiplist(one, two *Zip) (b []byte) {
-    buf := im.buf
-    buf.Reset()
-    
+func (im Importer) WriteZiplistTo(w io.Writer, one, two *Zip) (err error) {
     if two == nil {
-        buf.WriteString(one.Path.String())
-        buf.WriteByte('\n')
+        _, err = fmt.Fprintf(w, "%s\n", one.Path.String())
     } else {
         after := two.Date().After(one.Date())
         
@@ -91,11 +88,13 @@ func (im Importer) MakeZiplist(one, two *Zip) (b []byte) {
             first, second = second, first
         }
         
-        buf.WriteString(first.Path.String())
-        buf.WriteByte('\n')
-        buf.WriteString(second.Path.String())
-        buf.WriteByte('\n')
+        _, err = fmt.Fprintf(w, "%s\n", one.Path.String())
+        if err != nil {
+            return
+        }
+        
+        _, err = fmt.Fprintf(w, "%s\n", second.Path.String())
     }
     
-    return buf.Bytes()
+    return
 }

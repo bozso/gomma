@@ -5,7 +5,7 @@ import (
     "math"
     
     "github.com/bozso/gotoolbox/path"
-    "github.com/bozso/gotoolbox/geometry"
+    "github.com/bozso/emath/geometry"
     
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/data"
@@ -135,7 +135,7 @@ func inIWs(p geometry.LatLon, IWs IWInfos) bool {
     return false
 }
 
-func (iw IWInfos) contains(aoi common.AOI) bool {
+func (iw IWInfos) Contains(aoi common.AOI) bool {
     sum := 0
 
     for _, point := range aoi {

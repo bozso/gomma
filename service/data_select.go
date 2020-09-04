@@ -1,26 +1,96 @@
-package cli
+package service
 
 import (
     "fmt"
     "log"
     "io"
     "bufio"
+    "net/http"
     
-    "github.com/bozso/gotoolbox/cli/stream"
-    "github.com/bozso/gotoolbox/cli"
     "github.com/bozso/gotoolbox/path"
 
-    "github.com/bozso/gomma/common"
+    "github.com/bozso/emath/geometry"
+    
     "github.com/bozso/gomma/date"
+    "github.com/bozso/gomma/common"
     s1 "github.com/bozso/gomma/sentinel1"
 )
 
-type checkerFun func(*s1.Zip) bool
+type DataSelect struct {
+    CacheDir path.Dir
+}
 
-func parseS1(zip path.ValidFile, pol, dst string) (S1 *s1.Zip, IWs s1.IWInfos, err error) {
+func (ds *DataSelect) Default() {
+    if len(ds.CacheDir.String()) == 0 {
+        ds.CacheDir, _ = path.New(".").ToDir()
+    }
+}
+
+type SentinelSelect struct {
+    Output
+    DataFiles []path.ValidFile  `json:"data_files"`
+    Start     date.ShortTime    `json:"start"`
+    Stop      date.ShortTime    `json:"stop"`
+    Region    geometry.Region   `json:"region"`
+    AOI       common.AOI        `json:"aoi"`
+    CheckZips bool              `json:"check_zips"`
+    Pol       common.Pol        `json:"polarization"`
+}
+
+func (ds *DataSelect) SelectFiles(_ http.Request, ss *SentinelSelect, _ *Empty) (err error) {
+    dataFiles := ss.DataFiles
+
+    if len(dataFiles) == 0 {
+        return fmt.Errorf("At least one datafile must be specified!")
+    }
+    
+    checker := date.NewCheckers()
+
+    if d := ss.Start; d.IsSet() {
+        checker.Append(date.Min.New(d.Time))
+    }
+    if d := ss.Stop; d.IsSet() {
+        checker.Append(date.Max.New(d.Time))
+    }
+    
+    // TODO: implement checkZip
+    //if dsect.CheckZips {
+    //    checker = func(s1zip S1Zip) bool {
+    //        return checker(s1zip) && s1zip.checkZip()
+    //    }
+    //    check = true
+    //
+    //}
+    
+    // nzip := len(zipfiles)
+    
+    
+    writer := ss.Out
+    defer writer.Close()
+    
+    for _, zip := range dataFiles {
+        s1zip, IWs, err := parseS1(zip, ds.CacheDir)
+        
+        if err != nil {
+            return err
+        }
+        
+        if IWs.Contains(ss.AOI) && checker.In(s1zip.Date()) {
+            _, err := fmt.Fprintf(writer, "%s\n", s1zip.Path)
+            if err != nil {
+                return err
+            }
+        }
+    }
+    
+    return
+}
+
+func parseS1(zip path.ValidFile, dst path.Dir) (S1 *s1.Zip, IWs s1.IWInfos, err error) {
     if S1, err = s1.NewZip(zip); err != nil {
         return
     }
+    
     log.Printf("Parsing IW Information for S1 zipfile '%s'", S1.Path)
     
     if IWs, err = S1.Info(dst); err != nil {
@@ -34,19 +104,19 @@ func loadS1(reader io.Reader, pol string) (S1 s1.Zips, err error) {
     file := bufio.NewScanner(reader)
     
     for file.Scan() {
-        p, Err := path.New(file.Text()).ToValid()
+        if err = file.Err(); err != nil {
+            return
+        }
+
+        vf, Err := path.New(file.Text()).ToValidFile()
         if Err != nil {
             err = Err
             return
         }
         
-        if err = file.Err(); err != nil {
-            return
-        }
-        
-        
-        var s1zip *s1.Zip
-        if s1zip, err = s1.NewZip(p); err != nil {
+        s1zip, Err := s1.NewZip(vf)
+        if Err != nil {
+            err = Err
             return
         }
         
@@ -360,17 +430,11 @@ func stepCoreg(self *Config) (err error) {
 }
 */
 
-func toZiplist(name string, one, two *s1.Zip) (err error) {
-
-    return file.Wrap()
-}
-
 func Search(s1 *s1.Zip, zips s1.Zips) *s1.Zip {
-    
-    date1 := date2str(s1, DShort)
+    date1 := date.Short.Format(s1)
     
     for _, zip := range zips {
-        if date1 == date2str(zip, DShort)  && s1.Path != zip.Path {
+        if date1 == date.Short.Format(zip)  && s1.Path != zip.Path {
             return zip
         }
     }

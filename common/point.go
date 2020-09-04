@@ -2,7 +2,7 @@ package common
 
 import (
     "github.com/bozso/gotoolbox/errors"
-    "github.com/bozso/gotoolbox/geometry"
+    "github.com/bozso/emath/geometry"
 
     "github.com/bozso/gomma/utils/params"
 )
