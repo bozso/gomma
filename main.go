@@ -14,11 +14,11 @@ func (_ Main) Run() (err error) {
     c := cli.New("gamma",
         "Wrapper program for the GAMMA SAR processing software.")
     
-    c.Add(&gcli.RPC{})
+    c.AddAction("rpc", "starts JSON RPC service", &gcli.JsonRPC{})
     
     //c.SetupGammaCli(cli)
 
-    return c.Run(os.Args[1:])
+    return c.Run()
 }
 
 func main() {

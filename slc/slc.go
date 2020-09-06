@@ -119,9 +119,11 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli mli.MLI, opt SSIOpt) (ret SSIOut,
     }
     
     cflg := 1
-    if opt.Keep { cflg = 0 }
+    if opt.Keep {
+        cflg = 0
+    }
     
-    mID, sID := date.Short.Format(ref), date.Short.Format(slave)
+    mID, sID := date.Short.Format(ref.Time), date.Short.Format(slave.Time)
     
     ID := fmt.Sprintf("%s_%s", mID, sID)
     

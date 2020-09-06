@@ -2,9 +2,6 @@ package service
 
 import (
     "fmt"
-    "log"
-    "io"
-    "bufio"
     "net/http"
     
     "github.com/bozso/gotoolbox/path"
@@ -16,13 +13,13 @@ import (
     s1 "github.com/bozso/gomma/sentinel1"
 )
 
-type DataSelect struct {
+type Sentinel1 struct {
     CacheDir path.Dir
 }
 
-func (ds *DataSelect) Default() {
-    if len(ds.CacheDir.String()) == 0 {
-        ds.CacheDir, _ = path.New(".").ToDir()
+func (s *Sentinel1) Default() {
+    if len(s.CacheDir.String()) == 0 {
+        s.CacheDir, _ = path.New(".").ToDir()
     }
 }
 
@@ -37,7 +34,7 @@ type SentinelSelect struct {
     Pol       common.Pol        `json:"polarization"`
 }
 
-func (ds *DataSelect) SelectFiles(_ http.Request, ss *SentinelSelect, _ *Empty) (err error) {
+func (s *Sentinel1) SelectFiles(_ http.Request, ss *SentinelSelect, _ *Empty) (err error) {
     dataFiles := ss.DataFiles
 
     if len(dataFiles) == 0 {
@@ -69,7 +66,7 @@ func (ds *DataSelect) SelectFiles(_ http.Request, ss *SentinelSelect, _ *Empty) 
     defer writer.Close()
     
     for _, zip := range dataFiles {
-        s1zip, IWs, err := parseS1(zip, ds.CacheDir)
+        s1zip, IWs, err := parseS1(zip, s.CacheDir)
         
         if err != nil {
             return err
@@ -86,47 +83,6 @@ func (ds *DataSelect) SelectFiles(_ http.Request, ss *SentinelSelect, _ *Empty) 
     return
 }
 
-func parseS1(zip path.ValidFile, dst path.Dir) (S1 *s1.Zip, IWs s1.IWInfos, err error) {
-    if S1, err = s1.NewZip(zip); err != nil {
-        return
-    }
-    
-    log.Printf("Parsing IW Information for S1 zipfile '%s'", S1.Path)
-    
-    if IWs, err = S1.Info(dst); err != nil {
-        return
-    }
-    
-    return
-}
-
-func loadS1(reader io.Reader, pol string) (S1 s1.Zips, err error) {
-    file := bufio.NewScanner(reader)
-    
-    for file.Scan() {
-        if err = file.Err(); err != nil {
-            return
-        }
-
-        vf, Err := path.New(file.Text()).ToValidFile()
-        if Err != nil {
-            err = Err
-            return
-        }
-        
-        s1zip, Err := s1.NewZip(vf)
-        if Err != nil {
-            err = Err
-            return
-        }
-        
-        S1 = append(S1, s1zip)
-    }
-    
-    return
-}
-
-
 //func (s *selector) extOpt(satellite string) *ExtractOpt {
     //return &ExtractOpt{pol: s.Pol, 
         //root: filepath.Join(s.CachePath, satellite)}
@@ -138,150 +94,6 @@ type dataImporter struct {
     GeneralOpt
     IWs        [3]IMinmax `cli:"iws" usage:"IW burst indices"`
     
-}
-
-var DataImport = &cli.Command{
-    Name: "import",
-    Desc: "Import SAR datafiles",
-    Argv: func() interface{} { return &dataImporter{} },
-    Fn: dataImport,
-}
-
-var s1Import = Gamma.Must("S1_import_SLC_from_zipfiles")
-
-func dataImport(ctx *cli.Context) (err error) {
-    const (
-        tpl = "iw%d_number_of_bursts: %d\niw%d_first_burst: %f\niw%d_last_burst: %f\n"
-        burst_table = "burst_number_table"
-        ziplist = "ziplist"
-    )
-    
-    imp := ctx.Argv().(*dataImporter)
-        
-    defer imp.InFile.Close()
-    var zips S1Zips
-    if zips, err = loadS1(imp.InFile, imp.Pol); err != nil {
-        return Handle(err, "failed to load zipfiles")
-    }
-    
-    var master *S1Zip
-    
-    //sort.Sort(ByDate(zips))
-    
-    masterDate := imp.MasterDate
-    
-    for _, s1zip := range zips {
-        if date2str(s1zip, DShort) == masterDate {
-            master = s1zip
-        }
-    }
-    
-    
-    var masterIW IWInfos
-    if masterIW, err = master.Info(imp.CachePath); err != nil {
-        return Handle(err, "failed to parse S1Zip data from master '%s'",
-            master.Path)
-    }
-    
-    fburst := NewWriterFile(burst_table);
-    if err = fburst.Wrap(); err != nil {
-        return
-    }
-    defer fburst.Close()
-    
-    fburst.WriteFmt("zipfile: %s\n", master.Path)
-    
-    nIWs := 0
-    
-    for ii, iw := range imp.IWs {
-        min, max := iw.Min, iw.Max
-        
-        if min == 0 && max == 0 {
-            continue
-        }
-        
-        nburst := max - min
-        
-        if nburst < 0 {
-            return Handle(nil, "number of burst for IW%d is negative, did " +
-                "you mix up first and last burst numbers?", ii + 1)
-        }
-        
-        IW := masterIW[ii]
-        first := IW.bursts[min - 1]
-        last := IW.bursts[max - 1]
-        
-        line := fmt.Sprintf(tpl, ii + 1, nburst, ii + 1, first, ii + 1, last)
-        
-        fburst.WriteString(line)
-        nIWs++
-    }
-    
-    if err = fburst.Wrap(); err != nil {
-        return
-    }
-    
-    // defer os.Remove(ziplist)
-    
-    slcDir := filepath.Join(imp.OutputDir, "SLC")
-
-    if err = os.MkdirAll(slcDir, os.ModePerm); err != nil {
-        return DirCreateErr.Wrap(err, slcDir)
-    }
-    
-    pol, writer := imp.Pol, bufio.NewWriter(&imp.OutFile)
-    defer imp.OutFile.Close()
-    
-    for _, s1zip := range zips {
-        // iw, err := s1zip.Info(extInfo)
-        
-        date := date2str(s1zip, DShort)
-        
-        other := Search(s1zip, zips)
-        
-        err = toZiplist(ziplist, s1zip, other)
-        
-        if err != nil {
-            return Handle(err, "could not write zipfiles to zipfile list file '%s'",
-                ziplist)
-        }
-        
-        if err != nil {
-            return Handle(err, "failed to import zipfile '%s'", s1zip.Path)
-        }
-        
-        base := fmt.Sprintf("%s.%s", date, pol)
-        
-        slc := S1SLC{
-            Tab: base + ".SLC_tab",
-            nIW: nIWs,
-        }
-        
-        for ii := 0; ii < nIWs; ii++ {
-            dat := fmt.Sprintf("%s.slc.iw%d", base, ii + 1)
-            
-            slc.IWs[ii].Dat = dat
-            slc.IWs[ii].Params = NewGammaParam(dat + ".par")
-            slc.IWs[ii].TOPS_par = NewGammaParam(dat + ".TOPS_par")
-        }
-        
-        if slc, err = slc.Move(slcDir); err != nil {
-            return
-        }
-        
-        if _, err = writer.WriteString(slc.Tab); err != nil {
-            return
-        }
-    }
-    
-    // TODO: save master idx?
-    //err = SaveJson(path, meta)
-    //
-    //if err != nil {
-    //    return Handle(err, "failed to write metadata to '%s'", path)
-    //}
-    
-    return nil
 }
 
 /*
@@ -431,10 +243,10 @@ func stepCoreg(self *Config) (err error) {
 */
 
 func Search(s1 *s1.Zip, zips s1.Zips) *s1.Zip {
-    date1 := date.Short.Format(s1)
+    date1 := date.Short.Format(s1.Date())
     
     for _, zip := range zips {
-        if date1 == date.Short.Format(zip)  && s1.Path != zip.Path {
+        if date1 == date.Short.Format(zip.Date())  && s1.Path != zip.Path {
             return zip
         }
     }

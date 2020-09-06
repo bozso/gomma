@@ -197,7 +197,7 @@ var derampSlave = common.Must("S1_deramp_TOPS_slave")
 func (s1 SLC) DerampSlave(ref *SLC, looks common.RngAzi, keep bool) (ret SLC, err error) {
     looks.Default()
     
-    reftab, tab, id := ref.Tab, s1.Tab, date.Short.Format(s1)
+    reftab, tab, id := ref.Tab, s1.Tab, date.Short.Format(s1.Time)
     
     clean := 1
     

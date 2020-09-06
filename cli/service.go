@@ -2,13 +2,12 @@ package cli
 
 import (
     "github.com/bozso/gotoolbox/cli"
-    "github.com/bozso/gotoolbox/services"
 
     "github.com/bozso/gomma/service"
 )
 
 type JsonRPC struct {
-    jsonRpc services.JsonRPC
+    jsonRpc cli.JsonRPC
 }
 
 func (j *JsonRPC) SetCli(c *cli.Cli) {

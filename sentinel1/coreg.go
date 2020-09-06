@@ -130,8 +130,8 @@ func (c *CoregOpt) Coreg(Slc, ref *SLC) (co CoregOut, err error) {
     
     m := c.Master.SLC
     
-    slc1Tab, slc1ID := m.Tab, date.Short.Format(m)
-    slc2Tab, slc2ID := Slc.Tab, date.Short.Format(Slc)
+    slc1Tab, slc1ID := m.Tab, date.Short.Format(m.Time)
+    slc2Tab, slc2ID := Slc.Tab, date.Short.Format(Slc.Time)
     
     // TODO: parse opt.hgt
     hgt := c.Master.Height
@@ -153,7 +153,7 @@ func (c *CoregOpt) Coreg(Slc, ref *SLC) (co CoregOut, err error) {
     if ref == nil {
         log.Printf("Coregistering: '%s'.", slc2Tab)
     } else {
-        rslcRefTab, rslcRefID := ref.Tab, date.Short.Format(ref)
+        rslcRefTab, rslcRefID := ref.Tab, date.Short.Format(ref.Time)
         
         log.Printf(" Reference: '%s'.\n", rslcRefTab)
         

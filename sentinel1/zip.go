@@ -17,7 +17,7 @@ var dirPaths = [4]string{"slc", "rslc", "mli", "rmli"}
 
 type (
     Zip struct {
-        Path path.ValidFile
+        Path          path.ValidFile
         Safe          path.File
         pol           common.Pol
         Templates     templates
@@ -156,5 +156,5 @@ func (d ByDate) Len() int      { return len(d) }
 func (d ByDate) Swap(i, j int) { d[i], d[j] = d[j], d[i] }
 
 func (d ByDate) Less(i, j int) bool {
-    return date.Before(d[i], d[j])
+    return d[i].Date().Before(d[j].Date())
 }

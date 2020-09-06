@@ -61,11 +61,11 @@ func (df ParseFmt) Parse(str string) (t time.Time, err error) {
     return
 }
 
-func (df ParseFmt) Format(d Dater) (s string) {
-    return d.Date().Format(string(df))
+func (df ParseFmt) Format(t time.Time) (s string) {
+    return t.Format(string(df))
 }
 
-func (df ParseFmt) ID(one, two Dater) string {
+func (df ParseFmt) ID(one, two time.Time) string {
     return fmt.Sprintf("%s_%s", df.Format(one), df.Format(two))
 }
 
