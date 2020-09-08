@@ -3,6 +3,8 @@ package service
 import (
     "sync"
     
+    "github.com/bozso/gotoolbox/path"
+    
     "github.com/bozso/gomma/command"
     "github.com/bozso/gomma/settings"
 )
@@ -17,11 +19,19 @@ type Directory struct {
     Dir path.Dir `json:"directory"`
 }
 
-//func (s *Settings) SetGammaDirectory()
+func (s *Settings) Setup(s settings.Setup) (err error) {
+    s.settings, err = s.New()
+    if err != nil {
+        return 
+    }
+    
+    s.commands, err = s.settings.MakeCommands()
+    return
+}
 
 func (s *Settings) Get(name string) (c command.Command, err error) {
     s.mutex.RLock()
-    c, err s.commands.Get(name)
+    c, err = s.commands.Get(name)
     s.mutex.RUnlock()
     return
 }
