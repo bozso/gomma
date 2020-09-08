@@ -3,18 +3,41 @@ package sentinel1
 import (
     "io"
     "fmt"
-    "bytes"
+    //"bytes"
     
     "github.com/bozso/gotoolbox/path"
 
+    "github.com/bozso/gomma/data"
     "github.com/bozso/gomma/common"
+    "github.com/bozso/gomma/settings"
 )
 
 type SwathFlag int
 
 const (
-    AsListed SwathFlag = 0
+    AsListed SwathFlag = iota
+    One
+    Two
+    Three
+    OneTwo
+    TwoThree
 )
+
+func (sf SwathFlag) String() (s string) {
+    switch sf {
+    case AsListed:
+        s = "0"
+    case One, Two, Three:
+        s = fmt.Sprintf("%d", sf)
+    case OneTwo:
+        s = "4"
+    case TwoThree:
+        s = "5"
+    default:
+        s = "-"
+    }
+    return
+}
 
 type Noise int
 
@@ -23,36 +46,82 @@ const (
     NoCorrection
 )
 
+func (n Noise) String() (s string) {
+    switch n {
+    case ApplyCorrection:
+        s = "1"
+    case NoCorrection:
+        s = "2"
+    default:
+        s = "-"
+    }
+    return
+}
+
 type ImportOptions struct {
-    OPODDirectory path.Dir
-    burstTable path.ValidFile
+    OPODDirectory string
+    burstTable string
+    dtype data.Type
     SwathFlag
     Noise
     pol common.Pol
 }
 
-func (iop ImportOptions) ToArgs() (s string) {
-    const template = "%s 0 0 \".\" 1 1"
-    // TODO: actually implement
-    // 0 = FCOMPLEX, 0 = swath_flag - as listed in burst_number_table_ref
-    // "." = OPOD dir, 1 = intermediate files are deleted
-    // 1 = apply noise correction
-    return fmt.Sprintf(template, iop.pol)
+var defaultImporter = ImportOptions{
+    OPODDirectory: ".",
+    burstTable: "",
+    SwathFlag: AsListed,
+    Noise: ApplyCorrection,
+    pol: common.AllPolarisation,
 }
 
-type Importer struct {
-    buf bytes.Buffer
-    opArgs string
-    burstTable path.ValidFile
-    ZiplistFile path.File
+func DefaultImporter() (io ImportOptions) {
+    return defaultImporter
 }
 
-func (iop ImportOptions) New(burstTable path.ValidFile) (im Importer) {
-    im.burstTable, im.opArgs = burstTable, iop.ToArgs()
+func (io ImportOptions) ToArgs() (s string, err error) {
+    var dt string
+    
+    switch d := io.dtype; d {
+    case data.FloatCpx:
+        dt = "0"
+    case data.ShortCpx:
+        dt = "1"
+    default:
+        err = d.WrongType("Sentinel1 import")
+        return
+    }
+    
+    burstTable, err := path.New(io.burstTable).ToValidFile()
+    if err != nil {
+        return
+    }
+    
+    opod, err := path.New(io.OPODDirectory).ToDir()
+    if err != nil {
+        return
+    }
+    
+    s = fmt.Sprintf("%s %s %d %s", io.pol, dt, io.SwathFlag,
+        opod, io.Cleaning, io.Noise)
     return
 }
 
-var s1Import = common.Must("S1_import_SLC_from_zipfiles")
+func (io ImportOptions) New(c settings.Commands) (im Importer, err error) {
+    im.command, err = c.Get("S1_import_SLC_from_zipfiles")
+    if err != nil {
+        return
+    }
+    
+    im.opArgs, err = io.ToArgs()
+    return
+}
+
+type Importer struct {
+    command settings.Command
+    opArgs string
+    burstTable path.ValidFile
+}
 
 func (im Importer) Import(one, two *Zip) (err error) {
     err = im.WriteZiplist(one, two)
@@ -60,8 +129,7 @@ func (im Importer) Import(one, two *Zip) (err error) {
         return
     } 
     
-    _, err = s1Import.Call(im.ZiplistFile, im.burstTable,
-        im.opArgs)
+    _, err = im.command.Call(im.ZiplistFile, im.opArgs)
     return
 }
 

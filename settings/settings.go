@@ -5,8 +5,6 @@ import (
     
     "github.com/bozso/gotoolbox/path"
     "github.com/bozso/gotoolbox/enum"
-
-    "github.com/bozso/gomma/command"
 )
 
 var (
@@ -77,11 +75,11 @@ func (s *Settings) Default() (err error) {
     return s.SetCachePath(".")
 }
 
-var exeDirectories = [2]string{"bin", "scripts"}
+var exeDirectories = [2]string{"bin", "scriptks"}
 
-func (s Settings) MakeCommands() (c command.Commands, err error) {
+func (s Settings) MakeCommands() (c Commands, err error) {
     gammaDir := s.GammaDirectory
-    c = make(command.Commands)
+    c = make(Commands)
 
     for _, module := range s.Modules {
         for _, dir := range exeDirectories {
@@ -92,7 +90,7 @@ func (s Settings) MakeCommands() (c command.Commands, err error) {
             }
 
             for _, exePath := range glob {
-                c[exePath.Base().String()] = command.New(exePath.String())
+                c[exePath.Base().String()] = NewCommand(exePath.String())
             }
         }
     }

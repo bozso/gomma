@@ -19,7 +19,8 @@ const (
     UChar
     Short
     Unknown
-    Any)
+    Any
+)
 
 func (d *Type) SetCli(c *cli.Cli) {
     c.Var(d, "dtype", "Datatype of datafile.")
@@ -103,6 +104,10 @@ func (e UnknownTypeError) Error() string {
 
 func (e UnknownTypeError) Unwrap() error {
     return e.Err
+}
+
+func (t Type) WrongType(purpose string) error {
+    return WrongTypeError{t, purpose, nil}
 }
 
 func WrongType(dtype Type, kind string) error {

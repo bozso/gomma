@@ -2,7 +2,6 @@ package service
 
 import (
     "fmt"
-    "net/http"
     
     "github.com/bozso/gotoolbox/path"
 
@@ -12,16 +11,6 @@ import (
     "github.com/bozso/gomma/common"
     s1 "github.com/bozso/gomma/sentinel1"
 )
-
-type Sentinel1 struct {
-    CacheDir path.Dir
-}
-
-func (s *Sentinel1) Default() {
-    if len(s.CacheDir.String()) == 0 {
-        s.CacheDir, _ = path.New(".").ToDir()
-    }
-}
 
 type SentinelSelect struct {
     Output
@@ -34,7 +23,7 @@ type SentinelSelect struct {
     Pol       common.Pol        `json:"polarization"`
 }
 
-func (s *Sentinel1) SelectFiles(_ http.Request, ss *SentinelSelect, _ *Empty) (err error) {
+func (s *S1Implement) SelectFiles(ss *SentinelSelect) (err error) {
     dataFiles := ss.DataFiles
 
     if len(dataFiles) == 0 {

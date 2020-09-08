@@ -13,6 +13,7 @@ const (
     VH
     HV
     HH
+    AllPolarisation
 )
 
 func (p *Pol) Set(s string) (err error) {
@@ -29,6 +30,8 @@ func (p *Pol) Set(s string) (err error) {
         *p = HV
     case "hh":
         *p = HH
+    case "all":
+        *p = AllPolarisation
     default:
         err = mode.Error(s)
     }
@@ -45,6 +48,8 @@ func (p Pol) String() (s string) {
         s = "hv"
     case HH:
         s = "hh"
+    case AllPolarisation:
+        s = "-"
     }
     return
 }

@@ -5,22 +5,21 @@ import (
     
     "github.com/bozso/gotoolbox/path"
     
-    "github.com/bozso/gomma/command"
     "github.com/bozso/gomma/settings"
 )
 
 type Settings struct {
     mutex    sync.RWMutex
     settings settings.Settings
-    commands command.Commands
+    commands settings.Commands
 }
 
 type Directory struct {
     Dir path.Dir `json:"directory"`
 }
 
-func (s *Settings) Setup(s settings.Setup) (err error) {
-    s.settings, err = s.New()
+func (s *Settings) SetupGamma(ss settings.Setup) (err error) {
+    s.settings, err = ss.New()
     if err != nil {
         return 
     }
@@ -29,7 +28,7 @@ func (s *Settings) Setup(s settings.Setup) (err error) {
     return
 }
 
-func (s *Settings) Get(name string) (c command.Command, err error) {
+func (s *Settings) Get(name string) (c settings.Command, err error) {
     s.mutex.RLock()
     c, err = s.commands.Get(name)
     s.mutex.RUnlock()

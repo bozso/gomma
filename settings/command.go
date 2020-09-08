@@ -1,4 +1,4 @@
-package command
+package settings
 
 import (
     "fmt"
@@ -12,7 +12,7 @@ type Command struct {
     command.Command
 }
 
-func New(name string) (c Command) {
+func NewCommand(name string) (c Command) {
     c.Command = command.New(name)
     return
 }

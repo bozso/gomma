@@ -3,9 +3,8 @@ package service
 import (
     "fmt"
     "bufio"
-    "net/http"
     
-    //"github.com/bozso/gotoolbox/path"
+    "github.com/bozso/gotoolbox/path"
 
     //"github.com/bozso/emath/geometry"
     
@@ -23,24 +22,24 @@ type SentinelImport struct {
 
 var s1Import = common.Must("S1_import_SLC_from_zipfiles")
 
-func (s *Sentinel1) DataImport(_ http.Request, ss *SentinelImport, _ *Empty) (err error) {
+func (s *S1Implement) DataImport(si *SentinelImport) (err error) {
     const (
-        tpl = "iw%d_number_of_bursts: %d\niw%d_first_burst: %f\niw%d_last_burst: %f\n"
         burst_table = "burst_number_table"
         ziplist = "ziplist"
     )
     
-    defer ss.In.Close()
-    zips, err := loadS1(ss.In)
+    defer si.In.Close()
+    
+    zips, err := loadS1(si.In)
     if err != nil {
         return
     }
     
-    if !ss.MasterDate.IsSet() {
+    if !si.MasterDate.IsSet() {
         return fmt.Errorf("master date is not set")
     }
     
-    masterDate := date.Short.Format(ss.MasterDate.Time)
+    masterDate := date.Short.Format(si.MasterDate.Time)
     var master *s1.Zip
     for _, s1zip := range zips {
         if date.Short.Format(s1zip.Date()) == masterDate {
@@ -52,23 +51,25 @@ func (s *Sentinel1) DataImport(_ http.Request, ss *SentinelImport, _ *Empty) (er
         return fmt.Errorf("could not find master file, Sentinel 1 zipfile with date '%s' not found", masterDate)
     }
     
-    var masterIW IWInfos
-    if masterIW, err = master.Info(imp.CachePath); err != nil {
-        return Handle(err, "failed to parse S1Zip data from master '%s'",
-            master.Path)
+    masterIW, err := master.Info(s.CachePath)
+    if err != nil {
+        return
     }
     
-    fburst := NewWriterFile(burst_table);
-    if err = fburst.Wrap(); err != nil {
+    fburst, err := path.New(burst_table).Create()
+    if err != nil {
         return
     }
     defer fburst.Close()
     
-    fburst.WriteFmt("zipfile: %s\n", master.Path)
+    _, err = fmt.Fprintf(fburst, "zipfile: %s\n", master.Path)
+    if err != nil {
+        return
+    }
     
     nIWs := 0
     
-    for ii, iw := range imp.IWs {
+    for ii, iw := range si.IWs {
         min, max := iw.Min, iw.Max
         
         if min == 0 && max == 0 {
@@ -78,66 +79,62 @@ func (s *Sentinel1) DataImport(_ http.Request, ss *SentinelImport, _ *Empty) (er
         nburst := max - min
         
         if nburst < 0 {
-            return Handle(nil, "number of burst for IW%d is negative, did " +
-                "you mix up first and last burst numbers?", ii + 1)
+            return fmt.Errorf(
+                "number of burst for IW%d is negative, did you mix up first and last burst numbers?", ii + 1)
         }
         
         IW := masterIW[ii]
         first := IW.bursts[min - 1]
         last := IW.bursts[max - 1]
         
-        line := fmt.Sprintf(tpl, ii + 1, nburst, ii + 1, first, ii + 1, last)
+        const tpl = "iw%d_number_of_bursts: %d\niw%d_first_burst: %f\niw%d_last_burst: %f\n"
+        _, err = fmt.Fprintf(fburst, tpl, ii + 1, nburst, ii + 1, first, ii + 1, last)
         
-        fburst.WriteString(line)
+        if err != nil {
+            return
+        }
+        
         nIWs++
-    }
-    
-    if err = fburst.Wrap(); err != nil {
-        return
     }
     
     // defer os.Remove(ziplist)
     
-    slcDir := filepath.Join(imp.OutputDir, "SLC")
-
-    if err = os.MkdirAll(slcDir, os.ModePerm); err != nil {
-        return DirCreateErr.Wrap(err, slcDir)
+    slcDir, err := s.OutputDir.Join("SLC").Mkdir()
+    if err != nil {
+        return
     }
     
-    pol, writer := imp.Pol, bufio.NewWriter(&imp.OutFile)
-    defer imp.OutFile.Close()
+    pol, writer := si.Pol, bufio.NewWriter(&si.Out)
+    defer si.Out.Close()
     
     for _, s1zip := range zips {
         // iw, err := s1zip.Info(extInfo)
-        
-        date := date2str(s1zip, DShort)
-        
+        date := date.Short.Format(s1zip.Date())
         other := Search(s1zip, zips)
         
         err = toZiplist(ziplist, s1zip, other)
         
         if err != nil {
-            return Handle(err, "could not write zipfiles to zipfile list file '%s'",
-                ziplist)
+            return fmt.Errorf(
+                "could not write zipfiles to zipfile list file '%s'\n%w",
+                ziplist, err)
         }
         
+        tab, err := path.New(fmt.Sprintf("%s.%s.SLC_TAB", date, pol)).
+                         ToValidFile()
         if err != nil {
-            return Handle(err, "failed to import zipfile '%s'", s1zip.Path)
+            return
         }
         
-        base := fmt.Sprintf("%s.%s", date, pol)
-        
-        slc := S1SLC{
-            Tab: base + ".SLC_tab",
-            nIW: nIWs,
-        }
+        slc := s1.FromTabfile()
         
         for ii := 0; ii < nIWs; ii++ {
             dat := fmt.Sprintf("%s.slc.iw%d", base, ii + 1)
             
-            slc.IWs[ii].Dat = dat
-            slc.IWs[ii].Params = NewGammaParam(dat + ".par")
-            slc.IWs[ii].TOPS_par = NewGammaParam(dat + ".TOPS_par")
+            slc.IWs[ii], err = s1.NewIW(dat).Load()
+            if err != nil {
+                return
+            }
         }
         
         if slc, err = slc.Move(slcDir); err != nil {
