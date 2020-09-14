@@ -80,7 +80,7 @@ func DefaultImporter() (io ImportOptions) {
 }
 
 func (io ImportOptions) ToArgs() (s string, err error) {
-    var dt string
+    var buf strings.Buffer
     
     switch d := io.dtype; d {
     case data.FloatCpx:
@@ -140,17 +140,17 @@ func (im Importer) WriteZiplist(one, two *Zip) (err error) {
     }
     defer zipList.Close()
     
-    err = im.WriteZiplistTo(zipList, one, two)
+    err = im.FormatZiplist(zipList, one, two)
     return 
 }
 
-func (im Importer) WriteZiplistTo(w io.Writer, one, two *Zip) (err error) {
+func (im Importer) FormatZiplist(w io.Writer, one, two *Zip) (err error) {
     if two == nil {
         _, err = fmt.Fprintf(w, "%s\n", one.Path.String())
     } else {
-        after := two.Date().After(one.Date())
-        
         first, second := one, two
+
+        after := two.Date().After(one.Date())
         
         if !after {
             first, second = second, first
