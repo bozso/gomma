@@ -60,8 +60,6 @@ func calcFactor(ndata, factor int) int {
     }
 }
 
-
-
 var (
     rasByte = common.Must("rasbyte")
     rasCC = common.Must("rascc")
@@ -75,4 +73,21 @@ var (
     rasShd = common.Must("rasshd")
     rasSLC = common.Must("rasSLC")
     rasLinear = common.Must("ras_linear")
+)
+
+type Mode int
+
+const (
+    Byte Mode = iota
+    CC
+    Decibel
+    Deform
+    Height
+    Linear
+    MagPhase
+    MagPhasePwr
+    Power
+    SingleLook
+    Unwrapped
+    Undefined
 )

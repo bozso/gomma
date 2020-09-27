@@ -6,9 +6,7 @@ import (
     "log"
     "math"
     "encoding/json"
-    "path/filepath"
     
-    "github.com/bozso/gotoolbox/command"
     "github.com/bozso/gotoolbox/errors"
     "github.com/bozso/gotoolbox/path"
 )
@@ -17,7 +15,6 @@ const DefaultCachePath = "/mnt/bozso_i/cache"
 
 type (
     Slice []string
-    Commands map[string]Command
 
     settings struct {
         RasExt    string
@@ -37,7 +34,6 @@ var (
     
     // TODO: get settings path from environment variable
     Settings = loadSettings(confpath)
-    commands = makeCommands()
 )
 
 func Check(err error) {
@@ -62,14 +58,6 @@ func getConfigPath() (f path.ValidFile) {
     return
 }
 
-func Must(name string) (c Command) {
-    return commands.Must(name)
-}
-
-func Select(name1, name2 string) (c Command) {
-    return commands.Select(name1, name2)
-}
-
 func loadSettings(file path.ValidFile) (ret settings) {
     if err := LoadJson(file, &ret); err != nil {
         log.Fatalf("Failed to load Gamma settings from '%s'\nError:'%s'\n!",
@@ -79,75 +67,6 @@ func loadSettings(file path.ValidFile) (ret settings) {
     return
 }
 
-type Command struct {
-    command.Command
-}
-
-func (c Command) Call(args ...interface{}) (s string, err error) {
-    arg := make([]string, len(args))
-
-    for ii, elem := range args {
-        if elem == nil {
-            arg[ii] = "-"
-        } else {
-            arg[ii] = fmt.Sprint(elem)
-        }
-    }
-
-    return c.Command.CallWithArgs(arg...)
-}
-
-func makeCommands() Commands {
-    Path := Settings.Path
-    result := make(Commands)
-
-    for _, module := range Settings.Modules {
-        for _, dir := range [2]string{"bin", "scripts"} {
-
-            _path := filepath.Join(Path, module, dir, "*")
-            glob, err := filepath.Glob(_path)
-
-            if err != nil {
-                log.Fatal(err, "Glob '%s' failed! %s", _path, err)
-            }
-
-            for _, path := range glob {
-                result[filepath.Base(path)] = Command{
-                        Command:command.New(path),
-                    }
-            }
-        }
-    }
-
-    return result
-}
-
-func (cs Commands) Select(name1, name2 string) (c Command) {
-    c, ok := cs[name1]
-    
-    if ok {
-        return
-    }
-    
-    c, ok = cs[name2]
-    
-    if !ok {
-        log.Fatalf("either '%s' or '%s' must be an available executable",
-            name1, name2)
-    }
-    
-    return
-}
-
-func (cs Commands) Must(name string) (c Command) {
-    c, ok := cs[name]
-    
-    if !ok {
-        log.Fatalf("failed to find Gamma executable '%s'", name)
-    }
-    
-    return
-}
 
 func isClose(num1, num2 float64) bool {
     return math.RoundToEven(math.Abs(num1 - num2)) > 0.0
@@ -239,4 +158,8 @@ func (e FileParseError) Error() string {
 
 func (e FileParseError) Unwrap() error {
     return e.err
+}
+
+type Pather interface {
+    Path() path.ValidFile
 }

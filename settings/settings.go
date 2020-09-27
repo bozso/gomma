@@ -5,6 +5,7 @@ import (
     
     "github.com/bozso/gotoolbox/path"
     "github.com/bozso/gotoolbox/enum"
+    "github.com/bozso/gotoolbox/command"
 )
 
 var (
@@ -77,7 +78,7 @@ func (s *Settings) Default() (err error) {
 
 var exeDirectories = [2]string{"bin", "scriptks"}
 
-func (s Settings) MakeCommands() (c Commands, err error) {
+func (s Settings) MakeCommands(builder command.Builder) (c Commands, err error) {
     gammaDir := s.GammaDirectory
     c = make(Commands)
 
@@ -90,7 +91,12 @@ func (s Settings) MakeCommands() (c Commands, err error) {
             }
 
             for _, exePath := range glob {
-                c[exePath.Base().String()] = NewCommand(exePath.String())
+                com, err := builder.New(exePath.String())
+                if err != nil {
+                    return c, err
+                }
+                
+                c[exePath.Base().String()] = com
             }
         }
     }

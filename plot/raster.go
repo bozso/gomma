@@ -15,7 +15,7 @@ type RasArgs struct {
     Raster     string `name:"ras"`
 }
 
-func (opt *RasArgs) Parse(dat data.Data) {
+func (opt *RasArgs) Parse(dat Plottable) {
     opt.DisArgs.Parse(dat)
     
     if opt.AvgFact == 0 {
@@ -35,23 +35,6 @@ func (opt *RasArgs) Parse(dat data.Data) {
             common.Settings.RasExt)
     }    
 }
-
-type PlotMode int
-
-const (
-    Byte PlotMode = iota
-    CC
-    Decibel
-    Deform
-    Height
-    Linear
-    MagPhase
-    MagPhasePwr
-    Power
-    SingleLook
-    Unwrapped
-    Undefined
-)
 
 func Raster(d data.Data, opt RasArgs) (err error) {
     opt.Parse(d)
@@ -151,4 +134,3 @@ func Raster(d data.Data, opt RasArgs) (err error) {
     }
     return err
 }
-

@@ -107,8 +107,8 @@ func (s ShapeMismatchError) Error() string {
         "datafile '%s' (%d != %d)", s.dat1, s.dim, s.dat2, s.n1, s.n2)
 }
 
-func (s ShapeMismatchError) Pathes(one, two Pather) error {
-    s.dat1, s.dat2 = one.DataPath(), two.DataPath()
+func (s ShapeMismatchError) Pathes(one, two common.Pather) error {
+    s.dat1, s.dat2 = one.Path(), two.Path()
     
     return s
 }

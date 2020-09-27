@@ -8,18 +8,9 @@ import (
     "github.com/bozso/gotoolbox/errors"
 )
 
-type Command struct {
-    command.Command
-}
+type Commands map[string]command.Command
 
-func NewCommand(name string) (c Command) {
-    c.Command = command.New(name)
-    return
-}
-
-type Commands map[string]Command
-
-func (cs Commands) Get(name string) (c Command, err error) {
+func (cs Commands) Get(name string) (c command.Command, err error) {
     c, ok := cs[name]
     if !ok {
         err = errors.KeyNotFound(name)
@@ -27,7 +18,7 @@ func (cs Commands) Get(name string) (c Command, err error) {
     return
 }
 
-func (cs Commands) Select(names ...string) (c Command, err error) {
+func (cs Commands) Select(names ...string) (c command.Command, err error) {
     var ok bool
     for _, name := range names {
         c, ok = cs[name]
@@ -43,7 +34,7 @@ func (cs Commands) Select(names ...string) (c Command, err error) {
     return
 }
 
-func (cs Commands) Must(name string) (c Command) {
+func (cs Commands) Must(name string) (c command.Command) {
     c, ok := cs[name]
     
     if !ok {

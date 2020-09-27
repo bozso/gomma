@@ -1,10 +1,11 @@
 package data
 
 import (
+    "strings"
+    
     "github.com/bozso/gotoolbox/path"
-    "github.com/bozso/gotoolbox/errors"
-
-    "github.com/bozso/gomma/common"
+    "github.com/bozso/gotoolbox/enum"
+    "github.com/bozso/gotoolbox/command"
 )
 
 type Complex struct {
@@ -18,63 +19,87 @@ func (c Complex) Validate() (err error) {
 type CpxToReal int
 
 const (
-    Real CpxToReal = iota
-    Imaginary
-    Intensity
-    Magnitude
-    Phase
+    ToReal CpxToReal = iota
+    ToImaginary
+    ToIntensity
+    ToMagnitude
+    ToPhase
 )
 
-func (c CpxToReal) String() string {
-    switch c {
-    case Real:
-        return "Real"
-    case Imaginary:
-        return "Imaginary"
-    case Intensity:
-        return "Intensity"
-    case Magnitude:
-        return "Magnitude"
-    case Phase:
-        return "Phase"
+var cpxToReal = enum.NewStringSet("ToReal", "ToImaginary",
+    "ToIntensity", "ToMagnitude", "ToPhase").EnumType("CpxToReal")
+
+func (c *CpxToReal) Set(str string) (err error) {
+    switch strings.ToLower(str) {
+    case "toreal":
+        *c = ToReal
+    case "toimaginary":
+        *c = ToImaginary
+    case "tointensity":
+        *c = ToIntensity
+    case "tomagnitude":
+        *c = ToMagnitude
+    case "tophase":
+        *c = ToPhase
     default:
-        return "Unknown"
+        err = cpxToReal.UnknownElement(str)
     }
+    return    
 }
 
-var cpxToReal = common.Must("cpx_to_real")
+func (c CpxToReal) String() (s string) {
+    switch c {
+    case ToReal:
+        s = "ToReal"
+    case ToImaginary:
+        s = "ToImaginary"
+    case ToIntensity:
+        s = "ToIntensity"
+    case ToMagnitude:
+        s = "ToMagnitude"
+    case ToPhase:
+        s = "ToPhase"
+    default:
+        s = "Unknown"
+    }
+    return
+}
 
-func (c Complex) ToReal(mode CpxToReal, file path.Path) (d File, err error) {
+func (c Complex) ComplexToReal(cmd command.Command, mode CpxToReal, dst path.Path) (r Real, err error) {
     Mode := 0
     
     switch mode {
-    case Real:
+    case ToReal:
         Mode = 0
-    case Imaginary:
+    case ToImaginary:
         Mode = 1
-    case Intensity:
+    case ToIntensity:
         Mode = 2
-    case Magnitude:
+    case ToMagnitude:
         Mode = 3
-    case Phase:
+    case ToPhase:
         Mode = 4
     default:
-        err = errors.UnrecognizedMode(mode.String(), "Complex.ToReal")
+        err = cpxToReal.UnknownElement(c.String())
         return
     }
     
-    p := New(file)
+    p := New(dst)
     
-    _, err = cpxToReal.Call(c.DatFile, p.DatFile, c.Ra.Rng, Mode)
+    _, err = cmd.Call(c.DatFile, p.DatFile, c.Ra.Rng, Mode)
     if err != nil {
         return
     }
     
-    d, err = c.WithShapeDType(p, Float)
+    r.File, err = c.WithShapeDType(p, Float)
+    return    
+}
+
+func (s *ServiceImpl) ComplexToReal(src, dst path.ValidFile, mode CpxToReal) (r Real, err error) {
     return
 }
 
 type ComplexWithPar struct {
-    Complex   `json:"complex"`
+    Complex
     Parameter `json:"parameter"`
 }

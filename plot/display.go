@@ -5,14 +5,19 @@ import (
     "github.com/bozso/gomma/data"
 )
 
+type Plottable interface {
+    common.Dims
+    common.Pather
+    PlotMode() Mode
+}
+
 type DisArgs struct {
     ScaleExp
     common.RngAzi
     common.Minmax
-    data.Type
     Inverse
     Channel
-    Mode       PlotMode
+    Mode
     zeroFlag   ZeroFlag
     Flip       bool    `name:"flip" default:""`
     Datfile    string  `name:"dat" default:""`
@@ -34,7 +39,7 @@ type DisArgs struct {
     CCMin      float64 `name:"ccMin" default:"0.2"`
 }
 
-func (arg *DisArgs) Parse(dat data.Data) {
+func (arg *DisArgs) Parse(dat Plottable) {
     arg.ScaleExp.Parse()
     
     if arg.Start == 0 {
@@ -42,7 +47,7 @@ func (arg *DisArgs) Parse(dat data.Data) {
     }
     
     if len(arg.Datfile) == 0 {
-        arg.Datfile = dat.DataPath().String()
+        arg.Datfile = dat.Path().String()
     }
     
     if arg.Rng == 0 {
@@ -77,7 +82,6 @@ func (arg *DisArgs) Parse(dat data.Data) {
         arg.StartSec = 1
     }
     
-    
     if arg.Cycle == 0 {
         arg.Cycle = 160.0
     }
@@ -90,12 +94,7 @@ func (arg *DisArgs) Parse(dat data.Data) {
         arg.Orient = 135.0
     }
     
-    // TODO: implement proper deduction of plot mode
-    //if arg.Mode == Undefined {
-        //switch opt.DType {
-            
-        //}
-    //}
+    arg.Mode = dat.PlotMode()
     
     if arg.Inverse == 0 {
         arg.Inverse = Float2Raster 
