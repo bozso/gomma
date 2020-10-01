@@ -3,6 +3,8 @@ package plot
 import (
     "fmt"
     
+    "github.com/bozso/gotoolbox/command"
+
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/data"
 )
@@ -36,19 +38,19 @@ func (opt *RasArgs) Parse(dat Plottable) {
     }    
 }
 
-func Raster(d data.Data, opt RasArgs) (err error) {
-    opt.Parse(d)
+func Raster(cmd command.Command, p Plottable, opt RasArgs) (err error) {
+    opt.Parse(p)
     
     //fmt.Printf("%#v\n", opt)
     //return nil
                 
     switch opt.Mode {
     case Byte:
-        _, err = rasByte.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+        _, err = cmd.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                          opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.LR,
                          opt.Raster)
     case CC:
-        _, err = rasCC.Call(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
+        _, err = cmd.Call(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
                        opt.StartSec, opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
                        opt.Min, opt.Max, opt.Scale, opt.Exp, opt.LR,
                        opt.Raster)
@@ -58,16 +60,16 @@ func Raster(d data.Data, opt RasArgs) (err error) {
                        //opt.Offset, opt.LR, opt.Raster, opt.AbsFlag,
                        //opt.Inverse, opt.Channel)
     case Deform:
-        _, err = rasdtPwr.Call(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
+        _, err = cmd.Call(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
                           opt.StartSec, opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
                           opt.Cycle, opt.Scale, opt.Exp, opt.LR, opt.Raster,
                           opt.CC, opt.StartCC, opt.CCMin)
     case Height:
-        _, err = rasHgt.Call(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
+        _, err = cmd.Call(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
                         opt.StartSec, opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
                         opt.Cycle, opt.Scale, opt.Exp, opt.LR, opt.Raster)
     case Linear:
-        _, err = rasLinear.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+        _, err = cmd.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                            opt.Avg.Rng, opt.Avg.Azi, opt.Min, opt.Max, opt.LR,
                            opt.Raster, opt.Inverse, opt.Channel)
     case MagPhase:
@@ -81,7 +83,7 @@ func Raster(d data.Data, opt RasArgs) (err error) {
         default:
             // Error
         }
-        _, err = rasMph.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+        _, err = cmd.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                         opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
                         opt.LR, opt.Raster, dt)
     case MagPhasePwr:    
@@ -89,7 +91,7 @@ func Raster(d data.Data, opt RasArgs) (err error) {
             // Error
         }
         
-        _, err = rasMphPwr.Call(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
+        _, err = cmd.Call(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
                            opt.StartSec, opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
                            opt.Scale, opt.Exp, opt.LR, opt.Raster,
                            opt.CC, opt.StartCC, opt.CCMin)
@@ -107,7 +109,7 @@ func Raster(d data.Data, opt RasArgs) (err error) {
             // Error
         }
         
-        _, err = rasPwr.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+        _, err = cmd.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                         opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
                         opt.Raster, dt, opt.HeaderSize)
     
@@ -123,11 +125,11 @@ func Raster(d data.Data, opt RasArgs) (err error) {
             // Error
         }
         
-        _, err = rasSLC.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
+        _, err = cmd.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                         opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
                         opt.LR, dt, opt.HeaderSize, opt.Raster)
     case Unwrapped:
-        _, err = rasRmg.Call(opt.Datfile, opt.Sec, opt.Start, opt.StartSec, 
+        _, err = cmd.Call(opt.Datfile, opt.Sec, opt.Start, opt.StartSec, 
                         opt.Nlines, opt.Avg.Rng, opt.Avg.Azi, opt.PhaseScale,
                         opt.Scale, opt.Exp, opt.Offset, opt.LR, opt.Raster,
                         opt.CC, opt.StartCC, opt.CCMin)

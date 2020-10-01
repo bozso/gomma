@@ -1,7 +1,7 @@
 package plot
 
 import (
-    "github.com/bozso/gomma/common"
+    //"github.com/bozso/gomma/common"
 )
 
 type ScaleExp struct {
@@ -47,11 +47,7 @@ const (
 )
 
 func calcFactor(ndata, factor int) int {
-    // log.Printf("ndata: %d factor: %d\n", ndata, factor)
-    
     ret := float64(ndata) / float64(factor)
-    
-    // log.Fatalf("ret: %f\n", ret)
     
     if ret <= 0.0 {
         return 1
@@ -59,35 +55,3 @@ func calcFactor(ndata, factor int) int {
         return int(ret)
     }
 }
-
-var (
-    rasByte = common.Must("rasbyte")
-    rasCC = common.Must("rascc")
-    rasdB = common.Must("ras_dB")
-    rasHgt = common.Must("rashgt")
-    rasdtPwr = common.Must("rasdt_pwr")
-    rasMph = common.Must("rasmph")
-    rasMphPwr = common.Must("rasmph_pwr")
-    rasPwr = common.Must("raspwr")
-    rasRmg = common.Must("rasrmg")
-    rasShd = common.Must("rasshd")
-    rasSLC = common.Must("rasSLC")
-    rasLinear = common.Must("ras_linear")
-)
-
-type Mode int
-
-const (
-    Byte Mode = iota
-    CC
-    Decibel
-    Deform
-    Height
-    Linear
-    MagPhase
-    MagPhasePwr
-    Power
-    SingleLook
-    Unwrapped
-    Undefined
-)
