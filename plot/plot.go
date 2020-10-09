@@ -4,24 +4,8 @@ import (
     //"github.com/bozso/gomma/common"
 )
 
-type ScaleExp struct {
-    Scale float64 `name:"scale" default:"1.0"`
-    Exp   float64 `name:"exp" default:"0.35"`
-}
-
-func (se *ScaleExp) Set(s string) (err error) {
-    // implement!
-    return
-}
-
-func (se *ScaleExp) Parse() {
-    if se.Scale == 0.0 {
-        se.Scale = 1.0
-    }
-    
-    if se.Exp == 0.0 {
-        se.Exp = 0.35
-    }
+type Plottable interface {
+    DataDescription() DataDescription
 }
 
 type ZeroFlag int

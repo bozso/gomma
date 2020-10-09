@@ -1,42 +1,10 @@
 package plot
 
 import (
-    "fmt"
-    
     "github.com/bozso/gotoolbox/command"
 
-    "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/data"
 )
-
-type RasArgs struct {
-    DisArgs
-    AvgFact    int    `name:"afact" default:"1000"`
-    HeaderSize int    `name:"header" default:"0"`
-    Avg        common.RngAzi `name:"avg"`
-    Raster     string `name:"ras"`
-}
-
-func (opt *RasArgs) Parse(dat Plottable) {
-    opt.DisArgs.Parse(dat)
-    
-    if opt.AvgFact == 0 {
-        opt.AvgFact = 1000
-    }
-    
-    if opt.Avg.Rng == 0 {
-        opt.Avg.Rng = calcFactor(opt.Rng, opt.AvgFact)
-    }
-    
-    if opt.Avg.Azi == 0 {
-        opt.Avg.Azi = calcFactor(opt.Azi, opt.AvgFact)
-    }
-    
-    if len(opt.Raster) == 0 {
-        opt.Raster = fmt.Sprintf("%s.%s", opt.Datfile,
-            common.Settings.RasExt)
-    }    
-}
 
 func Raster(cmd command.Command, p Plottable, opt RasArgs) (err error) {
     opt.Parse(p)

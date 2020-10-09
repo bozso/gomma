@@ -12,7 +12,26 @@ var (
     validExtensions = enum.NewStringSet("bmp", "ras", "tif")
     validModules = enum.NewStringSet(
         "DIFF", "DISP", "ISP", "LAT", "IPTA")
+    Extensions = validExtensions.EnumType("RasterExtension")
 )
+
+type RasterExtension string
+
+func (r *RasterExtension) UnmarshalJSON(b []byte) (err error) {
+    *r = RasterExtension(string(b))
+    err = r.Validate()
+    return
+}
+
+func (r *RasterExtension) Validate() (err error) {
+    v := string(*r)
+    
+    if !validExtensions.Contains(v) {
+        err = Extensions.UnknownElement(v)
+    }
+    
+    return
+}
 
 type Setup struct {
     RasterExtension string   `json:"raster_extension"`
