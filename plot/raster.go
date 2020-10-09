@@ -6,7 +6,7 @@ import (
     "github.com/bozso/gomma/data"
 )
 
-func Raster(cmd command.Command, p Plottable, opt RasArgs) (err error) {
+func raster(cmd command.Command, p Plottable, opt Options) (err error) {
     opt.Parse(p)
     
     //fmt.Printf("%#v\n", opt)

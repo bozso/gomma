@@ -37,16 +37,7 @@ func (d *DisplayCommands) CommandSet(cmd settings.Commands) (err error) {
 }
 
 type ServiceImpl struct {
-    displayCommands DisplayCommands
-    rasterCommands RasterCommands
-}
-
-func (s *ServiceImpl) Raster(p Plottable, r RasArgs) (err error) {
-    return Raster(s.rasterCommands[RasterMode(r.Mode)], p, r)
-}
-
-func (s *ServiceImpl) Display(p Plottable, r RasArgs) (err error) {
-    return Display(s.displayCommands[DisplayMode(r.Mode)], p, r)
+    plotters [MaximumMode]Plotter
 }
 
 type Mode int
