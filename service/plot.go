@@ -5,26 +5,21 @@ import (
     "github.com/bozso/gotoolbox/command"
     
     //"github.com/bozso/gomma/settings"
+    "github.com/bozso/gomma/plot"
 )
 
 type Service interface {
-    Raster(path.ValidFile, CommonOptions) error
-    Display(path.ValidFile, CommonOptions) error
+    Raster(path.ValidFile, plot.CommonOptions) error
+    Display(path.ValidFile, plot.CommonOptions) error
 }
 
 type Commands [MaximumMode]command.Command
 
 type ServiceImpl struct {
-    plotters [MaximumMode]Plotter
+    plotters [MaximumMode]plot.Plotter
 }
 
-func (s *ServiceImpl) Plot(t Type, vf path.ValidFile, co CommonOptions) (err error) {
-    bytes, err := vf.ReadAll()
-    if err != nil {
-        return
-    }
-    
-    opt := co.Parse(datafile)
-    
+func (s *ServiceImpl) Plot(t Type, p Plottable, co plot.CommonOptions) (err error) {
+    opt := co.Parse(p)
     return plotters[opt.Mode].Plot(t, opt)    
 }
