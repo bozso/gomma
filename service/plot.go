@@ -1,4 +1,4 @@
-package plot
+package service
 
 import (
     "github.com/bozso/gotoolbox/path"
@@ -28,24 +28,3 @@ func (s *ServiceImpl) Plot(t Type, vf path.ValidFile, co CommonOptions) (err err
     
     return plotters[opt.Mode].Plot(t, opt)    
 }
-
-type Mode int
-
-const (
-    Byte Mode = iota
-    CC
-    Decibel
-    Deform
-    Height
-    Linear
-    MagPhase
-    MagPhasePwr
-    Power
-    SingleLook
-    Unwrapped
-    Undefined
-    MaximumMode
-)
-
-var modes = [...]Mode{Byte, CC, Decibel, Deform, Height, Linear,
-    MagPhase, MagPhasePwr, Power, SingleLook, Unwrapped, Undefined}

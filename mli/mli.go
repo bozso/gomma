@@ -34,6 +34,6 @@ func (opt *Options) Parse() {
 }
 */
 
-func (_ MLI) PlotMode() (m Mode) {
+func (_ MLI) PlotMode() (m plot.Mode) {
     return plot.Power
 }
