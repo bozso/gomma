@@ -1,5 +1,6 @@
 package plot
 
+/*
 import (
     "github.com/bozso/gotoolbox/command"
 
@@ -104,3 +105,4 @@ func raster(cmd command.Command, p Plottable, opt Options) (err error) {
     }
     return err
 }
+*/

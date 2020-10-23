@@ -14,8 +14,9 @@ import (
 const DateFmt date.ParseFmt = "2016 12 05"
 
 type Meta struct {
+    DataFile   path.ValidFile  `json:"datafile"`
     Dtype     Type            `json:"data_type"`
-    Ra        common.RngAzi   `json:"rng_azi"`
+    common.RngAzi             `json:"rng_azi"`
     time.Time                 `json:"time"`
 }
 
@@ -24,11 +25,11 @@ func (m *Meta) SetMeta(meta Meta) {
 }
 
 func (m Meta) Rng() int {
-    return m.Ra.Rng
+    return m.RngAzi.Rng
 }
 
 func (m Meta) Azi() int {
-    return m.Ra.Azi
+    return m.RngAzi.Azi
 }
 
 func (m Meta) Date() time.Time {

@@ -78,7 +78,7 @@ type WithParser struct {
 }
 
 func (pp WithParser) Load(l Loadable) (err error) {
-    f, err := pp.DatFile.ToValid()
+    f, err := pp.DataFile.ToValid()
     if err != nil {
         return
     }
@@ -94,12 +94,12 @@ func (pp WithParser) Load(l Loadable) (err error) {
     pr, k := pp.parser, pp.keys
     
     meta := Meta{}
-    meta.Ra.Rng, err = pr.Int(k.Rng, 0)
+    meta.RngAzi.Rng, err = pr.Int(k.Rng, 0)
     if err != nil {
         return
     }
     
-    meta.Ra.Azi, err = pr.Int(k.Azi, 0)
+    meta.RngAzi.Azi, err = pr.Int(k.Azi, 0)
     if err != nil {
         return
     }

@@ -2,10 +2,12 @@ package plot
 
 import (
     //"github.com/bozso/gomma/common"
+    "github.com/bozso/gomma/data"
 )
 
 type Plottable interface {
-    DataDescription() DataDescription
+    PlotMode() Mode
+    MetaData() data.Meta
 }
 
 type ZeroFlag int

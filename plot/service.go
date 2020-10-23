@@ -1,43 +1,32 @@
 package plot
 
 import (
+    "github.com/bozso/gotoolbox/path"
     "github.com/bozso/gotoolbox/command"
     
-    "github.com/bozso/gomma/settings"
+    //"github.com/bozso/gomma/settings"
 )
 
 type Service interface {
-    Raster(Plottable, RasArgs) error
-    Display(Plottable, DisArgs) error
+    Raster(path.ValidFile, CommonOptions) error
+    Display(path.ValidFile, CommonOptions) error
 }
 
 type Commands [MaximumMode]command.Command
 
-type RasterCommands Commands
-type DisplayCommands Commands
-
-func (r *RasterCommands) CommandSet(cmd settings.Commands) (err error) {
-    for _, mode := range modes {
-        r[mode], err = cmd.MustGet(RasterMode(mode).CommandName())
-        if err != nil {
-            break
-        }
-    }
-    return
-}
-
-func (d *DisplayCommands) CommandSet(cmd settings.Commands) (err error) {
-    for _, mode := range modes {
-        d[mode], err = cmd.MustGet(DisplayMode(mode).CommandName())
-        if err != nil {
-            break
-        }
-    }
-    return
-}
-
 type ServiceImpl struct {
     plotters [MaximumMode]Plotter
+}
+
+func (s *ServiceImpl) Plot(t Type, vf path.ValidFile, co CommonOptions) (err error) {
+    bytes, err := vf.ReadAll()
+    if err != nil {
+        return
+    }
+    
+    opt := co.Parse(datafile)
+    
+    return plotters[opt.Mode].Plot(t, opt)    
 }
 
 type Mode int
@@ -60,64 +49,3 @@ const (
 
 var modes = [...]Mode{Byte, CC, Decibel, Deform, Height, Linear,
     MagPhase, MagPhasePwr, Power, SingleLook, Unwrapped, Undefined}
-
-type RasterMode Mode
-
-func (r RasterMode) CommandName() (s string) {
-    switch Mode(r) {
-    case Byte:
-        s = "rasbyte"
-    case CC:
-        s = "rascc"
-    case Decibel:
-        s = "ras_dB"
-    case Height:
-        s = "rashgt"
-    case Linear:
-        s = "ras_linear"
-    case MagPhase:
-        s = "rasmph"
-    case MagPhasePwr:
-        s = "rasmph_pwr"
-    case Power:
-        s = "raspwr"
-    case SingleLook:
-        s = "rasSLC"
-    /// @TODO: check out wether the following mappings are correct
-    case Deform:
-        s = "rasdt_pwr"
-    case Unwrapped:
-        s = "rasdt_pwr"
-    }
-    return
-}
-
-type DisplayMode Mode
-
-func (d DisplayMode) CommandName() (s string) {
-    switch Mode(d) {
-    case Byte:
-        s = "disbyte"
-    case CC:
-        s = "discc"
-    case Decibel:
-        s = "dis_dB"
-    case Height:
-        s = "dishgt"
-    case Linear:
-        s = "dis_linear"
-    case MagPhase:
-        s = "dismph"
-    case MagPhasePwr:
-        s = "dismph_pwr"
-    case Power:
-        s = "dispwr"
-    case SingleLook:
-        s = "disSLC"
-    /// @TODO: check out wether the following mappings are correct
-    case Deform:
-        s = "disdt_pwr"
-    case Unwrapped:
-        s = "disdt_pwr"
-    }
-}

@@ -136,7 +136,6 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli mli.MLI, opt SSIOpt) (ret SSIOut,
     return
 }
 
-func (s SLC) Raster(opt plot.RasArgs) error {
-    opt.Mode = plot.SingleLook
-    return s.Raster(opt)
+func (_ SLC) PlotMode() (m Mode) {
+    return plot.SingleLook
 }

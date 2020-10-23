@@ -18,10 +18,6 @@ func (h *Height) Set(s string) (err error) {
     return
 }
 
-func (h Height) Raster(opt plot.RasArgs) (err error) {
-    opt.Mode = plot.Height
-    opt.Parse(h)
-    
-    err = plot.Raster(h, opt)
-    return
+func (_ Height) PlotMode() (m plot.Mode) {
+    return plot.Height
 }

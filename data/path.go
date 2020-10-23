@@ -7,11 +7,11 @@ import (
 
 
 type Path struct {
-    DatFile path.File
+    DataFile path.File
 }
 
 func New(file path.Pather) (p Path) {
-    p.DatFile = file.AsPath().ToFile()
+    p.DataFile = file.AsPath().ToFile()
     return
 }
 
@@ -25,16 +25,16 @@ func (d File) WithShapeDType(p Path, dtype Type) (f File, err error) {
         dtype = d.Dtype
     }
     
-    f, err = p.Load(d.Ra, dtype)
+    f, err = p.Load(d.RngAzi, dtype)
     return
 }
 
 func (p Path) Load(ra common.RngAzi, dtype Type) (f File, err error) {
-    f.DatFile, err = p.DatFile.ToValid()
+    f.DataFile, err = p.DataFile.ToValid()
     if err != nil {
         return
     }
     
-    f.Ra, f.Dtype = ra, dtype
+    f.RngAzi, f.Dtype = ra, dtype
     return
 }

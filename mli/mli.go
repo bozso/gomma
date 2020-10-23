@@ -14,22 +14,15 @@ func (m MLI) Validate() (err error) {
     return m.EnsureFloat()
 }
 
-func (m MLI) Raster(opt plot.RasArgs) (err error) {
-    opt.Mode = plot.Power
-    return m.Raster(opt)
+// TODO: add loff, nlines
+type Options struct {
+    //Subset
+    RefTab string
+    Looks common.RngAzi
+    WindowFlag bool
+    plot.ScaleExp
 }
-
-type (
-    // TODO: add loff, nlines
-    Options struct {
-        //Subset
-        RefTab string
-        Looks common.RngAzi
-        WindowFlag bool
-        plot.ScaleExp
-    }
-)
-
+/*
 func (opt *Options) Parse() {
     opt.ScaleExp.Parse()
     
@@ -38,4 +31,9 @@ func (opt *Options) Parse() {
     }
     
     opt.Looks.Default()
+}
+*/
+
+func (_ MLI) PlotMode() (m Mode) {
+    return plot.Power
 }

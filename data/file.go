@@ -8,25 +8,29 @@ import (
 )
 
 type File struct {
-    DatFile path.ValidFile `json:"datafile"`
-    Meta                   `json:"metadata"`
+    Meta
 }
 
+func (f File) MetaData() Meta {
+    return f.Meta
+}
+
+
 func (f File) SavePath(ext string) (fp path.File) {
-    return f.DatFile.AddExt(ext).ToFile()
+    return f.DataFile.AddExt(ext).ToFile()
 }
 
 func (f *File) SetDataFile(vf path.ValidFile) {
-    f.DatFile = vf
+    f.DataFile = vf
 }
 
 func (f File) TypeCheck(dtypes... Type) (err error) {
-    err = f.Meta.TypeCheck(f.DatFile, dtypes...)
+    err = f.Meta.TypeCheck(f.DataFile, dtypes...)
     return
 }
 
 func (d File) DataPath() path.ValidFile {
-    return d.DatFile
+    return d.DataFile
 }
 
 func (f File) Save() (err error) {
@@ -39,7 +43,7 @@ func (d File) SaveWithPath(file path.File) (err error) {
 
 func (f File) Move(dir path.Dir) (fm File, err error) {
     fm = f
-    fm.DatFile, err = f.DatFile.Move(dir)
+    fm.DataFile, err = f.DataFile.Move(dir)
     if err != nil {
         return
     }
@@ -48,7 +52,7 @@ func (f File) Move(dir path.Dir) (fm File, err error) {
 }
 
 func (d File) Exist() (b bool, err error) {
-    b, err = d.DatFile.Exist()
+    b, err = d.DataFile.Exist()
     return
 }
 

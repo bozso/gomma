@@ -22,9 +22,14 @@ type AverageFactor struct {
     Azi validate.NaturalInt `json:"azimuth"`
 }
 
+/// \TODO: constrain scale and exp to a range
+type ScaleExp struct {
+    Scale         float64 `json:"scale"`
+    Exp           float64 `json:"exp"`    
+}
+
 type Common struct {
-    Scale         float64              `json:"scale"`
-    Exp           float64              `json:"exp"`
+    ScaleExp
     Start         validate.PositiveInt `json:"start"`
     NumLines      validate.PositiveInt `json:"num_lines"`
     MinMax        geometry.MinMaxFloat `json:"min_max"`    
@@ -41,9 +46,9 @@ type CommonOptions struct {
 
 func (c CommonOptions) Parse(p Plottable) (o Options) {
     o.Common = c.Common
-    o.DataDesc = p.DataDescription()
+    o.Meta, o.Mode = p.MetaData(), p.PlotMode()
 
-    dim, avg := &o.DataDesc.RngAzi, &c.AverageFactor
+    dim, avg := &o.Meta.RngAzi, &c.AverageFactor
     
     o.AveragePixels.Rng = calcFactor(dim.Rng, int(avg.Rng))
     o.AveragePixels.Azi = calcFactor(dim.Azi, int(avg.Azi))
@@ -68,14 +73,15 @@ func (c CommonOptions) Parse(p Plottable) (o Options) {
 type Options struct {
     AveragePixels common.RngAzi
     MinMax        geometry.MinMaxFloat
-    DataDesc      DataDescription
+    Meta          data.Meta
     LR            int
+    Mode
     Common
 }
 
 func (o *Options) GetRaster() (p path.Path) {
     if len(o.Raster.String()) == 0 {
-        o.Raster = o.DataDesc.DataFile.AddExt(
+        o.Raster = o.Meta.DataFile.AddExt(
             string(o.Common.RasterExtension))
     }
     

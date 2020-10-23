@@ -18,6 +18,10 @@ type LookupPath struct {
     data.Path
 }
 
+func (_ Lookup) PlotMode() (m plot.Mode) {
+    return plot.MagPhase
+}
+
 func NewLookup(p path.Path) (l LookupPath) {
     l.Path = data.New(p)
     return
@@ -34,14 +38,6 @@ type Lookup struct {
 
 func (l Lookup) Validate() (err error) {
     return l.EnsureComplex()
-}
-
-func (l Lookup) Raster(opt plot.RasArgs) (err error) {
-    opt.Mode = plot.MagPhase
-    opt.Parse(l)
-
-    err = plot.Raster(l, opt)
-    return
 }
 
 var coord2sarpix = common.Must("coord_to_sarpix")

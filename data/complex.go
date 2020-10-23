@@ -80,13 +80,13 @@ func (c Complex) ComplexToReal(cmd command.Command, mode CpxToReal, dst path.Pat
     case ToPhase:
         Mode = 4
     default:
-        err = cpxToReal.UnknownElement(c.String())
+        err = cpxToReal.UnknownElement(mode.String())
         return
     }
     
     p := New(dst)
     
-    _, err = cmd.Call(c.DatFile, p.DatFile, c.Ra.Rng, Mode)
+    _, err = cmd.Call(c.DataFile, p.DataFile, c.Rng, Mode)
     if err != nil {
         return
     }

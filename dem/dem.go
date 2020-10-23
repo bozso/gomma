@@ -13,6 +13,10 @@ type File struct {
     data.FileWithPar
 }
 
+func (_ File) PlotMode() (m plot.Mode) {
+    return plot.Power
+}
+
 func (f File) Validate() (err error) {
     return f.EnsureFloat()
 }
@@ -41,11 +45,4 @@ func New(file path.Path) (p PathWithPar) {
 func (p PathWithPar) Load() (f File, err error) {
     f, err = p.Load()
     return
-}
-func (f File) Raster(opt plot.RasArgs) (err error) {
-    opt.Mode = plot.Power
-    opt.Parse(f)
-    
-    err = plot.Raster(f, opt)
-    return nil
 }

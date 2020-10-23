@@ -187,11 +187,8 @@ func FromSLC(slc1, slc2 slc.SLC, opt IfgOpt) (out File, err error) {
 
 var rasmph_pwr24 = common.Must("rasmph_pwr24")
 
-func (ifg File) Raster(opt plot.RasArgs) (err error) {
-    opt.Mode = plot.MagPhasePwr
-
-    err = ifg.Raster(opt)
-    return
+func (_ File) PlotMode() (m plot.Mode) {
+    return plot.MagPhasePwr
 }
 
 type AdaptFiltOpt struct {
