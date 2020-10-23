@@ -256,7 +256,7 @@ func (l Lookup) geo2radar(in, out data.Data, opt CodeOpt) (err error) {
     }
     
     
-    _, err = g2r.Call(l.DatFile, in.DataPath(), in.Rng(),
+    _, err = g2r.Call(l.DataFile, in.DataPath(), in.Rng(),
                  out.DataPath(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Oversamp,
                  opt.MaxRad, opt.Npoints)
@@ -323,7 +323,7 @@ func (l Lookup) radar2geo(in, out data.Data, opt CodeOpt) (err error) {
         
     }
     
-    _, err = r2g.Call(in.DataPath(), in.Rng(), l.DatFile,
+    _, err = r2g.Call(in.DataPath(), in.Rng(), l.DataFile,
                  out.DataPath(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Order)
     

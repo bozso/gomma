@@ -18,7 +18,7 @@ type Path struct {
 }
 
 func New(data path.File) (p Path) {
-    p.DatFile, p.ParFile = data, data.AddExt("par").ToFile()
+    p.DataFile, p.ParFile = data, data.AddExt("par").ToFile()
     return
 }
 
@@ -41,7 +41,7 @@ var multiLook = common.Must("multi_look")
 func (s SLC) MLI(out mli.MLI, opt mli.Options) (err error) {
     opt.Parse()
     
-    _, err = multiLook.Call(s.DatFile, s.ParFile, out.DatFile, out.ParFile,
+    _, err = multiLook.Call(s.DataFile, s.ParFile, out.DataFile, out.ParFile,
                        opt.Looks.Rng, opt.Looks.Azi,
                        //opt.Subset.RngOffset, opt.Subset.RngWidth,
                        opt.ScaleExp.Scale, opt.ScaleExp.Exp)
@@ -78,8 +78,8 @@ func (ref SLC) SplitBeamIfg(slave SLC, opt SBIOpt) (err error) {
     if opt.InvWeight { iwflg = 1 }
     if opt.Keep { cflg = 1 }
     
-    _, err = sbiInt.Call(ref.DatFile, ref.ParFile,
-                    slave.DatFile, slave.ParFile,
+    _, err = sbiInt.Call(ref.DataFile, ref.ParFile,
+                    slave.DataFile, slave.ParFile,
                     opt.Ifg, opt.Ifg + ".off", opt.Mli, opt.Mli + ".par", 
                     opt.NormSquintDiff, opt.Looks.Rng, opt.Looks.Azi,
                     iwflg, cflg)
@@ -127,15 +127,15 @@ func (ref SLC) SplitSpectrumIfg(slave SLC, mli mli.MLI, opt SSIOpt) (ret SSIOut,
     
     ID := fmt.Sprintf("%s_%s", mID, sID)
     
-    _, err = ssiInt.Call(ref.DatFile, ref.ParFile, mli.DatFile, mli.ParFile,
-        opt.Hgt, opt.LtFine, slave.DatFile, slave.ParFile, mode,
-        mID, sID, ID, opt.OutDir, cflg)
+    _, err = ssiInt.Call(ref.DataFile, ref.ParFile,
+        mli.DatFile, mli.ParFile, opt.Hgt, opt.LtFine, slave.DataFile,
+        slave.ParFile, mode, mID, sID, ID, opt.OutDir, cflg)
     
     // TODO: figure out the name of the output files
     
     return
 }
 
-func (_ SLC) PlotMode() (m Mode) {
+func (_ SLC) PlotMode() (m plot.Mode) {
     return plot.SingleLook
 }
