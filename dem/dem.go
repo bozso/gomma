@@ -38,7 +38,7 @@ func NewWithPar(dat, par path.Path) (p PathWithPar) {
 }
 
 func New(file path.Path) (p PathWithPar) {
-    par := path.New(fmt.Sprintf("%s.dem_par", file))    
+    par := path.New(fmt.Sprintf("%s.dem_par", file))
     return NewWithPar(file, par)
 }
 

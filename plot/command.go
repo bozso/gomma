@@ -2,10 +2,10 @@ package plot
 
 import (
     "strings"
-    
+
     "github.com/bozso/gotoolbox/command"
     "github.com/bozso/gotoolbox/enum"
-    
+
     "github.com/bozso/gomma/settings"
 )
 
@@ -27,7 +27,6 @@ func (t Type) String() (s string) {
     default:
     }
     return
-    
 }
 
 func (t *Type) Set(s string) (err error) {
@@ -77,11 +76,10 @@ func (m Mode) CommandNames() (c CommandNames) {
         c.Raster, c.Display = "raspwr", "dispwr"
     case SingleLook:
         c.Raster, c.Display = "rasSLC", "disSLC"
-    /// @TODO: check out wether the following mappings are correct
+    /// TODO: check out whether the following mappings are correct
     case Deform, Unwrapped:
         c.Raster, c.Display = "rasdt_pwr", "disdt_pwr"
     }
-    
     return
 }
 
@@ -91,7 +89,7 @@ type PlotCommand struct {
 
 func (m Mode) NewPlotCommand(c settings.Commands) (p PlotCommand, err error) {
     d := m.CommandNames()
-    
+
     p.raster, err = c.Get(d.Raster)
     if err != nil {
         return
@@ -105,13 +103,13 @@ type BytePlotter PlotCommand
 
 func (b BytePlotter) Plot(t Type, o Options) (err error) {
     m := &o.Meta
-    
+
     switch t {
     case Raster:
     _, err = b.raster.Call(m.DataFile, m.RngAzi.Rng, o.Start, o.NumLines,
                      o.AveragePixels.Rng, o.AveragePixels.Azi, o.Scale,
                      o.LR, o.GetRaster())
-    /// \TODO: check for arguments
+    /// TODO: check for arguments
     case Display:
     _, err = b.display.Call(m.DataFile, m.RngAzi.Rng, o.Start, o.NumLines,
                      o.AveragePixels.Rng, o.AveragePixels.Azi, o.Scale,

@@ -2,7 +2,7 @@ package dem
 
 import (
     "fmt"
-    
+
     "github.com/bozso/gomma/data"
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/plot"
@@ -44,36 +44,36 @@ var coord2sarpix = common.Must("coord_to_sarpix")
 
 func ToRadar(ll common.LatLon, mpar, hgt, diffPar string) (ra common.RngAzi, err error) {
     const par = "corrected SLC/MLI range, azimuth pixel (int)"
-    
+
     out, err := coord2sarpix.Call(mpar, "-", ll.Lat, ll.Lon, hgt, diffPar)
     if err != nil {
         err = errors.WrapFmt(err, "failed to retreive radar coordinates")
         return
     }
-    
+
     param := params.FromString(out, ":")
-    
+
     line, err := param.Param(par)
-    
+
     if err != nil {
         err = errors.WrapFmt(err, "failed to retreive range, azimuth")
         return
     }
-    
+
     split, err := splitted.New(line, " ")
     if err != nil { return }
-    
+
     if split.Len() < 2 {
         err = fmt.Errorf("split to retreive range, azimuth failed")
         return
     }
-    
+
     ra.Rng, err = split.Int(0)
     if err != nil { return }
-    
+
     ra.Azi, err = split.Int(1)
     if err != nil { return }
-    
+
     return ra, nil
 }
 
@@ -124,7 +124,7 @@ func (i *InterpolationMode) Set(s string) (err error) {
         err = errors.UnrecognizedMode(s, "Interpolation Mode")
         return
     }
-    
+
     return nil
 }
 
@@ -173,36 +173,36 @@ type CodeOpt struct {
 
 func (co *CodeOpt) SetCli(c *cli.Cli) {
     //c.Var()
-    
 }
+
 
 func (opt *CodeOpt) Parse() (lrIn int, lrOut int) {
     lrIn, lrOut = 1, 1
-    
+
     if opt.FlipInput {
         lrIn = -1
     }
-    
+
     if opt.FlipOutput {
         lrOut = -1
     }
-    
+
     if opt.Order == 0 {
         opt.Order = 5
     }
-    
+
     if opt.Oversamp == 0.0 {
         opt.Oversamp = 2.0
     }
-    
+
     if opt.MaxRad == 0.0 {
         opt.MaxRad = 4 * opt.Oversamp
     }
-    
+
     if opt.Npoints == 0 {
         opt.Npoints = 4
     }
-        
+
     return lrIn, lrOut
 }
 
@@ -211,11 +211,10 @@ var g2r = common.Must("geocode")
 
 func (l Lookup) geo2radar(in, out data.Data, opt CodeOpt) (err error) {
     lrIn, lrOut := opt.Parse()
-    
     if err = opt.RngAzi.Validate(); err != nil {
         return
     }
-    
+
     intm := opt.InterpolMode
     interp := 0
 
@@ -233,9 +232,9 @@ func (l Lookup) geo2radar(in, out data.Data, opt CodeOpt) (err error) {
     default:
         return errors.UnrecognizedMode(intm.String(), "Interpolation Mode")
     }
-    
+
     dt, dtype := 0, in.DataType()
-    
+
     switch dtype {
     case data.Float:
         dt = 0
@@ -254,13 +253,12 @@ func (l Lookup) geo2radar(in, out data.Data, opt CodeOpt) (err error) {
     default:
         return data.WrongType(dtype, "geo2radar")
     }
-    
-    
+
     _, err = g2r.Call(l.DataFile, in.DataPath(), in.Rng(),
                  out.DataPath(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Oversamp,
                  opt.MaxRad, opt.Npoints)
-    
+
     return
 }
 
@@ -268,14 +266,14 @@ var r2g = common.Must("geocode_back")
 
 func (l Lookup) radar2geo(in, out data.Data, opt CodeOpt) (err error) {
     lrIn, lrOut := opt.Parse()
-    
+
     if err = opt.RngAzi.Validate(); err != nil {
         return
     }
-    
+
     intm := opt.InterpolMode
     var interp int
-    
+
     // default interpolation mode
     if intm == NearestNeighbour {
         interp = 1
@@ -301,10 +299,9 @@ func (l Lookup) radar2geo(in, out data.Data, opt CodeOpt) (err error) {
             return errors.UnrecognizedMode(intm.String(), "interpolation option")
         }
     }
-    
-    
+
     dt, dtype := 0, in.DataType()
-    
+
     switch dtype {
     case data.Float:
         dt = 0
@@ -320,12 +317,11 @@ func (l Lookup) radar2geo(in, out data.Data, opt CodeOpt) (err error) {
         dt = 5
     default:
         return data.WrongType(dtype, "radar2geo")
-        
     }
-    
+
     _, err = r2g.Call(in.DataPath(), in.Rng(), l.DataFile,
                  out.DataPath(), out.Rng(),
                  opt.Nlines, interp, dt, lrIn, lrOut, opt.Order)
-    
+
     return
 }

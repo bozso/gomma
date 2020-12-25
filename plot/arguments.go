@@ -4,7 +4,7 @@ import (
     "github.com/bozso/emath/geometry"
     "github.com/bozso/emath/validate"
     "github.com/bozso/gotoolbox/path"
-    
+
     "github.com/bozso/gomma/common"
     "github.com/bozso/gomma/settings"
     "github.com/bozso/gomma/data"
@@ -13,7 +13,7 @@ import (
 type DataDescription struct {
     DataFile path.ValidFile
     Type     data.Type
-    Mode     Mode    
+    Mode     Mode
     common.RngAzi
 }
 
@@ -22,17 +22,17 @@ type AverageFactor struct {
     Azi validate.NaturalInt `json:"azimuth"`
 }
 
-/// \TODO: constrain scale and exp to a range
+/// TODO: constrain scale and exp to a range
 type ScaleExp struct {
     Scale         float64 `json:"scale"`
-    Exp           float64 `json:"exp"`    
+    Exp           float64 `json:"exp"`
 }
 
 type Common struct {
     ScaleExp
     Start         validate.PositiveInt `json:"start"`
     NumLines      validate.PositiveInt `json:"num_lines"`
-    MinMax        geometry.MinMaxFloat `json:"min_max"`    
+    MinMax        geometry.MinMaxFloat `json:"min_max"`
     HeaderSize    validate.NaturalInt  `json:"header_size,omitempty"`
     Raster        path.Path            `json:"output_raster,omitempty"`
     settings.RasterExtension           `json:"raste_extension,omitempty"`
@@ -49,7 +49,7 @@ func (c CommonOptions) Parse(p Plottable) (o Options) {
     o.Meta, o.Mode = p.MetaData(), p.PlotMode()
 
     dim, avg := &o.Meta.RngAzi, &c.AverageFactor
-    
+
     o.AveragePixels.Rng = calcFactor(dim.Rng, int(avg.Rng))
     o.AveragePixels.Azi = calcFactor(dim.Azi, int(avg.Azi))
 
@@ -58,15 +58,15 @@ func (c CommonOptions) Parse(p Plottable) (o Options) {
     } else {
         o.LR = 1
     }
-    
+
     if c.MinMax.Min == 0.0 {
         o.MinMax.Min = 0.1
     }
-    
+
     if c.MinMax.Max == 0.0 {
         o.MinMax.Min = 0.9
     }
-    
+
     return
 }
 
@@ -84,7 +84,7 @@ func (o *Options) GetRaster() (p path.Path) {
         o.Raster = o.Meta.DataFile.AddExt(
             string(o.Common.RasterExtension))
     }
-    
+
     return o.Raster
 }
 

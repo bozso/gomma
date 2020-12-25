@@ -34,7 +34,7 @@ const (
 
 func calcFactor(ndata, factor int) int {
     ret := float64(ndata) / float64(factor)
-    
+
     if ret <= 0.0 {
         return 1
     } else {
