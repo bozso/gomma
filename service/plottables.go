@@ -5,7 +5,6 @@ import (
     "github.com/bozso/gomma/slc"
     "github.com/bozso/gomma/dem"
     "github.com/bozso/gomma/geo"
-    
     "github.com/bozso/gomma/plot"
 )
 
@@ -27,6 +26,6 @@ func (p *Plottable) UnmarshalJSON(b []byte) (err error) {
             return
         }
     }
-    
+
     return
 }

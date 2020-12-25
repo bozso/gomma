@@ -3,7 +3,7 @@ package service
 import (
     "github.com/bozso/gotoolbox/path"
     "github.com/bozso/gotoolbox/command"
-    
+
     //"github.com/bozso/gomma/settings"
     "github.com/bozso/gomma/plot"
 )
@@ -21,5 +21,5 @@ type ServiceImpl struct {
 
 func (s *ServiceImpl) Plot(t Type, p Plottable, co plot.CommonOptions) (err error) {
     opt := co.Parse(p)
-    return plotters[opt.Mode].Plot(t, opt)    
+    return plotters[opt.Mode].Plot(t, opt)
 }

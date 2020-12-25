@@ -2,9 +2,9 @@ package service
 
 import (
     "sync"
-    
+
     "github.com/bozso/gotoolbox/path"
-    
+
     "github.com/bozso/gomma/settings"
 )
 
@@ -21,9 +21,9 @@ type Directory struct {
 func (s *Settings) SetupGamma(ss settings.Setup) (err error) {
     s.settings, err = ss.New()
     if err != nil {
-        return 
+        return
     }
-    
+
     s.commands, err = s.settings.MakeCommands()
     return
 }

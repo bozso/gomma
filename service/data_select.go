@@ -2,11 +2,11 @@ package service
 
 import (
     "fmt"
-    
+
     "github.com/bozso/gotoolbox/path"
 
     "github.com/bozso/emath/geometry"
-    
+
     "github.com/bozso/gomma/date"
     "github.com/bozso/gomma/common"
     s1 "github.com/bozso/gomma/sentinel1"
@@ -29,7 +29,7 @@ func (s *S1Implement) SelectFiles(ss *SentinelSelect) (err error) {
     if len(dataFiles) == 0 {
         return fmt.Errorf("At least one datafile must be specified!")
     }
-    
+
     checker := date.NewCheckers()
 
     if d := ss.Start; d.IsSet() {
@@ -38,7 +38,7 @@ func (s *S1Implement) SelectFiles(ss *SentinelSelect) (err error) {
     if d := ss.Stop; d.IsSet() {
         checker.Append(date.Max.New(d.Time))
     }
-    
+
     // TODO: implement checkZip
     //if dsect.CheckZips {
     //    checker = func(s1zip S1Zip) bool {
@@ -47,20 +47,19 @@ func (s *S1Implement) SelectFiles(ss *SentinelSelect) (err error) {
     //    check = true
     //
     //}
-    
+
     // nzip := len(zipfiles)
-    
-    
+
     writer := ss.Out
     defer writer.Close()
-    
+
     for _, zip := range dataFiles {
         s1zip, IWs, err := parseS1(zip, s.CacheDir)
-        
+
         if err != nil {
             return err
         }
-        
+
         if IWs.Contains(ss.AOI) && checker.In(s1zip.Date()) {
             _, err := fmt.Fprintf(writer, "%s\n", s1zip.Path)
             if err != nil {
@@ -68,7 +67,7 @@ func (s *S1Implement) SelectFiles(ss *SentinelSelect) (err error) {
             }
         }
     }
-    
+
     return
 }
 
