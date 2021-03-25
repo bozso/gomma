@@ -23,7 +23,6 @@ type LatLonRegion struct {
 
 func (ll LatLonRegion) Contains(l geometry.LatLon) (b bool) {
     return ll.ToRegion().Contains(l.ToPoint())
-    
 }
 
 func (ll LatLonRegion) ToRegion() (r geometry.Region) {
@@ -36,14 +35,14 @@ func ParseRegion(info params.Parser) (r LatLonRegion, err error) {
     if err != nil {
         return
     }
-    
+
     r.Min, err = Min.Parse(info)
     return
 }
 
 func (mode MinOrMax) Parse(info params.Parser) (p geometry.LatLon, err error) {
     var tpl_lon, tpl_lat string
-    
+
     switch mode {
     case Max:
         tpl_lon, tpl_lat = "Max_Lon", "Max_Lat"
@@ -71,7 +70,7 @@ type ParseError struct {
 
 func (e ParseError) Error() string {
     const msg errors.String = "failed to retreive %s value"
-    
+
     return msg.WrapFmt(e.err, e.coordinate).Error()
 }
 

@@ -16,8 +16,8 @@ func (f File) MetaData() Meta {
 }
 
 
-func (f File) SavePath(ext string) (fp path.File) {
-    return f.DataFile.AddExt(ext).ToFile()
+func (f File) SavePath(ext string) (l path.Like) {
+    return f.DataFile.AddExtension(ext)
 }
 
 func (f *File) SetDataFile(vf path.ValidFile) {
@@ -37,7 +37,7 @@ func (f File) Save() (err error) {
     return common.SaveJson(f)
 }
 
-func (d File) SaveWithPath(file path.File) (err error) {
+func (d File) SaveWithPath(file path.Like) (err error) {
     return common.SaveJsonTo(file, d)
 }
 
@@ -51,8 +51,8 @@ func (f File) Move(dir path.Dir) (fm File, err error) {
     return
 }
 
-func (d File) Exist() (b bool, err error) {
-    b, err = d.DataFile.Exist()
+func (d File) Exists() (b bool, err error) {
+    b, err = d.DataFile.Exists()
     return
 }
 

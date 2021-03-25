@@ -2,10 +2,11 @@ package settings
 
 import (
     "fmt"
-    
+
     "github.com/bozso/gotoolbox/path"
     "github.com/bozso/gotoolbox/enum"
-    "github.com/bozso/gotoolbox/command"
+
+    "github.com/bozso/gomma/command"
 )
 
 var (
@@ -23,28 +24,36 @@ func (r *RasterExtension) UnmarshalJSON(b []byte) (err error) {
     return
 }
 
-func (r *RasterExtension) Validate() (err error) {
-    v := string(*r)
-    
+func (r RasterExtension) Validate() (err error) {
+    v := string(r)
+
     if !validExtensions.Contains(v) {
         err = Extensions.UnknownElement(v)
     }
-    
+
     return
 }
 
-type Setup struct {
-    RasterExtension string   `json:"raster_extension"`
-    GammaDirectory  string `json:"gamma_directory"`
-    Modules         []string `json:"modules"`
-    CachePath       string `json:"cache_path"`    
+type Common struct {
+    RasterExtension RasterExtension `json:"raster_extension"`
+    GammaDirectory  path.Dir        `json:"gamma_directory"`
+    CachePath       path.Dir        `json:"cache_path"`
+}
+
+type Payload struct {
+    Common
+    Modules []string               `json:"modules"`
+    Executor command.ExecutorSetup `json:"executor"`
 }
 
 type Settings struct {
-    RasterExtension string   `json:"raster_extension"`
-    GammaDirectory  path.Dir `json:"gamma_directory"`
-    Modules         []string `json:"modules"`
-    CachePath       path.Dir `json:"cache_path"`
+    Common
+    executor        command.Executor
+    Commands        Commands
+}
+
+func (s *Settings) Update(p Payload) (er error) {
+
 }
 
 func (s Setup) New() (st Settings, err error) {
@@ -76,14 +85,14 @@ func (s *Settings) SetRasterExtension(ext string) (err error) {
             validExtensions, ext)
         return
     }
-    
+
     s.RasterExtension = ext
     return
 }
 
 func (s *Settings) SetGammaDirectory(gammaPath string) (err error) {
     s.GammaDirectory, err = path.New(gammaPath).Mkdir()
-    return    
+    return
 }
 
 func (s *Settings) SetCachePath(cachePath string) (err error) {
@@ -95,9 +104,9 @@ func (s *Settings) Default() (err error) {
     return s.SetCachePath(".")
 }
 
-var exeDirectories = [2]string{"bin", "scriptks"}
+var exeDirectories = [2]string{"bin", "scripts"}
 
-func (s Settings) MakeCommands(builder command.Builder) (c Commands, err error) {
+func (s Settings) MakeCommands(create command.Creator) (c Commands, err error) {
     gammaDir := s.GammaDirectory
     c = make(Commands)
 
@@ -110,11 +119,11 @@ func (s Settings) MakeCommands(builder command.Builder) (c Commands, err error) 
             }
 
             for _, exePath := range glob {
-                com, err := builder.New(exePath.String())
+                com, err := create.Create(exePath.String())
                 if err != nil {
                     return c, err
                 }
-                
+
                 c[exePath.Base().String()] = com
             }
         }

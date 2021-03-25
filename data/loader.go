@@ -19,19 +19,19 @@ var DefaultKeys = &ParamKeys{
 
 type PathWithPar struct {
     Path
-    ParFile path.File
+    ParFile path.Path
     keys *ParamKeys
 }
 
 func (p PathWithPar) WithPar(file path.Path) (pp PathWithPar) {
-    p.ParFile = file.ToFile()
+    p.ParFile = file
     return p
 }
 
 func (p Path) WithParFile(file path.Path) (pp PathWithPar) {
     return PathWithPar{
         Path: p,
-        ParFile: file.ToFile(),
+        ParFile: file,
         keys: DefaultKeys,
     }
 }
@@ -47,11 +47,11 @@ func (pp PathWithPar) WithParser(p params.Parser) (wp WithParser) {
 }
 
 func (pp PathWithPar) GetParser() (p params.Params, err error) {
-    par, err := pp.ParFile.ToValid()
+    par, err := pp.ParFile.ToValidFile()
     if err != nil {
         return
     }
-    
+
     p, err = NewGammaParams(par)
     return
 }
@@ -68,7 +68,7 @@ func (pp PathWithPar) Load(l Loadable) (err error) {
     if err != nil {
         return
     }
-    
+
     return pp.WithParser(p.ToParser()).Load(l)
 }
 
@@ -78,53 +78,52 @@ type WithParser struct {
 }
 
 func (pp WithParser) Load(l Loadable) (err error) {
-    f, err := pp.DataFile.ToValid()
+    f, err := pp.DataFile.ToValidFile()
     if err != nil {
         return
     }
     l.SetDataFile(f)
 
-    f, err = pp.ParFile.ToValid()
+    f, err = pp.ParFile.ToValidFile()
     if err != nil {
         return
     }
     l.SetParFile(f)
-    
-    
+
     pr, k := pp.parser, pp.keys
-    
+
     meta := Meta{}
     meta.RngAzi.Rng, err = pr.Int(k.Rng, 0)
     if err != nil {
         return
     }
-    
+
     meta.RngAzi.Azi, err = pr.Int(k.Azi, 0)
     if err != nil {
         return
     }
-    
+
     s, err := pr.Param(k.Type)
     if err != nil {
         return
     }
-    
+
     err = meta.Dtype.Set(s)
     if err != nil {
         return
     }
-    
+
     if d := k.Date; len(d) != 0 {
         s, err = pr.Param(d)
         if err != nil {
             return
         }
-        
+
         meta.Time, err = DateFmt.Parse(s)
     }
-    
+
     l.SetMeta(meta)
-    
+
     err = l.Validate()
     return
 }

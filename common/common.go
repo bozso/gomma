@@ -6,7 +6,7 @@ import (
     "log"
     "math"
     "encoding/json"
-    
+
     "github.com/bozso/gotoolbox/errors"
     "github.com/bozso/gotoolbox/path"
 )
@@ -29,9 +29,9 @@ const (
 
 var (
     Pols = [4]string{"vv", "hh", "hv", "vh"}
-    
+
     confpath = getConfigPath()
-    
+
     // TODO: get settings path from environment variable
     Settings = loadSettings(confpath)
 )
@@ -44,17 +44,17 @@ func Check(err error) {
 
 func getConfigPath() (f path.ValidFile) {
     s, ok := os.LookupEnv("GOMMA_CONFIG")
-    
+
     if !ok {
         var err error
         s, err = os.UserConfigDir()
         Check(err)
         return
     }
-    
-    f, err := path.New(s).Join("gomma.json").ToFile().ToValid()
+
+    f, err := path.New(s).Join("gomma.json").ToValidFile()
     Check(err)
-    
+
     return
 }
 
@@ -63,7 +63,7 @@ func loadSettings(file path.ValidFile) (ret settings) {
         log.Fatalf("Failed to load Gamma settings from '%s'\nError:'%s'\n!",
             file, err)
     }
-    
+
     return
 }
 
@@ -82,22 +82,22 @@ func (sl Slice) Contains(s string) bool {
 }
 
 type SavePather interface {
-    SavePath(ext string) path.File
+    SavePath(ext string) path.Like
 }
 
 func SaveJson(val SavePather) (err error) {
     return SaveJsonTo(val.SavePath("json"), val)
 }
 
-func SaveJsonTo(pth path.File, val interface{}) (err error) {
+func SaveJsonTo(pth path.Like, val interface{}) (err error) {
+    f, err := os.Create(pth.String())
+    if err != nil { return }
+    defer f.Close()
+
     out, err := json.MarshalIndent(val, "", "    ")
     if err != nil {
         return errors.WrapFmt(err, "failed to json encode struct: %v", val)
     }
-    
-    f, err := pth.Create()
-    if err != nil { return }
-    defer f.Close()
 
     if _, err = f.Write(out); err != nil {
         return
@@ -115,19 +115,19 @@ func LoadJson(f path.ValidFile, val interface{}) (err error) {
     if err != nil {
         return errors.WrapFmt(err, "failed to read file '%s'", f)
     }
-    
+
     if err := json.Unmarshal(d, &val); err != nil {
         return errors.WrapFmt(err, "failed to parse json data %s'", d)
     }
-    
+
     v, ok := val.(Validator)
-    
+
     if !ok {
         return nil
     }
-    
+
     err = v.Validate()
-    
+
     return
 }
 
@@ -148,11 +148,11 @@ func (e FileParseError) ToRetreive(s string) error {
 
 func (e FileParseError) Error() string {
     str := fmt.Sprintf("failed to parse file '%s'", e.p.AsPath())
-    
+
     if tr := e.toRetreive; len(tr) > 0 {
         str = fmt.Sprintf("%s to retreive %s", str, tr)
     }
-    
+
     return fmt.Sprintf("%s\n%s", e.err, str)
 }
 
