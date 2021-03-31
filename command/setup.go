@@ -2,6 +2,8 @@ package command
 
 import (
     "encoding/json"
+
+    "github.com/bozso/gotoolbox/meta"
 )
 
 type ExecutorSetup interface {
@@ -14,7 +16,14 @@ var setups = ExecutorSetups{
     "default": DefaultExecutorSetup{},
 }
 
-var setupKeys = 
+var (
+    setupKeys []string
+    s meta.Startup
+    _ = s.Do(&meta.MapKeysGet{
+        Map: setups,
+        Keys: setupKeys,
+    })
+)
 
 type DefaultExecutorSetup struct {}
 

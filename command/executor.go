@@ -24,7 +24,7 @@ func NewExecute() (ex Execute) {
     return execute
 }
 
-func (e Execute) Exec(cmd Command, ctx Context) (err error) {
+func (e Execute) Execute(cmd Command, ctx Context) (err error) {
     return exec.CommandContext(ctx.Context, cmd.String(), ctx.Args...).Run()
 }
 
