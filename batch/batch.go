@@ -5,12 +5,12 @@ import (
     "github.com/bozso/gotoolbox/cli"
 )
 
-type Batcher interface {
-    Batch(infiles []path.ValidFile) (outfiles []path.ValidFile, err error)
+type Operation interface {
+    Call(infile path.ValidFile) (outfile path.ValidFile, err error)
 }
 
 type Creator interface {
-    CreateBatcher(ctx Context) (b Batcher, err error)
+    CreateOp(Context) (Operation, error)
 }
 
 type CreatorMap map[string]Creator

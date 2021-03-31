@@ -6,14 +6,14 @@ import (
     "github.com/bozso/gotoolbox/meta"
 )
 
-type ExecutorSetup interface {
+type ExecutorConfig interface {
     SetupExecutor() (Executor, error)
 }
 
-type ExecutorSetups map[string]ExecutorSetup
+type ExecutorConfigs map[string]ExecutorConfig
 
-var setups = ExecutorSetups{
-    "default": DefaultExecutorSetup{},
+var setups = ExecutorConfigs {
+    "default": DefaultExecutor{},
 }
 
 var (
@@ -25,18 +25,19 @@ var (
     })
 )
 
-type DefaultExecutorSetup struct {}
+type DefaultExecutor struct {}
 
-func (_ DefaultExecutorSetup) SetupExecutor() (ex Executor, err error) {
+func (_ DefaultExecutor) SetupExecutor() (ex Executor, err error) {
     return NewExecute(), nil
 }
 
-type DebugExecutorSetup struct {
+type DebugExecutor struct {
+
 
 }
 
 
-func selectSetup(setups ExecutorSetups, b []byte) (es ExecutorSetup, err error) {
+func selectSetup(confs ExecutorConfigs, b []byte) (es ExecutorConfig, err error) {
     var payload struct {
         tag string  `json:"type"`
         data []byte `json:"data"`
@@ -46,7 +47,7 @@ func selectSetup(setups ExecutorSetups, b []byte) (es ExecutorSetup, err error) 
         return
     }
 
-    if dataType, ok := setups[payload.tag]; !ok {
+    if dataType, ok := confs[payload.tag]; !ok {
         return
     }
 

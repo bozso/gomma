@@ -1,4 +1,4 @@
-package batch
+package cli
 
 import (
     "bufio"
@@ -13,7 +13,7 @@ type ExecutorPayload struct {
     Data []byte `json:"data"`
 }
 
-type ContextPayload struct {
+type ContextConfig struct {
     Logfile   path.File       `json:"logfile"`
     GammaPath path.Dir        `json:"gamma_dir"`
     Executor  ExecutorPayload `json:"executor"`
