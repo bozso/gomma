@@ -37,7 +37,7 @@ func WithEnv(ex Executor, env Env) (se SharedEnv) {
 
 type SharedEnv struct {
     env Env
-    ex Executor
+    ex  Executor
 }
 
 func (se SharedEnv) Execute(cmd Command, ctx Context) (err error) {
@@ -53,11 +53,3 @@ func Format(cmd Command, ctx Context) (s string) {
     )
 }
 
-type Debugger struct {
-    wr io.Writer
-}
-
-func (d Debugger) Execute(cmd Command, ctx Context) (err error) {
-    _, err = fmt.Fprintf(d.wr, "command to be executed\n%s\n", Format(cmd, ctx))
-    return
-}

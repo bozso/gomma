@@ -14,9 +14,6 @@ func TrimJSON(b []byte) (s string) {
     return strings.Trim(s, " ")
 }
 
-type stdNames struct {
-    out, in string
-}
 
 func open(s string) (f *os.File, err error) {
     vf, err := path.New(s).ToValidFile()
@@ -27,7 +24,9 @@ func open(s string) (f *os.File, err error) {
     return
 }
 
-var names = stdNames {
+var names = struct {
+    out, in string
+}{
     out: "stdout",
     in: "stdin",
 }

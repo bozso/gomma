@@ -4,61 +4,41 @@ import (
     "encoding/json"
 
     "github.com/bozso/gotoolbox/meta"
-    "github.com/bozso/gotoolbox/enum"
+    gmeta "github.com/bozso/gomma/meta"
 )
 
 type ExecutorConfig interface {
-    SetupExecutor() (Executor, error)
+    ToExecutor() (Executor, error)
 }
 
-type ExecutorMap map[string]Executor
+type ExecutorConfigMap map[string]ExecutorConfig
 
-var execs = ExecutorMap {
+var execs = ExecutorConfigMap {
     "default": NewExecute(),
 }
 
 var (
-    setupKeys []string
+    execKeys []string
     s meta.Startup
     _ = s.Do(&meta.MapKeysGet{
         Map: execs,
-        Keys: setupKeys,
+        Keys: execKeys,
     })
 )
 
-type TagNotFound struct {
-    Tag string
-    Choices enum.StringSet
-}
+type ExecutorConfig gmeta.Config
 
-func selectSetup(execs ExecutorMap, b []byte) (e Executor, err error) {
-    var payload struct {
-        Tag string  `json:"type"`
-        Data []byte `json:"data"`
-    }
-
-    if err = json.Unmarshal(b, &payload); err != nil {
-        return
-    }
-
-    e, ok := execs[payload.Tag]
+func (ec ExecutorConfig) ToExecutor() (e Executor, err error) {
+    e, ok := execs[ec.Tag]
 
     if !ok {
-        // TODO: set error message
+        err = gmeta.TagNotFound{
+            Tag: ec.Tag,
+            Choices: execKeys,
+        }
         return
     }
 
-
+    err = json.Unmarshal(ec.Data, &e)
     return
 }
-
-/*
-func (e *ExecutorFromJSON) UnmarshalJSON(b []byte) (err error) {
-    setup, err := selectSetup(setups, b)
-    if err != nil {
-        return
-    }
-    e.ExecutorSetup = setup
-    return
-}
-*/
