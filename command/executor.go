@@ -35,21 +35,4 @@ func WithEnv(ex Executor, env Env) (se SharedEnv) {
     }
 }
 
-type SharedEnv struct {
-    env Env
-    ex  Executor
-}
-
-func (se SharedEnv) Execute(cmd Command, ctx Context) (err error) {
-    ctx.Env = se.env
-    return se.ex.Execute(cmd, ctx)
-}
-
-func Format(cmd Command, ctx Context) (s string) {
-    return fmt.Sprintf("%s %s %s",
-        strings.Join(ctx.Env.Get(), " "),
-        cmd.String(),
-        strings.Join(ctx.Args, " "),
-    )
-}
 

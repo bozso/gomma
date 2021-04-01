@@ -3,6 +3,7 @@ package command
 import (
     "io"
     "fmt"
+    "strings"
 
     "github.com/bozso/gomma/stream"
 )
@@ -32,3 +33,12 @@ func (d *DebuggerConfig) ToExecutor() (e Executor, err error) {
     }
     return
 }
+
+func Format(cmd Command, ctx Context) (s string) {
+    return fmt.Sprintf("%s %s %s",
+        strings.Join(ctx.Env.Get(), " "),
+        cmd.String(),
+        strings.Join(ctx.Args, " "),
+    )
+}
+
