@@ -4,52 +4,50 @@ import (
     "encoding/json"
 
     "github.com/bozso/gotoolbox/meta"
+    "github.com/bozso/gotoolbox/enum"
 )
 
 type ExecutorConfig interface {
     SetupExecutor() (Executor, error)
 }
 
-type ExecutorConfigs map[string]ExecutorConfig
+type ExecutorMap map[string]Executor
 
-var setups = ExecutorConfigs {
-    "default": DefaultExecutor{},
+var execs = ExecutorMap {
+    "default": NewExecute(),
 }
 
 var (
     setupKeys []string
     s meta.Startup
     _ = s.Do(&meta.MapKeysGet{
-        Map: setups,
+        Map: execs,
         Keys: setupKeys,
     })
 )
 
-type DefaultExecutor struct {}
-
-func (_ DefaultExecutor) SetupExecutor() (ex Executor, err error) {
-    return NewExecute(), nil
+type TagNotFound struct {
+    Tag string
+    Choices enum.StringSet
 }
 
-type DebugExecutor struct {
-
-
-}
-
-
-func selectSetup(confs ExecutorConfigs, b []byte) (es ExecutorConfig, err error) {
+func selectSetup(execs ExecutorMap, b []byte) (e Executor, err error) {
     var payload struct {
-        tag string  `json:"type"`
-        data []byte `json:"data"`
+        Tag string  `json:"type"`
+        Data []byte `json:"data"`
     }
 
-    if err = json.Unmarshal(b, payload); err != nil {
+    if err = json.Unmarshal(b, &payload); err != nil {
         return
     }
 
-    if dataType, ok := confs[payload.tag]; !ok {
+    e, ok := execs[payload.Tag]
+
+    if !ok {
+        // TODO: set error message
         return
     }
+
 
     return
 }
