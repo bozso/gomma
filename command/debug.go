@@ -24,11 +24,11 @@ func (d Debug) Execute(cmd Command, ctx Context) (err error) {
 }
 
 type DebugConfig struct {
-    logfile stream.Config `json:"logfile"`
+    Logfile stream.Config `json:"logfile"`
 }
 
-func (d *DebugConfig) ToExecutor() (e Executor, err error) {
-    wr, err := d.logfile.ToOutStream()
+func (d DebugConfig) CreateExecutor() (e Executor, err error) {
+    wr, err := d.Logfile.ToOutStream()
     if err != nil {
         return
     }

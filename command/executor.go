@@ -25,6 +25,12 @@ func (e Execute) Execute(cmd Command, ctx Context) (err error) {
     return exec.CommandContext(ctx.Context, cmd.String(), ctx.Args...).Run()
 }
 
+type Setup struct {}
+
+func (_ Setup) CreateExecutor() (e Executor, err error) {
+    return NewExecute(), nil
+}
+
 func WithEnv(ex Executor, env Env) (se SharedEnv) {
     return SharedEnv {
         ex: ex,

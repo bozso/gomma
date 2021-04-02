@@ -7,14 +7,15 @@ import (
     gmeta "github.com/bozso/gomma/meta"
 )
 
-type ExecutorConfig interface {
-    ToExecutor() (Executor, error)
+type ExecutorCreator interface {
+    CreateExecutor() (Executor, error)
 }
 
-type ExecutorConfigMap map[string]ExecutorConfig
+type ExecutorCreatorMap map[string]ExecutorCreator
 
-var execs = ExecutorConfigMap {
-    "default": NewExecute(),
+var execs = ExecutorCreatorMap {
+    "default": Setup{},
+    "debug": DebugConfig{},
 }
 
 var (
@@ -27,18 +28,29 @@ var (
 )
 
 type ExecutorConfig gmeta.Config
+type ExecutorConfigMap map[string]ExecutorConfig
 
-func (ec ExecutorConfig) ToExecutor() (e Executor, err error) {
-    e, ok := execs[ec.Tag]
+func (conf ExecutorConfig) ToCreator() (ec ExecutorCreator, err error) {
+    ec, ok := execs[conf.Tag]
 
     if !ok {
         err = gmeta.TagNotFound{
-            Tag: ec.Tag,
+            Tag: conf.Tag,
             Choices: execKeys,
         }
         return
     }
 
-    err = json.Unmarshal(ec.Data, &e)
+    err = json.Unmarshal(conf.Data, &ec)
+    return
+}
+
+func (conf ExecutorConfig) CreateExecutor() (e Executor, err error) {
+    ec, err := conf.ToCreator()
+    if err != nil {
+        return
+    }
+
+    e, err = ec.CreateExecutor()
     return
 }
