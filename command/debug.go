@@ -13,27 +13,27 @@ type Formatter interface {
     FormatCommand(io.Writer, Command, Context) (int, error)
 }
 
-type Debugger struct {
+type Debug struct {
     wr io.Writer
     fmt Formatter
 }
 
-func (d Debugger) Execute(cmd Command, ctx Context) (err error) {
+func (d Debug) Execute(cmd Command, ctx Context) (err error) {
     _, err = d.fmt.FormatCommand(d.wr, cmd, ctx)
     return
 }
 
-type DebuggerConfig struct {
+type DebugConfig struct {
     logfile stream.Config `json:"logfile"`
 }
 
-func (d *DebuggerConfig) ToExecutor() (e Executor, err error) {
+func (d *DebugConfig) ToExecutor() (e Executor, err error) {
     wr, err := d.logfile.ToOutStream()
     if err != nil {
         return
     }
 
-    e = Debugger {
+    e = Debug {
         wr: &wr,
         fmt: LineFormat,
     }
@@ -50,11 +50,6 @@ func (_ LineFormatter) FormatCommand(wr io.Writer, cmd Command, ctx Context) (n 
         cmd.String(),
         strings.Join(ctx.Args, " "),
     )
-}
-
-type Pair struct {
-    Command Command
-    Context Context
 }
 
 type Encoder interface {
@@ -78,6 +73,11 @@ func (_ CreateJSONEncoder) CreateEncoder(wr io.Writer) (e Encoder) {
 }
 
 func (e EncodeFormatter) FormatCommand(wr io.Writer, cmd Command, ctx Context) (n int, err error) {
-    err = e.creator.CreateEncoder(wr).Encode(Pair{cmd, ctx})
+    type pair struct {
+        Command Command
+        Context Context
+    }
+
+    err = e.creator.CreateEncoder(wr).Encode(pair{cmd, ctx})
     return
 }

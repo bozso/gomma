@@ -30,7 +30,7 @@ import (
 /*
 Formatter is the value type for Map.
 */
-type Formatter interface {
+type EnvFormatter interface {
     // FormatEnv will return with the string representation of an environment
     // variable given a specific key.
     FormatEnv(key string) string
@@ -45,7 +45,7 @@ func (t trueVal) FormatEnv(key string) (s string) {
 /*
 True represents that the environemnt variable is set.
 */
-var True Formatter = trueVal{}
+var True EnvFormatter = trueVal{}
 
 /*
 String is an alias to string to implement the Formatter interface.
@@ -70,7 +70,7 @@ func (i Int) FormatEnv(key string) (out string) {
 /*
 Map represent key value pairs of environment variables
 */
-type Map map[string]Formatter
+type Map map[string]EnvFormatter
 
 // Set sets key to String(val).
 func (m Map) Set(key, val string) {

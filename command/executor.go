@@ -1,9 +1,6 @@
 package command
 
 import (
-    "fmt"
-    "io"
-    "strings"
     "os/exec"
 )
 
@@ -34,5 +31,3 @@ func WithEnv(ex Executor, env Env) (se SharedEnv) {
         env: env,
     }
 }
-
-
