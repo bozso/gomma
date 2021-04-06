@@ -13,7 +13,9 @@ const payload = `
 {
     "debug": {
         "type": "debug",
-        "logfile": "/tmp/test.log"
+        "data": {
+            "logfile": "/tmp/test.log"
+        }
     },
     "default": {
         "type": "default"
@@ -48,7 +50,7 @@ func TestDecodeSetup(t *testing.T) {
     for key, val := range confs {
         creator, err := val.ToCreator()
         if err != nil {
-            t.Errorf("could not create creator: %s", err)
+            t.Fatalf("could not create creator: %s", err)
         }
 
         creators[key] = creator

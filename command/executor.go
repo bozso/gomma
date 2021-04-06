@@ -27,6 +27,10 @@ func (e Execute) Execute(cmd Command, ctx Context) (err error) {
 
 type Setup struct {}
 
+func (_ *Setup) UnmarshalJSON(_ []byte) (err error) {
+    return nil
+}
+
 func (_ Setup) CreateExecutor() (e Executor, err error) {
     return NewExecute(), nil
 }

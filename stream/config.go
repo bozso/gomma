@@ -41,7 +41,7 @@ func (m Mode) String() (s string) {
 
 type Config struct {
     Mode Mode
-    Data string `json:"data"`
+    Logfile string `json:"logfile"`
 }
 
 func (c *Config) Set(s string) (err error) {
@@ -49,7 +49,7 @@ func (c *Config) Set(s string) (err error) {
     if err = c.Mode.Set(s); err != nil {
         return
     }
-    c.Data = s
+    c.Logfile = s
     return
 }
 
@@ -78,11 +78,11 @@ func (c Config) ToInStream() (in In, err error) {
     case Stdout:
         err = fmt.Errorf("%s cannot be used as in stream", m.String())
     default:
-        f, err := os.Open(c.Data)
+        f, err := os.Open(c.Logfile)
         if err != nil {
-            err = fmt.Errorf("while opening '%s': %w", c.Data, err)
+            err = fmt.Errorf("while opening '%s': %w", c.Logfile, err)
         }
-        in.name = c.Data
+        in.name = c.Logfile
         in.r = f
     }
 
@@ -97,11 +97,11 @@ func (c Config) ToOutStream() (out Out, err error) {
         out.name = m.String()
         out.w = os.Stdout
     default:
-        f, err := os.Create(c.Data)
+        f, err := os.Create(c.Logfile)
         if err != nil {
-            err = fmt.Errorf("while creating '%s': %w", c.Data, err)
+            err = fmt.Errorf("while creating '%s': %w", c.Logfile, err)
         }
-        out.name = c.Data
+        out.name = c.Logfile
         out.w = f
     }
 

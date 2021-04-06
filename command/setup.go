@@ -1,6 +1,7 @@
 package command
 
 import (
+    "fmt"
     "encoding/json"
 
     "github.com/bozso/gotoolbox/meta"
@@ -41,6 +42,7 @@ func (conf ExecutorConfig) ToCreator() (ec ExecutorCreator, err error) {
         return
     }
 
+    fmt.Printf("%s %#v\n", conf.Tag, ec)
     err = json.Unmarshal(conf.Data, &ec)
     return
 }
