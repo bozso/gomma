@@ -18,17 +18,23 @@ const payload = `
         }
     },
     "default": {
-        "type": "default"
+        "type": "default",
+        "data": ""
     }
 }
 `
+
+type (
+    ExecutorConfigMap map[string]ExecutorConfig
+    ExecutorCreatorMap map[string]ExecutorCreator
+)
 
 var reference = ExecutorCreatorMap {
     "default": Setup{},
     "debug": DebugConfig {
         Logfile: stream.Config {
             Mode: stream.Path,
-            Data: "/tmp/test.log",
+            Logfile: "/tmp/test.log",
         },
     },
 }

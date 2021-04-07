@@ -1,10 +1,8 @@
 package command
 
 import (
-    "fmt"
     "encoding/json"
 
-    "github.com/bozso/gotoolbox/meta"
     gmeta "github.com/bozso/gomma/meta"
 )
 
@@ -12,38 +10,28 @@ type ExecutorCreator interface {
     CreateExecutor() (Executor, error)
 }
 
-type ExecutorCreatorMap map[string]ExecutorCreator
-
-var execs = ExecutorCreatorMap {
-    "default": Setup{},
-    "debug": DebugConfig{},
-}
-
-var (
-    execKeys []string
-    s meta.Startup
-    _ = s.Do(&meta.MapKeysGet{
-        Map: execs,
-        Keys: execKeys,
-    })
-)
-
 type ExecutorConfig gmeta.Config
-type ExecutorConfigMap map[string]ExecutorConfig
+
+var execKeys = []string{"default", "debug"}
 
 func (conf ExecutorConfig) ToCreator() (ec ExecutorCreator, err error) {
-    ec, ok := execs[conf.Tag]
-
-    if !ok {
-        err = gmeta.TagNotFound{
+    switch conf.Tag {
+    case "default":
+        var setup Setup
+        err = json.Unmarshal(conf.Data, &setup)
+        ec = setup
+    case "debug":
+        var dc DebugConfig
+        err = json.Unmarshal(conf.Data, &dc)
+        ec = dc
+    default:
+        err = gmeta.TagNotFound {
             Tag: conf.Tag,
             Choices: execKeys,
         }
         return
     }
 
-    fmt.Printf("%s %#v\n", conf.Tag, ec)
-    err = json.Unmarshal(conf.Data, &ec)
     return
 }
 
