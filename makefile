@@ -1,2 +1,2 @@
 test:
-	go test ./command
+	go test ./command ./meta
