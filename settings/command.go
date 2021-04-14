@@ -4,7 +4,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/bozso/gotoolbox/command"
+    "github.com/bozso/gomma/command"
     "github.com/bozso/gotoolbox/errors"
 )
 

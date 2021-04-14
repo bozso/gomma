@@ -7,6 +7,9 @@ import (
     "github.com/bozso/gotoolbox/enum"
 
     "github.com/bozso/gomma/command"
+    "github.com/bozso/gomma/stream"
+
+    "git.st.ht/~istvan_bozso/sert/log"
 )
 
 var (
@@ -38,76 +41,42 @@ type Common struct {
     RasterExtension RasterExtension `json:"raster_extension"`
     GammaDirectory  path.Dir        `json:"gamma_directory"`
     CachePath       path.Dir        `json:"cache_path"`
+    Logging         log.Config      `json:"logging"`
 }
 
 type Payload struct {
     Common
-    Modules []string               `json:"modules"`
-    Executor command.ExecutorSetup `json:"executor"`
+    Modules []string      `json:"modules"`
+    Executor json.Payload `json:"executor"`
+}
+
+func (p Payload) ToSettings() (s Settings, err error) {
+    s.Common = p.Common
+    s.Executor, err = command.FromPayload(p.Executor)
+    if err != nil {
+        return
+    }
+
+    s.Commands, err = p.MakeCommands()
+    if err != nil {
+        return
+    }
+
+    s.Logger, err = p.Logging.Create()
+    return
 }
 
 type Settings struct {
     Common
-    executor        command.Executor
+    Executor        command.Executor
     Commands        Commands
+    Logger          log.Logger
 }
 
-func (s *Settings) Update(p Payload) (er error) {
+var exeDirectories = [...]string{"bin", "scripts"}
 
-}
-
-func (s Setup) New() (st Settings, err error) {
-    if err = st.SetRasterExtension(s.RasterExtension); err != nil {
-        return
-    }
-
-    if err = st.SetGammaDirectory(s.GammaDirectory); err != nil {
-        return
-    }
-
-    if err = st.SetModules(s.Modules); err != nil {
-        return
-    }
-
-    err = st.SetCachePath(s.CachePath)
-    return
-}
-
-
-func (s *Settings) SetModules(modules []string) (err error) {
-    s.Modules = modules
-    return
-}
-
-func (s *Settings) SetRasterExtension(ext string) (err error) {
-    if !validExtensions.Contains(ext) {
-        err = fmt.Errorf("expected either '%s', got '%s'",
-            validExtensions, ext)
-        return
-    }
-
-    s.RasterExtension = ext
-    return
-}
-
-func (s *Settings) SetGammaDirectory(gammaPath string) (err error) {
-    s.GammaDirectory, err = path.New(gammaPath).Mkdir()
-    return
-}
-
-func (s *Settings) SetCachePath(cachePath string) (err error) {
-    s.CachePath, err = path.New(cachePath).Mkdir()
-    return
-}
-
-func (s *Settings) Default() (err error) {
-    return s.SetCachePath(".")
-}
-
-var exeDirectories = [2]string{"bin", "scripts"}
-
-func (s Settings) MakeCommands(create command.Creator) (c Commands, err error) {
-    gammaDir := s.GammaDirectory
+func (p Payload) MakeCommands() (c Commands, err error) {
+    gammaDir := p.GammaDirectory
     c = make(Commands)
 
     for _, module := range s.Modules {
@@ -119,12 +88,10 @@ func (s Settings) MakeCommands(create command.Creator) (c Commands, err error) {
             }
 
             for _, exePath := range glob {
-                com, err := create.Create(exePath.String())
+                c[exePath.Base().String()], err = command.New(exePath)
                 if err != nil {
                     return c, err
                 }
-
-                c[exePath.Base().String()] = com
             }
         }
     }

@@ -1,42 +1,42 @@
 package command
 
 import (
-    "encoding/json"
+    "errors"
 
-    gmeta "github.com/bozso/gomma/meta"
+    "github.com/bozso/gomma/meta"
+    "git.sr.ht/~istvan_bozso/sert/json"
 )
 
 type ExecutorCreator interface {
     CreateExecutor() (Executor, error)
 }
 
-type ExecutorConfig gmeta.Config
+var tags = [...]string{"default", "debug"}
 
-var execKeys = []string{"default", "debug"}
-
-func (conf ExecutorConfig) ToCreator() (ec ExecutorCreator, err error) {
-    switch conf.Tag {
-    case "default":
-        var setup Setup
-        err = json.Unmarshal(conf.Data, &setup)
-        ec = setup
-    case "debug":
-        var dc DebugConfig
-        err = json.Unmarshal(conf.Data, &dc)
-        ec = dc
-    default:
-        err = gmeta.TagNotFound {
-            Tag: conf.Tag,
-            Choices: execKeys,
+func ToCreator(pl json.Payload) (ec ExecutorCreator, err error) {
+    for _, tag := range tags {
+        switch tag {
+        case "default":
+            var setup Setup
+            err = pl.Unmarshal(tag, &setup)
+            ec = setup
+        case "debug":
+            var dc DebugConfig
+            err = pl.Unmarshal(tag, &dc)
+            ec = dc
         }
-        return
+        if errors.Is(err, meta.MissingTagError) {
+            continue
+        } else {
+            break
+        }
     }
 
     return
 }
 
-func (conf ExecutorConfig) CreateExecutor() (e Executor, err error) {
-    ec, err := conf.ToCreator()
+func CreateExecutor(pl json.Payload) (e Executor, err error) {
+    ec, err := ToCreator(pl)
     if err != nil {
         return
     }

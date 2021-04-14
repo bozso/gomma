@@ -7,25 +7,22 @@ import (
     "encoding/json"
 
     "github.com/bozso/gomma/stream"
+    "github.com/bozso/gomma/meta"
 )
 
 const payload = `
 {
     "debug": {
-        "type": "debug",
-        "data": {
+        "debug": {
             "logfile": "/tmp/test.log"
         }
     },
-    "default": {
-        "type": "default",
-        "data": ""
-    }
+    "default": { "default": {} }
 }
 `
 
 type (
-    ExecutorConfigMap map[string]ExecutorConfig
+    Payloads map[string]meta.Payload
     ExecutorCreatorMap map[string]ExecutorCreator
 )
 
@@ -39,7 +36,7 @@ var reference = ExecutorCreatorMap {
     },
 }
 
-func DecodeConfigs(t *testing.T) (confs ExecutorConfigMap) {
+func DecodeConfigs(t *testing.T) (confs Payloads) {
     dec := json.NewDecoder(strings.NewReader(payload))
 
     if err := dec.Decode(&confs); err != nil {
@@ -54,7 +51,7 @@ func TestDecodeSetup(t *testing.T) {
     creators := make(ExecutorCreatorMap)
 
     for key, val := range confs {
-        creator, err := val.ToCreator()
+        creator, err := ToCreator(val)
         if err != nil {
             t.Fatalf("could not create creator: %s", err)
         }
