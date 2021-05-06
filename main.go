@@ -1,9 +1,6 @@
 package main
 
 import (
-    //"fmt"
-    //"os"
-
     gcli "github.com/bozso/gomma/cli"
     "github.com/bozso/gotoolbox/cli"
 )
