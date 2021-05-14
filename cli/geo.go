@@ -1,13 +1,13 @@
 package cli
 
 import (
-    //"strings"
-    
-    //"github.com/bozso/gotoolbox/cli"
+//"strings"
 
-    //"github.com/bozso/gomma/data"
-    //"github.com/bozso/gomma/dem"
-    //"github.com/bozso/gomma/geo"
+//"github.com/bozso/gotoolbox/cli"
+
+//"github.com/bozso/gomma/data"
+//"github.com/bozso/gomma/dem"
+//"github.com/bozso/gomma/geo"
 )
 
 /*
@@ -20,18 +20,18 @@ type geoCode struct {
 
 func (g *geoCode) SetCli(c *cli.Cli) {
     c.Var(&g.Lookup, "lookup", "Lookup table file.")
-    
+
     c.Var(&g.InFile, "infile", "Input datafile to geocode.")
     c.Var(&g.OutFile, "outfile", "Geocoded output datafile.")
     c.StringVar(&g.Mode, "mode", "",
         "Geocoding direction; from or to radar cordinates.")
-    
+
     g.CodeOpt.SetCli(c)
 }
 
 func (c geoCode) Run() (err error) {
     mode := strings.ToUpper(c.Mode)
-    
+
     switch mode {
     case "TORADAR", "RADAR":
         err = c.Lookup.geo2radar(c.InFile, c.OutFile, c.CodeOpt)
@@ -40,7 +40,7 @@ func (c geoCode) Run() (err error) {
     default:
         err = UnrecognizedMode{name: "geocoding", got: mode}
     }
-    
+
     return
 }
 */

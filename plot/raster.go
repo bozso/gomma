@@ -9,10 +9,10 @@ import (
 
 func raster(cmd command.Command, p Plottable, opt Options) (err error) {
     opt.Parse(p)
-    
+
     //fmt.Printf("%#v\n", opt)
     //return nil
-                
+
     switch opt.Mode {
     case Byte:
         _, err = cmd.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
@@ -43,7 +43,7 @@ func raster(cmd command.Command, p Plottable, opt Options) (err error) {
                            opt.Raster, opt.Inverse, opt.Channel)
     case MagPhase:
         dt := 0
-        
+
         switch opt.Type {
         case data.FloatCpx:
             dt = 0
@@ -55,18 +55,18 @@ func raster(cmd command.Command, p Plottable, opt Options) (err error) {
         _, err = cmd.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                         opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
                         opt.LR, opt.Raster, dt)
-    case MagPhasePwr:    
+    case MagPhasePwr:
         if opt.Type != data.FloatCpx {
             // Error
         }
-        
+
         _, err = cmd.Call(opt.Datfile, opt.Sec, opt.Rng, opt.Start,
                            opt.StartSec, opt.Nlines, opt.Avg.Rng, opt.Avg.Azi,
                            opt.Scale, opt.Exp, opt.LR, opt.Raster,
                            opt.CC, opt.StartCC, opt.CCMin)
     case Power:
         dt := 0
-        
+
         switch opt.Type {
         case data.Float:
             dt = 0
@@ -77,14 +77,14 @@ func raster(cmd command.Command, p Plottable, opt Options) (err error) {
         default:
             // Error
         }
-        
+
         _, err = cmd.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                         opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp, opt.LR,
                         opt.Raster, dt, opt.HeaderSize)
-    
+
     case SingleLook:
         dt := 0
-        
+
         switch opt.Type {
         case data.FloatCpx:
             dt = 0
@@ -93,12 +93,12 @@ func raster(cmd command.Command, p Plottable, opt Options) (err error) {
         default:
             // Error
         }
-        
+
         _, err = cmd.Call(opt.Datfile, opt.Rng, opt.Start, opt.Nlines,
                         opt.Avg.Rng, opt.Avg.Azi, opt.Scale, opt.Exp,
                         opt.LR, dt, opt.HeaderSize, opt.Raster)
     case Unwrapped:
-        _, err = cmd.Call(opt.Datfile, opt.Sec, opt.Start, opt.StartSec, 
+        _, err = cmd.Call(opt.Datfile, opt.Sec, opt.Start, opt.StartSec,
                         opt.Nlines, opt.Avg.Rng, opt.Avg.Azi, opt.PhaseScale,
                         opt.Scale, opt.Exp, opt.Offset, opt.LR, opt.Raster,
                         opt.CC, opt.StartCC, opt.CCMin)

@@ -9,7 +9,7 @@ Example usage:
         "GOLANG": environment.True,
         "CORES": environment.Int(6),
     }
-    
+
     env := envMap.IntoEnv()
     // converted to environment.Env the result is
     // env = {}string{"OS=linux", "GOLANG", "CORES=6"}
@@ -24,22 +24,22 @@ Example usage:
 package command
 
 import (
-    "fmt"
+	"fmt"
 )
 
 /*
 Formatter is the value type for Map.
 */
 type EnvFormatter interface {
-    // FormatEnv will return with the string representation of an environment
-    // variable given a specific key.
-    FormatEnv(key string) string
+	// FormatEnv will return with the string representation of an environment
+	// variable given a specific key.
+	FormatEnv(key string) string
 }
 
-type trueVal struct {}
+type trueVal struct{}
 
 func (t trueVal) FormatEnv(key string) (s string) {
-    return key
+	return key
 }
 
 /*
@@ -54,7 +54,7 @@ type String string
 
 // FormatEnv implements the Formatter interface
 func (s String) FormatEnv(key string) (out string) {
-    return fmt.Sprintf("%s=%s", key, s)
+	return fmt.Sprintf("%s=%s", key, s)
 }
 
 /*
@@ -64,7 +64,7 @@ type Int int
 
 // FormatEnv implements the Formatter interface
 func (i Int) FormatEnv(key string) (out string) {
-    return fmt.Sprintf("%s=%d", key, i)
+	return fmt.Sprintf("%s=%d", key, i)
 }
 
 /*
@@ -74,32 +74,32 @@ type Map map[string]EnvFormatter
 
 // Set sets key to String(val).
 func (m Map) Set(key, val string) {
-    m[key] = String(val)
+	m[key] = String(val)
 }
 
 // SetInt sets key to Int(val).
 func (m Map) SetInt(key string, val int) {
-    m[key] = Int(val)
+	m[key] = Int(val)
 }
 
 // Use sets key to True.
 func (m Map) Use(key string) {
-    m[key] = True
+	m[key] = True
 }
 
 // Remove removes a key from the map.
 func (m Map) Remove(key string) {
-    delete(m, key)
+	delete(m, key)
 }
 
 // IntoEnv converts m into an Env
 func (m Map) IntoEnv() (env Env, err error) {
-    s := make([]string, len(m))
+	s := make([]string, len(m))
 
-    ii := 0
-    for key, val := range m {
-        s[ii] = val.FormatEnv(key)
-    }
+	ii := 0
+	for key, val := range m {
+		s[ii] = val.FormatEnv(key)
+	}
 
-    return NewEnvironment(s), nil
+	return NewEnvironment(s), nil
 }

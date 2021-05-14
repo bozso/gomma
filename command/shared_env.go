@@ -1,14 +1,13 @@
 package command
 
-import (
-)
+import ()
 
 type SharedEnv struct {
-    env Env
-    ex  Executor
+	env Env
+	ex  Executor
 }
 
 func (se SharedEnv) Execute(cmd Command, ctx Context) (err error) {
-    ctx.Env = se.env
-    return se.ex.Execute(cmd, ctx)
+	ctx.Env = se.env
+	return se.ex.Execute(cmd, ctx)
 }

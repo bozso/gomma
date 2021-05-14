@@ -1,15 +1,15 @@
 package meta
 
 import (
-    "fmt"
+	"fmt"
 )
 
 type TagNotFound struct {
-    Tag string
-    Choices []string
+	Tag     string
+	Choices []string
 }
 
 func (t TagNotFound) Error() (s string) {
-    return fmt.Sprintf("type tag '%s' is not valid, valid options: %s",
-        t.Tag, t.Choices)
+	return fmt.Sprintf("type tag '%s' is not valid, valid options: %s",
+		t.Tag, t.Choices)
 }

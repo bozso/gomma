@@ -1,43 +1,43 @@
 package plot
 
 import (
-    //"github.com/bozso/gomma/common"
-    "github.com/bozso/gomma/data"
+	//"github.com/bozso/gomma/common"
+	"github.com/bozso/gomma/data"
 )
 
 type Plottable interface {
-    PlotMode() Mode
-    MetaData() data.Meta
+	PlotMode() Mode
+	MetaData() data.Meta
 }
 
 type ZeroFlag int
 
 const (
-    Missing ZeroFlag = iota
-    Valid
+	Missing ZeroFlag = iota
+	Valid
 )
 
 type Inverse int
 
 const (
-    Float2Raster Inverse = 1
-    Raster2Float Inverse = -1
+	Float2Raster Inverse = 1
+	Raster2Float Inverse = -1
 )
 
 type Channel int
 
 const (
-    Red   Channel = 1
-    Green Channel = 2
-    Blue  Channel = 3
+	Red   Channel = 1
+	Green Channel = 2
+	Blue  Channel = 3
 )
 
 func calcFactor(ndata, factor int) int {
-    ret := float64(ndata) / float64(factor)
+	ret := float64(ndata) / float64(factor)
 
-    if ret <= 0.0 {
-        return 1
-    } else {
-        return int(ret)
-    }
+	if ret <= 0.0 {
+		return 1
+	} else {
+		return int(ret)
+	}
 }

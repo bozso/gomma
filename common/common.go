@@ -1,165 +1,166 @@
 package common
 
 import (
-    "os"
-    "fmt"
-    "log"
-    "math"
-    "encoding/json"
+	"encoding/json"
+	"fmt"
+	"log"
+	"math"
+	"os"
 
-    "github.com/bozso/gotoolbox/errors"
-    "github.com/bozso/gotoolbox/path"
+	"github.com/bozso/gotoolbox/errors"
+	"github.com/bozso/gotoolbox/path"
 )
 
 const DefaultCachePath = "/mnt/bozso_i/cache"
 
 type (
-    Slice []string
+	Slice []string
 
-    settings struct {
-        RasExt    string
-        Path      string
-        Modules   []string
-    }
+	settings struct {
+		RasExt  string
+		Path    string
+		Modules []string
+	}
 )
 
 const (
-    BufSize    = 50
+	BufSize = 50
 )
 
 var (
-    Pols = [4]string{"vv", "hh", "hv", "vh"}
+	Pols = [4]string{"vv", "hh", "hv", "vh"}
 
-    confpath = getConfigPath()
+	confpath = getConfigPath()
 
-    // TODO: get settings path from environment variable
-    Settings = loadSettings(confpath)
+	// TODO: get settings path from environment variable
+	Settings = loadSettings(confpath)
 )
 
 func Check(err error) {
-    if err != nil {
-        log.Fatalf("%s\n", err)
-    }
+	if err != nil {
+		log.Fatalf("%s\n", err)
+	}
 }
 
 func getConfigPath() (f path.ValidFile) {
-    s, ok := os.LookupEnv("GOMMA_CONFIG")
+	s, ok := os.LookupEnv("GOMMA_CONFIG")
 
-    if !ok {
-        var err error
-        s, err = os.UserConfigDir()
-        Check(err)
-        return
-    }
+	if !ok {
+		var err error
+		s, err = os.UserConfigDir()
+		Check(err)
+		return
+	}
 
-    f, err := path.New(s).Join("gomma.json").ToValidFile()
-    Check(err)
+	f, err := path.New(s).Join("gomma.json").ToValidFile()
+	Check(err)
 
-    return
+	return
 }
 
 func loadSettings(file path.ValidFile) (ret settings) {
-    if err := LoadJson(file, &ret); err != nil {
-        log.Fatalf("Failed to load Gamma settings from '%s'\nError:'%s'\n!",
-            file, err)
-    }
+	if err := LoadJson(file, &ret); err != nil {
+		log.Fatalf("Failed to load Gamma settings from '%s'\nError:'%s'\n!",
+			file, err)
+	}
 
-    return
+	return
 }
 
-
 func isClose(num1, num2 float64) bool {
-    return math.RoundToEven(math.Abs(num1 - num2)) > 0.0
+	return math.RoundToEven(math.Abs(num1-num2)) > 0.0
 }
 
 func (sl Slice) Contains(s string) bool {
-    for _, elem := range sl {
-        if s == elem {
-            return true
-        }
-    }
-    return false
+	for _, elem := range sl {
+		if s == elem {
+			return true
+		}
+	}
+	return false
 }
 
 type SavePather interface {
-    SavePath(ext string) path.Like
+	SavePath(ext string) path.Like
 }
 
 func SaveJson(val SavePather) (err error) {
-    return SaveJsonTo(val.SavePath("json"), val)
+	return SaveJsonTo(val.SavePath("json"), val)
 }
 
 func SaveJsonTo(pth path.Like, val interface{}) (err error) {
-    f, err := os.Create(pth.String())
-    if err != nil { return }
-    defer f.Close()
+	f, err := os.Create(pth.String())
+	if err != nil {
+		return
+	}
+	defer f.Close()
 
-    out, err := json.MarshalIndent(val, "", "    ")
-    if err != nil {
-        return errors.WrapFmt(err, "failed to json encode struct: %v", val)
-    }
+	out, err := json.MarshalIndent(val, "", "    ")
+	if err != nil {
+		return errors.WrapFmt(err, "failed to json encode struct: %v", val)
+	}
 
-    if _, err = f.Write(out); err != nil {
-        return
-    }
+	if _, err = f.Write(out); err != nil {
+		return
+	}
 
-    return nil
+	return nil
 }
 
 type Validator interface {
-    Validate() error
+	Validate() error
 }
 
 func LoadJson(f path.ValidFile, val interface{}) (err error) {
-    d, err := f.ReadAll()
-    if err != nil {
-        return errors.WrapFmt(err, "failed to read file '%s'", f)
-    }
+	d, err := f.ReadAll()
+	if err != nil {
+		return errors.WrapFmt(err, "failed to read file '%s'", f)
+	}
 
-    if err := json.Unmarshal(d, &val); err != nil {
-        return errors.WrapFmt(err, "failed to parse json data %s'", d)
-    }
+	if err := json.Unmarshal(d, &val); err != nil {
+		return errors.WrapFmt(err, "failed to parse json data %s'", d)
+	}
 
-    v, ok := val.(Validator)
+	v, ok := val.(Validator)
 
-    if !ok {
-        return nil
-    }
+	if !ok {
+		return nil
+	}
 
-    err = v.Validate()
+	err = v.Validate()
 
-    return
+	return
 }
 
 func ParseFail(p path.Pather, err error) FileParseError {
-    return FileParseError{p, "", err}
+	return FileParseError{p, "", err}
 }
 
 type FileParseError struct {
-    p path.Pather
-    toRetreive string
-    err error
+	p          path.Pather
+	toRetreive string
+	err        error
 }
 
 func (e FileParseError) ToRetreive(s string) error {
-    e.toRetreive = s
-    return e
+	e.toRetreive = s
+	return e
 }
 
 func (e FileParseError) Error() string {
-    str := fmt.Sprintf("failed to parse file '%s'", e.p.AsPath())
+	str := fmt.Sprintf("failed to parse file '%s'", e.p.AsPath())
 
-    if tr := e.toRetreive; len(tr) > 0 {
-        str = fmt.Sprintf("%s to retreive %s", str, tr)
-    }
+	if tr := e.toRetreive; len(tr) > 0 {
+		str = fmt.Sprintf("%s to retreive %s", str, tr)
+	}
 
-    return fmt.Sprintf("%s\n%s", e.err, str)
+	return fmt.Sprintf("%s\n%s", e.err, str)
 }
 
 func (e FileParseError) Unwrap() error {
-    return e.err
+	return e.err
 }
 
 type Pather interface {
-    Path() path.ValidFile
+	Path() path.ValidFile
 }

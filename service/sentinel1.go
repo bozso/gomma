@@ -1,9 +1,7 @@
 package service
 
-import (
-
-)
+import ()
 
 type S1Implement struct {
-    Settings
+	Settings
 }

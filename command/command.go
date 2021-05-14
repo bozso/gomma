@@ -1,17 +1,17 @@
 package command
 
 import (
-    "github.com/bozso/gotoolbox/path"
+	"github.com/bozso/gotoolbox/path"
 )
 
 type Command struct {
-    binPath path.ValidFile
+	binPath path.ValidFile
 }
 
 func New(p path.Path) (c Command, err error) {
-    c.binPath, err = p.ToValidFile()
+	c.binPath, err = p.ToValidFile()
 }
 
 func (c Command) String() (s string) {
-    return c.binPath.String()
+	return c.binPath.String()
 }

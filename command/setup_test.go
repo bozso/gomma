@@ -1,13 +1,13 @@
 package command
 
 import (
-    "testing"
-    "strings"
-    "reflect"
-    "encoding/json"
+	"encoding/json"
+	"reflect"
+	"strings"
+	"testing"
 
-    "github.com/bozso/gomma/stream"
-    "github.com/bozso/gomma/meta"
+	"github.com/bozso/gomma/meta"
+	"github.com/bozso/gomma/stream"
 )
 
 const payload = `
@@ -22,45 +22,44 @@ const payload = `
 `
 
 type (
-    Payloads map[string]meta.Payload
-    ExecutorCreatorMap map[string]ExecutorCreator
+	Payloads           map[string]meta.Payload
+	ExecutorCreatorMap map[string]ExecutorCreator
 )
 
-var reference = ExecutorCreatorMap {
-    "default": Setup{},
-    "debug": DebugConfig {
-        Logfile: stream.Config {
-            Mode: stream.Path,
-            Logfile: "/tmp/test.log",
-        },
-    },
+var reference = ExecutorCreatorMap{
+	"default": Setup{},
+	"debug": DebugConfig{
+		Logfile: stream.Config{
+			Mode:    stream.Path,
+			Logfile: "/tmp/test.log",
+		},
+	},
 }
 
 func DecodeConfigs(t *testing.T) (confs Payloads) {
-    dec := json.NewDecoder(strings.NewReader(payload))
+	dec := json.NewDecoder(strings.NewReader(payload))
 
-    if err := dec.Decode(&confs); err != nil {
-        t.Fatalf("could not decode %s into a config map: %s", payload, err)
-    }
-    return
+	if err := dec.Decode(&confs); err != nil {
+		t.Fatalf("could not decode %s into a config map: %s", payload, err)
+	}
+	return
 }
 
 func TestDecodeSetup(t *testing.T) {
-    confs := DecodeConfigs(t)
+	confs := DecodeConfigs(t)
 
-    creators := make(ExecutorCreatorMap)
+	creators := make(ExecutorCreatorMap)
 
-    for key, val := range confs {
-        creator, err := ToCreator(val)
-        if err != nil {
-            t.Fatalf("could not create creator: %s", err)
-        }
+	for key, val := range confs {
+		creator, err := ToCreator(val)
+		if err != nil {
+			t.Fatalf("could not create creator: %s", err)
+		}
 
-        creators[key] = creator
-    }
+		creators[key] = creator
+	}
 
-
-    if !reflect.DeepEqual(reference, creators) {
-        t.Errorf("expected %v and %v to be equal", confs, reference)
-    }
+	if !reflect.DeepEqual(reference, creators) {
+		t.Errorf("expected %v and %v to be equal", confs, reference)
+	}
 }

@@ -1,23 +1,22 @@
 package geo
 
 import (
-    "github.com/bozso/gomma/data"
-    "github.com/bozso/gomma/plot"
+	"github.com/bozso/gomma/data"
+	"github.com/bozso/gomma/plot"
 )
 
-
 type Height struct {
-    data.File
+	data.File
 }
 
 func (h Height) Validate() (err error) {
-    return h.EnsureFloat()
+	return h.EnsureFloat()
 }
 
 func (h *Height) Set(s string) (err error) {
-    return
+	return
 }
 
 func (_ Height) PlotMode() (m plot.Mode) {
-    return plot.Height
+	return plot.Height
 }

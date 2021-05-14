@@ -1,18 +1,16 @@
 package data
 
-import (
-    
-)
+import ()
 
 type Real struct {
-    File `json:"file"`    
+	File `json:"file"`
 }
 
 func (r Real) Validate() (err error) {
-    return r.EnsureFloat()
+	return r.EnsureFloat()
 }
 
 type RealWithPar struct {
-    Real
-    Parameter `json:"parameter"`
+	Real
+	Parameter `json:"parameter"`
 }

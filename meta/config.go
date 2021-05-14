@@ -1,10 +1,10 @@
 package meta
 
 import (
-    "encoding/json"
+	"encoding/json"
 )
 
 type Config struct {
-    Tag  string          `json:"type"`
-    Data json.RawMessage `json:"data,omitempty"`
+	Tag  string          `json:"type"`
+	Data json.RawMessage `json:"data,omitempty"`
 }
