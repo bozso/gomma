@@ -1,46 +1,44 @@
 package command
 
 import (
-	"errors"
-
-	"git.sr.ht/~istvan_bozso/sert/json"
-	"github.com/bozso/gomma/meta"
+	stdJson "encoding/json"
+	json "git.sr.ht/~istvan_bozso/sert/json"
 )
 
-type ExecutorCreator interface {
-	CreateExecutor() (Executor, error)
+type ExecutorJSON struct {
+	Executor
 }
 
-var tags = [...]string{"default", "debug"}
-
-func ToCreator(pl json.Payload) (ec ExecutorCreator, err error) {
-	for _, tag := range tags {
-		switch tag {
-		case "default":
-			var setup Setup
-			err = pl.Unmarshal(tag, &setup)
-			ec = setup
-		case "debug":
-			var dc DebugConfig
-			err = pl.Unmarshal(tag, &dc)
-			ec = dc
-		}
-		if errors.Is(err, meta.MissingTagError) {
-			continue
-		} else {
-			break
-		}
-	}
-
-	return
+var tags = []string{
+	"default", "debug",
 }
 
-func CreateExecutor(pl json.Payload) (e Executor, err error) {
-	ec, err := ToCreator(pl)
-	if err != nil {
+func (e *ExecutorJSON) UnmarshalJSON(b []byte) (err error) {
+	var pl json.Payloads
+	if err = stdJson.Unmarshal(b, &pl); err != nil {
 		return
 	}
 
-	e, err = ec.CreateExecutor()
+	var ex Executor = nil
+	for key, val := range pl {
+		switch key {
+		case "default":
+			ex = NewExecute()
+		case "debug":
+			var debug Debug
+			err = stdJson.Unmarshal(val, &debug)
+			ex = debug
+		}
+		if err != nil {
+			return
+		}
+	}
+	if ex == nil {
+		err = pl.NoMatchingTag(tags)
+	} else {
+		e.Executor = ex
+		err = nil
+	}
+
 	return
 }

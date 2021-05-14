@@ -10,6 +10,8 @@ type Command struct {
 
 func New(p path.Path) (c Command, err error) {
 	c.binPath, err = p.ToValidFile()
+
+	return
 }
 
 func (c Command) String() (s string) {

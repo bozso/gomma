@@ -11,6 +11,5 @@ build: /tmp/gomma
 lint:
 	golangci-lint run
 
-
 deploy: /tmp/gomma
 	cp /tmp/gomma /home/istvan/mount/zafir/packages/usr/bin/gomma

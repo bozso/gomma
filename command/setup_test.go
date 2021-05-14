@@ -1,16 +1,17 @@
 package command
 
 import (
-	"encoding/json"
+	stdJson "encoding/json"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/bozso/gomma/meta"
+	json "git.sr.ht/~istvan_bozso/sert/json"
+
 	"github.com/bozso/gomma/stream"
 )
 
-const payload = `
+var payload = `
 {
     "debug": {
         "debug": {
@@ -21,23 +22,16 @@ const payload = `
 }
 `
 
-type (
-	Payloads           map[string]meta.Payload
-	ExecutorCreatorMap map[string]ExecutorCreator
-)
-
-var reference = ExecutorCreatorMap{
-	"default": Setup{},
-	"debug": DebugConfig{
-		Logfile: stream.Config{
-			Mode:    stream.Path,
-			Logfile: "/tmp/test.log",
-		},
+var reference = map[string]Executor{
+	"default": NewExecute(),
+	"debug": Debug{
+		wr:  stream.Stdout(),
+		fmt: LineFormat,
 	},
 }
 
-func DecodeConfigs(t *testing.T) (confs Payloads) {
-	dec := json.NewDecoder(strings.NewReader(payload))
+func DecodeConfigs(t *testing.T) (confs json.Payloads) {
+	dec := stdJson.NewDecoder(strings.NewReader(payload))
 
 	if err := dec.Decode(&confs); err != nil {
 		t.Fatalf("could not decode %s into a config map: %s", payload, err)
@@ -48,18 +42,16 @@ func DecodeConfigs(t *testing.T) (confs Payloads) {
 func TestDecodeSetup(t *testing.T) {
 	confs := DecodeConfigs(t)
 
-	creators := make(ExecutorCreatorMap)
-
 	for key, val := range confs {
-		creator, err := ToCreator(val)
+		var ex ExecutorJSON
+		err := ex.UnmarshalJSON(val)
 		if err != nil {
-			t.Fatalf("could not create creator: %s", err)
+			t.Fatalf("unmarshaling failed: %s", err)
 		}
+		now, ref := ex.Executor, reference[key]
 
-		creators[key] = creator
-	}
-
-	if !reflect.DeepEqual(reference, creators) {
-		t.Errorf("expected %v and %v to be equal", confs, reference)
+		if !reflect.DeepEqual(now, ref) {
+			t.Errorf("expected %#v and %#v to be equal", now, ref)
+		}
 	}
 }

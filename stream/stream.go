@@ -68,6 +68,15 @@ type Out struct {
 	w    io.WriteCloser
 }
 
+var stdOut = &Out{
+	name: names.out,
+	w:    os.Stdout,
+}
+
+func Stdout() (out *Out) {
+	return stdOut
+}
+
 // Write implements io.Writer.
 func (o *Out) Write(b []byte) (n int, err error) {
 	return o.w.Write(b)
@@ -78,11 +87,15 @@ func (o *Out) Close() (err error) {
 	return o.w.Close()
 }
 
+func (o *Out) UnmarshalJSON(b []byte) (err error) {
+	// TODO(bozso): implement
+	return nil
+}
+
 func (o *Out) Set(s string) (err error) {
 	switch strings.ToLower(s) {
 	case names.out, "":
-		o.name = names.out
-		o.w = os.Stdout
+		o = Stdout()
 	case names.in:
 		err = fmt.Errorf("stream.Out cannot be set to stdin")
 	default:

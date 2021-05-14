@@ -1,5 +1,6 @@
 package stream
 
+/*
 import (
 	"fmt"
 	"os"
@@ -107,3 +108,4 @@ func (c Config) ToOutStream() (out Out, err error) {
 
 	return
 }
+*/

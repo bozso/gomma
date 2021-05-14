@@ -18,11 +18,22 @@ type Debug struct {
 	fmt Formatter
 }
 
+func (d *Debug) UnmarshalJSON(b []byte) (err error) {
+	var out stream.Out
+	if err = json.Unmarshal(b, &out); err != nil {
+		return
+	}
+	d.wr = &out
+	d.fmt = LineFormat
+	return nil
+}
+
 func (d Debug) Execute(cmd Command, ctx Context) (err error) {
 	_, err = d.fmt.FormatCommand(d.wr, cmd, ctx)
 	return
 }
 
+/*
 type DebugConfig struct {
 	Logfile stream.Config `json:"logfile"`
 }
@@ -39,12 +50,13 @@ func (d DebugConfig) CreateExecutor() (e Executor, err error) {
 	}
 	return
 }
+*/
 
-var LineFormat Formatter = LineFormatter{}
+var LineFormat Formatter = (*LineFormatter)(nil)
 
 type LineFormatter struct{}
 
-func (_ LineFormatter) FormatCommand(wr io.Writer, cmd Command, ctx Context) (n int, err error) {
+func (_ *LineFormatter) FormatCommand(wr io.Writer, cmd Command, ctx Context) (n int, err error) {
 	return fmt.Fprintf(wr, "%s %s %s",
 		strings.Join(ctx.Env.Get(), " "),
 		cmd.String(),
