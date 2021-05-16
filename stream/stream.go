@@ -2,7 +2,6 @@ package stream
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 
 func TrimJSON(b []byte) (s string) {
 	s = strings.Trim(string(b), "\"")
+
 	return strings.Trim(s, " ")
 }
 
@@ -19,6 +19,7 @@ func open(s string) (f *os.File, err error) {
 	if err != nil {
 		return
 	}
+
 	f, err = vf.Open()
 	return
 }
@@ -30,81 +31,86 @@ var names = struct {
 	in:  "stdin",
 }
 
-type In struct {
-	name string
-	r    io.ReadCloser
-}
+type Type int
 
-// Read implements io.Reader.
-func (i *In) Read(b []byte) (n int, err error) {
-	return i.r.Read(b)
-}
+const (
+	InStream Type = iota
+	OutStream
+)
 
-// Close implements io.Closer.
-func (i *In) Close() (err error) {
-	return i.r.Close()
-}
-
-func (i *In) Set(s string) (err error) {
-	switch strings.ToLower(s) {
-	case names.in, "":
-		i.name = names.in
-		i.r = os.Stdin
-	case names.out:
-		err = fmt.Errorf("stream.In cannot be set to stdout")
+func (t Type) String() (s string) {
+	switch t {
+	case InStream:
+		s = "input"
+	case OutStream:
+		s = "output"
 	default:
-		r, err := open(s)
-		if err != nil {
-			return err
-		}
-		i.name = s
-		i.r = r
+		s = "unknown"
 	}
+
 	return
 }
 
-type Out struct {
-	name string
-	w    io.WriteCloser
-}
+type Mode int
 
-var stdOut = &Out{
-	name: names.out,
-	w:    os.Stdout,
-}
+const (
+	PathMode Mode = iota
+	StdinMode
+	StdoutMode
+)
 
-func Stdout() (out *Out) {
-	return stdOut
-}
-
-// Write implements io.Writer.
-func (o *Out) Write(b []byte) (n int, err error) {
-	return o.w.Write(b)
-}
-
-// Close implements io.Closer.
-func (o *Out) Close() (err error) {
-	return o.w.Close()
-}
-
-func (o *Out) UnmarshalJSON(b []byte) (err error) {
-	// TODO(bozso): implement
-	return nil
-}
-
-func (o *Out) Set(s string) (err error) {
-	switch strings.ToLower(s) {
-	case names.out, "":
-		o = Stdout()
-	case names.in:
-		err = fmt.Errorf("stream.Out cannot be set to stdin")
+func (m Mode) String() (s string) {
+	switch m {
+	case PathMode:
+		s = "filepath"
+	case StdinMode:
+		s = "stdin"
+	case StdoutMode:
+		s = "stdout"
 	default:
-		w, err := os.Create(s)
-		if err != nil {
-			return err
-		}
-		o.name = s
-		o.w = w
+		s = "unknown"
 	}
+
 	return
+}
+
+type Meta struct {
+	StreamType Type
+	Mode       Mode
+}
+
+func (m Meta) Describe() (s string) {
+	return fmt.Sprintf("stream type: %s in mode: %s", m.StreamType, m.Mode)
+}
+
+func InMeta(mode Mode) (m Meta) {
+	return Meta{
+		StreamType: InStream,
+		Mode:       mode,
+	}
+}
+
+func StdinMeta() (m Meta) {
+	return InMeta(StdinMode)
+}
+
+func OutMeta(mode Mode) (m Meta) {
+	return Meta{
+		StreamType: OutStream,
+		Mode:       mode,
+	}
+}
+
+func StdoutMeta() (m Meta) {
+	return OutMeta(StdoutMode)
+}
+
+type MismatchedStreamType struct {
+	Expected Type
+	Got      Meta
+}
+
+func (m MismatchedStreamType) Error() (s string) {
+	return fmt.Sprintf("expected stream type %s got %s", m.Expected,
+		m.Got.Describe())
 }

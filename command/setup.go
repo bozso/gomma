@@ -14,13 +14,14 @@ var tags = []string{
 }
 
 func (e *ExecutorJSON) UnmarshalJSON(b []byte) (err error) {
-	var pl json.Payloads
-	if err = stdJson.Unmarshal(b, &pl); err != nil {
+	pl, err := json.UnmarshalPayloads(b)
+	if err != nil {
 		return
 	}
 
 	var ex Executor = nil
-	for key, val := range pl {
+	pl.ForEach(func(key string, val json.RawMsg) (err error) {
+		err = nil
 		switch key {
 		case "default":
 			ex = NewExecute()
@@ -29,10 +30,9 @@ func (e *ExecutorJSON) UnmarshalJSON(b []byte) (err error) {
 			err = stdJson.Unmarshal(val, &debug)
 			ex = debug
 		}
-		if err != nil {
-			return
-		}
-	}
+		return err
+	})
+
 	if ex == nil {
 		err = pl.NoMatchingTag(tags)
 	} else {

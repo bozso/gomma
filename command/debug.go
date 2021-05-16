@@ -1,10 +1,11 @@
 package command
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
+
+	json "git.sr.ht/~istvan_bozso/sert/json"
 
 	"github.com/bozso/gomma/stream"
 )
@@ -14,43 +15,29 @@ type Formatter interface {
 }
 
 type Debug struct {
-	wr  io.Writer
-	fmt Formatter
-}
-
-func (d *Debug) UnmarshalJSON(b []byte) (err error) {
-	var out stream.Out
-	if err = json.Unmarshal(b, &out); err != nil {
-		return
-	}
-	d.wr = &out
-	d.fmt = LineFormat
-	return nil
+	Out *stream.Out   `json:"logfile"`
+	Fmt FormatterJSON `json:"formatter"`
 }
 
 func (d Debug) Execute(cmd Command, ctx Context) (err error) {
-	_, err = d.fmt.FormatCommand(d.wr, cmd, ctx)
+	_, err = d.Fmt.FormatCommand(d.Out, cmd, ctx)
 	return
 }
 
-/*
-type DebugConfig struct {
-	Logfile stream.Config `json:"logfile"`
+type FormatterJSON struct {
+	Formatter
 }
 
-func (d DebugConfig) CreateExecutor() (e Executor, err error) {
-	wr, err := d.Logfile.ToOutStream()
-	if err != nil {
-		return
+func (f *FormatterJSON) UnmarshalJSON(b []byte) (err error) {
+	switch json.Trim(b) {
+	case "line_formatter":
+		f.Formatter = LineFormat
+	default:
+		err = fmt.Errorf("unrecognized option for formatter: '%s'", b)
 	}
 
-	e = Debug{
-		wr:  &wr,
-		fmt: LineFormat,
-	}
 	return
 }
-*/
 
 var LineFormat Formatter = (*LineFormatter)(nil)
 
@@ -62,34 +49,4 @@ func (_ *LineFormatter) FormatCommand(wr io.Writer, cmd Command, ctx Context) (n
 		cmd.String(),
 		strings.Join(ctx.Args, " "),
 	)
-}
-
-type Encoder interface {
-	Encode(v interface{}) error
-}
-
-type EncoderCreator interface {
-	CreateEncoder(io.Writer) Encoder
-}
-
-type EncodeFormatter struct {
-	creator EncoderCreator
-}
-
-var JSONEncoderCreator EncoderCreator = CreateJSONEncoder{}
-
-type CreateJSONEncoder struct{}
-
-func (_ CreateJSONEncoder) CreateEncoder(wr io.Writer) (e Encoder) {
-	return json.NewEncoder(wr)
-}
-
-func (e EncodeFormatter) FormatCommand(wr io.Writer, cmd Command, ctx Context) (n int, err error) {
-	type pair struct {
-		Command Command
-		Context Context
-	}
-
-	err = e.creator.CreateEncoder(wr).Encode(pair{cmd, ctx})
-	return
 }
