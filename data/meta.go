@@ -13,23 +13,20 @@ import (
 
 const DateFmt date.ParseFmt = "2016 12 05"
 
+type RngAzi struct {
+	Rng uint
+	Azi uint
+}
+
 type Meta struct {
-	DataFile      path.ValidFile `json:"datafile"`
-	Dtype         Type           `json:"data_type"`
-	common.RngAzi `json:"rng_azi"`
-	time.Time     `json:"time"`
+	DataFile path.ValidFile `json:"datafile"`
+	Dtype    Type           `json:"data_type"`
+	RngAzi   RngAzi         `json:"rng_azi"`
+	Time     time.Time      `json:"time"`
 }
 
 func (m *Meta) SetMeta(meta Meta) {
 	*m = meta
-}
-
-func (m Meta) Rng() int {
-	return m.RngAzi.Rng
-}
-
-func (m Meta) Azi() int {
-	return m.RngAzi.Azi
 }
 
 func (m Meta) Date() time.Time {
@@ -49,7 +46,7 @@ func (m Meta) TypeCheck(filepath path.Pather, dtypes ...Type) (err error) {
 		}
 	}
 
-	sb := strings.Builder{}
+	var sb strings.Builder
 
 	for _, dt := range dtypes {
 		sb.WriteString(dt.String() + ", ")
@@ -75,8 +72,8 @@ func SameCols(one common.Dims, two common.Dims) *ShapeMismatchError {
 	return nil
 }
 
-func SameRows(one common.Dims, two common.Dims) *ShapeMismatchError {
-	n1, n2 := one.Azi(), two.Azi()
+func SameRows(one, two RngAzi) (err *ShapeMismatchError) {
+	n1, n2 := one.Azi, two.Azi
 
 	if n1 != n2 {
 		return &ShapeMismatchError{
@@ -86,10 +83,10 @@ func SameRows(one common.Dims, two common.Dims) *ShapeMismatchError {
 		}
 	}
 
-	return nil
+	return
 }
 
-func SameShape(one common.Dims, two common.Dims) (err *ShapeMismatchError) {
+func SameShape(one, two RngAzi) (err *ShapeMismatchError) {
 	err = SameCols(one, two)
 	if err != nil {
 		return
@@ -101,17 +98,18 @@ func SameShape(one common.Dims, two common.Dims) (err *ShapeMismatchError) {
 type ShapeMismatchError struct {
 	dat1, dat2 path.Pather
 	dim        string
-	n1, n2     int
+	n1, n2     uint
 	err        error
 }
 
 func (s ShapeMismatchError) Error() string {
-	return fmt.Sprintf("expected datafile '%s' to have the same %s as "+
-		"datafile '%s' (%d != %d)", s.dat1, s.dim, s.dat2, s.n1, s.n2)
+	return fmt.Sprintf(
+		"expected datafile '%s' to have the same %s as datafile '%s' (%d != %d)", s.dat1, s.dim, s.dat2, s.n1, s.n2)
 }
 
-func (s ShapeMismatchError) Pathes(one, two common.Pather) error {
-	s.dat1, s.dat2 = one.Path(), two.Path()
+func (s ShapeMismatchError) WithPaths(one, two common.Pather) (sh ShapeMismatchError) {
+	sh = s
+	sh.dat1, sh.dat2 = one.Path(), two.Path()
 
 	return s
 }
