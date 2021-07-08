@@ -5,10 +5,7 @@ import (
 
 	"github.com/bozso/gotoolbox/enum"
 	"github.com/bozso/gotoolbox/path"
-
-	"git.st.ht/~istvan_bozso/shutil/command"
-
-	"git.st.ht/~istvan_bozso/sert/log"
+	//"git.st.ht/~istvan_bozso/shutil/command"
 )
 
 var (
@@ -40,7 +37,7 @@ type Common struct {
 	RasterExtension RasterExtension `json:"raster_extension"`
 	GammaDirectory  path.Dir        `json:"gamma_directory"`
 	CachePath       path.Dir        `json:"cache_path"`
-	Logging         log.Config      `json:"logging"`
+	Logging         Logger          `json:"logging"`
 }
 
 type Payload struct {
