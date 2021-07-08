@@ -95,10 +95,6 @@ func (c Complex) ComplexToReal(cmd command.Command, mode CpxToReal, dst path.Pat
 	return
 }
 
-func (s *ServiceImpl) ComplexToReal(src, dst path.ValidFile, mode CpxToReal) (r Real, err error) {
-	return
-}
-
 type ComplexWithPar struct {
 	Complex
 	Parameter `json:"parameter"`

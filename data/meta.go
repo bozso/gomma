@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bozso/gotoolbox/path"
+	"git.sr.ht/~istvan_bozso/shutil/path"
 
 	"github.com/bozso/gomma/common"
 	"github.com/bozso/gomma/date"
@@ -19,22 +19,9 @@ type RngAzi struct {
 }
 
 type Meta struct {
-	DataFile path.ValidFile `json:"datafile"`
-	Dtype    Type           `json:"data_type"`
-	RngAzi   RngAzi         `json:"rng_azi"`
-	Time     time.Time      `json:"time"`
-}
-
-func (m *Meta) SetMeta(meta Meta) {
-	*m = meta
-}
-
-func (m Meta) Date() time.Time {
-	return m.Time
-}
-
-func (m Meta) DataType() Type {
-	return m.Dtype
+	DataType Type      `json:"datatype"`
+	RngAzi   RngAzi    `json:"range_azimuth"`
+	Date     time.Time `json:"date"`
 }
 
 func (m Meta) TypeCheck(filepath path.Pather, dtypes ...Type) (err error) {
@@ -49,7 +36,7 @@ func (m Meta) TypeCheck(filepath path.Pather, dtypes ...Type) (err error) {
 	var sb strings.Builder
 
 	for _, dt := range dtypes {
-		sb.WriteString(dt.String() + ", ")
+		fmt.Fprintf(sb, "%s, ", dt.String())
 	}
 
 	return TypeMismatchError{
