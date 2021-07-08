@@ -6,8 +6,7 @@ import (
 	"github.com/bozso/gotoolbox/enum"
 	"github.com/bozso/gotoolbox/path"
 
-	"github.com/bozso/gomma/command"
-	"github.com/bozso/gomma/stream"
+	"git.st.ht/~istvan_bozso/shutil/command"
 
 	"git.st.ht/~istvan_bozso/sert/log"
 )

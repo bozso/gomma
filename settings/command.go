@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bozso/gomma/command"
+	"git.sr.ht/~istvan_bozso/shutil/command"
 	"github.com/bozso/gotoolbox/errors"
 )
 
