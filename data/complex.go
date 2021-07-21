@@ -9,11 +9,11 @@ import (
 )
 
 type Complex struct {
-	File `json:"file"`
+	File
 }
 
 func (c Complex) Validate() (err error) {
-	return c.EnsureComplex()
+	return c.File.Meta.MustBeComplex()
 }
 
 type CpxToReal int

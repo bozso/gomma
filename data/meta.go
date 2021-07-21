@@ -16,8 +16,24 @@ type Meta struct {
 	Date     time.Time `json:"date"`
 }
 
+func (m Meta) IsComplex() (b bool) {
+	return m.IsType(FloatCpx, ShortCpx)
+}
+
+func (m Meta) IsReal() (b bool) {
+	return m.IsType(Float, Double)
+}
+
+func (m Meta) MustBeComplex() (err error) {
+	return m.MustBeOfType(FloatCpx, ShortCpx)
+}
+
+func (m Meta) MustBeReal() (err error) {
+	return m.MustBeOfType(Float, Double)
+}
+
 func (m Meta) IsType(dtypes ...Type) (b bool) {
-	D := m.Dtype
+	D := m.DataType
 
 	for _, dt := range dtypes {
 		if D == dt {
@@ -40,6 +56,6 @@ func (m Meta) MustBeOfType(dtypes ...Type) (err error) {
 
 	return TypeMismatchError{
 		Expected: sb.String(),
-		Got:      m.Dtype,
+		Got:      m.DataType,
 	}
 }
