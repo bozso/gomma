@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/bozso/gotoolbox/cli"
-	"github.com/bozso/gotoolbox/path"
 )
 
 type Type int
@@ -22,11 +21,11 @@ const (
 	Any
 )
 
-func (d *Type) SetCli(c *cli.Cli) {
+func (t *Type) SetCli(c *cli.Cli) {
 	c.Var(d, "dtype", "Datatype of datafile.")
 }
 
-func (d *Type) Set(s string) error {
+func (t *Type) Set(s string) error {
 	in := strings.ToUpper(s)
 
 	switch in {
@@ -53,7 +52,7 @@ func (d *Type) Set(s string) error {
 	return nil
 }
 
-func (d Type) String() string {
+func (t Type) String() string {
 	switch d {
 	case Float:
 		return "FLOAT"
@@ -77,15 +76,14 @@ func (d Type) String() string {
 }
 
 type TypeMismatchError struct {
-	datafile path.Pather
-	expected string
-	Type
-	err error
+	Expected string
+	Got      Type
+	err      error
 }
 
 func (e TypeMismatchError) Error() string {
-	return fmt.Sprintf("expected datatype(s) '%s' for datafile '%s', got '%s'",
-		e.expected, e.datafile, e.Type)
+	return fmt.Sprintf("expected datatype(s) '%s', got '%s'",
+		e.Expected, e.Got)
 }
 
 func (e TypeMismatchError) Unwrap() error {
@@ -116,13 +114,13 @@ func WrongType(dtype Type, kind string) error {
 
 type WrongTypeError struct {
 	Type
-	kind string
+	Kind string
 	err  error
 }
 
 func (e WrongTypeError) Error() string {
 	return fmt.Sprintf("wrong datatype '%s' for %s", e.Type.String(),
-		e.kind)
+		e.Kind)
 }
 
 func (e WrongTypeError) Unwrap() error {
