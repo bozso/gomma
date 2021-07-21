@@ -3,19 +3,25 @@ package data
 import (
 	"strings"
 
-	"github.com/bozso/gotoolbox/command"
 	"github.com/bozso/gotoolbox/enum"
-	"github.com/bozso/gotoolbox/path"
 )
 
+// Complex represents a datafile holding complex values.
 type Complex struct {
 	File
 }
 
+// AsFile implements the interface.
+func (c Complex) AsFile() (f File) {
+	return c.File
+}
+
+// Validate ensures the datatype is complex.
 func (c Complex) Validate() (err error) {
 	return c.File.Meta.MustBeComplex()
 }
 
+// CpxToReal describes the conversion mode.
 type CpxToReal int
 
 const (
@@ -65,6 +71,7 @@ func (c CpxToReal) String() (s string) {
 	return
 }
 
+/*
 func (c Complex) ComplexToReal(cmd command.Command, mode CpxToReal, dst path.Path) (r Real, err error) {
 	Mode := 0
 
@@ -94,6 +101,7 @@ func (c Complex) ComplexToReal(cmd command.Command, mode CpxToReal, dst path.Pat
 	r.File, err = c.WithShapeDType(p, Float)
 	return
 }
+*/
 
 type ComplexWithPar struct {
 	Complex

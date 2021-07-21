@@ -5,8 +5,8 @@ import (
 )
 
 type File struct {
-	DataFile path.Like `json:"data_file"`
-	Meta     Meta      `json:"meta"`
+	DataFile Path
+	Meta     Meta `json:"meta"`
 }
 
 func (f File) Rng() (rng uint) {
@@ -23,4 +23,12 @@ func (f File) SameDim(other File) (b bool) {
 
 func (f File) MustSameDim(other File) (err error) {
 	return f.Meta.RngAzi.MustSameShape(other.Meta.RngAzi)
+}
+
+func (f File) AsFile() (F File) {
+	return f
+}
+
+type Like interface {
+	AsFile() File
 }
