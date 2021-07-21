@@ -22,7 +22,7 @@ const (
 )
 
 func (t *Type) SetCli(c *cli.Cli) {
-	c.Var(d, "dtype", "Datatype of datafile.")
+	c.Var(t, "dtype", "Datatype of datafile.")
 }
 
 func (t *Type) Set(s string) error {
@@ -30,30 +30,30 @@ func (t *Type) Set(s string) error {
 
 	switch in {
 	case "FLOAT":
-		*d = Float
+		*t = Float
 	case "DOUBLE":
-		*d = Double
+		*t = Double
 	case "SCOMPLEX":
-		*d = ShortCpx
+		*t = ShortCpx
 	case "FCOMPLEX":
-		*d = FloatCpx
+		*t = FloatCpx
 	case "SUN", "RASTER", "BMP":
-		*d = Raster
+		*t = Raster
 	case "UNSIGNED CHAR":
-		*d = UChar
+		*t = UChar
 	case "SHORT":
-		*d = Short
+		*t = Short
 	case "ANY":
-		*d = Any
+		*t = Any
 	default:
-		*d = Unknown
+		*t = Unknown
 	}
 
 	return nil
 }
 
 func (t Type) String() string {
-	switch d {
+	switch t {
 	case Float:
 		return "FLOAT"
 	case Double:
@@ -70,6 +70,8 @@ func (t Type) String() string {
 		return "SHORT"
 	case Any:
 		return "ANY"
+	case Unknown:
+		return "UNKNOWN"
 	default:
 		return "UNKNOWN"
 	}
