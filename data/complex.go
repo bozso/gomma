@@ -71,6 +71,11 @@ func (c CpxToReal) String() (s string) {
 	return
 }
 
+type ComplexWithPar struct {
+	Complex
+	Parameter `json:"parameter"`
+}
+
 /*
 func (c Complex) ComplexToReal(cmd command.Command, mode CpxToReal, dst path.Path) (r Real, err error) {
 	Mode := 0
@@ -102,8 +107,3 @@ func (c Complex) ComplexToReal(cmd command.Command, mode CpxToReal, dst path.Pat
 	return
 }
 */
-
-type ComplexWithPar struct {
-	Complex
-	Parameter `json:"parameter"`
-}

@@ -11,9 +11,10 @@ import (
 const DateFmt date.ParseFmt = "2016 12 05"
 
 type Meta struct {
-	DataType Type      `json:"datatype"`
-	RngAzi   RngAzi    `json:"range_azimuth"`
-	Date     time.Time `json:"date"`
+	DataType  Type      `json:"datatype"`
+	RngAzi    RngAzi    `json:"range_azimuth"`
+	Date      time.Time `json:"date"`
+	CreatedBy CreatedBy `json:"created_by"`
 }
 
 func (m Meta) IsComplex() (b bool) {
