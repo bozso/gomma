@@ -1,16 +1,25 @@
 package parser
 
-type Parser interface {
-	ParseInt(string, Base, BitSize) (int64, error)
-	ParseUInt(string, Base, BitSize) (uint64, error)
-	ParseFloat(string, BitSize) (float64, error)
+import (
+	"strconv"
+)
+
+type Default struct{}
+
+func (Default) ParseInt(s string, base bit.Base, size bit.Size) (ii int64, err error) {
+	ii, err = strconv.ParseInt(s, int(base), int(size))
+
+	return
 }
 
-func Int8(p Parser, s string, b Base) (i int8, err error) {
-	v, err := p.ParseInt(s, b, 8)
-	if err != nil {
-		return
-	}
+func (Default) ParseUInt(s string, base bit.Base, size bit.Size) (ii uint64, err error) {
+	ii, err = strconv.ParseUint(s, int(base), int(size))
 
-	return int8(v), nil
+	return
+}
+
+func (Default) ParseFloat(s string, size bit.Size) (ff float64, err error) {
+	ff, err = strconv.ParseFloat(s, int(size))
+
+	return
 }

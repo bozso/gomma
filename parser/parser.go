@@ -4,8 +4,15 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bozso/gotoolbox/splitted"
+	"github.com/bozso/gomma/bit"
 )
+
+type Parser interface {
+	ParseInt(string, bit.Base, bit.Size) (int64, error)
+	ParseUInt(string, bit.Base, bit.Size) (uint64, error)
+	ParseFloat(string, bit.Size) (float64, error)
+	ParseBool(string) (bool, error)
+}
 
 type Getter interface {
 	Get(key string) (string, bool)
