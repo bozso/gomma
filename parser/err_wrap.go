@@ -12,7 +12,7 @@ const (
 	ModeFloat
 )
 
-func (m Mode) WrapErr(ew ErrorWrapper, s string, e error) (err error) {
+func (m Mode) WrapError(ew ErrorWrapper, s string, e error) (err error) {
 	if e != nil {
 		e = ew.WrapParseError(s, m, e)
 	}
@@ -44,7 +44,7 @@ func (we WrapError) ParseUint(s string, base bit.Base, size bit.Size) (ii uint64
 }
 
 func (we WrapError) ParseFloat(s string, size bit.Size) (fl float64, err error) {
-	ii, err = we.p.ParseFloat(s, size)
+	fl, err = we.p.ParseFloat(s, size)
 	err = ModeFloat.WrapError(we.wrapper, s, err)
 
 	return
