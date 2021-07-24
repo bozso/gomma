@@ -35,31 +35,9 @@ func (p Path) WithParFile(file path.Path) (pp PathWithPar) {
 	}
 }
 
-func (pp PathWithPar) WithKeys(keys *ParamKeys) PathWithPar {
-	pp.keys = keys
-	return pp
-}
-
 func (pp PathWithPar) WithParser(p params.Parser) (wp WithParser) {
 	wp.PathWithPar, wp.parser = pp, p
 	return
-}
-
-func (pp PathWithPar) GetParser() (p params.Params, err error) {
-	par, err := pp.ParFile.ToValidFile()
-	if err != nil {
-		return
-	}
-
-	p, err = NewGammaParams(par)
-	return
-}
-
-type Loadable interface {
-	SetDataFile(path.ValidFile)
-	SetParFile(path.ValidFile)
-	SetMeta(Meta)
-	Validate() error
 }
 
 func (pp PathWithPar) Load(l Loadable) (err error) {
@@ -69,11 +47,6 @@ func (pp PathWithPar) Load(l Loadable) (err error) {
 	}
 
 	return pp.WithParser(p.ToParser()).Load(l)
-}
-
-type WithParser struct {
-	PathWithPar
-	parser params.Parser
 }
 
 func (pp WithParser) Load(l Loadable) (err error) {

@@ -1,8 +1,6 @@
 package data
 
-import (
-	"git.sr.ht/~istvan_bozso/shutil/path"
-)
+import ()
 
 type File struct {
 	DataFile Path
