@@ -18,6 +18,7 @@ type Getter interface {
 	Get(key string) (string, bool)
 }
 
+/*
 func (p Parser) Splitter(key string) (sp splitted.Parser, err error) {
 	s, err := p.Param(key)
 	if err != nil {
@@ -47,31 +48,27 @@ func (p Parser) Float(key string, idx int) (ff float64, err error) {
 	ff, err = sp.Float(idx)
 	return
 }
+*/
 
 /*
 Wrapper for reading from many Retreivers. It will try to read
 the appropriate parameters from each of the receivers. Returns
 with error if parameter could not be found in any of them.
 */
-type TeeParser struct {
-	retreivers []Retreiver
+type TeeGetter struct {
+	getters []Getter
 }
 
-// Wrap it into a parser struct.
-func (t TeeParser) ToParser() (p Parser) {
-	return Parser{t}
-}
-
-func NewTeeParser(retreiver ...Retreiver) (t TeeParser) {
-	t.retreivers = retreiver
+func NewTeeGetter(getters ...Getter) (t TeeGetter) {
+	t.getters = getters
 	return
 }
 
 var nf = NotFound{}
 
-func (tp TeeParser) Param(key string) (s string, err error) {
-	for _, r := range tp.retreivers {
-		s, err = r.Param(key)
+func (t TeeGetter) Get(key string) (s string, err error) {
+	for _, r := range t.getters {
+		s, err = r.Get(key)
 
 		if err == nil {
 			return
