@@ -2,10 +2,19 @@ package parser
 
 import ()
 
-type MapSetup struct {
-	splitter Splitter
-}
+type InMemoryStorage map[string]string
 
 type Map struct {
-	data map[string]string
+	data InMemoryStorage
+}
+
+func (m Map) Get(key string) (val string, err error) {
+	val, ok := m.data[key]
+	if !ok {
+		err = &MissingKey{
+			Key: key,
+		}
+	}
+
+	return
 }

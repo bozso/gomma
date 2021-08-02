@@ -9,15 +9,29 @@ type Splitter interface {
 	SplitLine(string) (key, value string, err error)
 }
 
+type SplitWrapErr struct {
+	splitter Splitter
+	wrapper  SplitterWrapErr
+}
+
+func (s SplitWrapErr) SplitLine(str string) (key, value string, err error) {
+	key, value, err = s.splitter.SplitLine(str)
+	if err != nil {
+		err = &SplitError{
+			Line: str,
+			err:  err,
+		}
+	}
+}
+
 type Delimiter string
 
 func (d Delimiter) SplitLine(str string) (key, value string, err error) {
 	split := strings.Split(str, string(d))
 	if err = CheckLen(split, 2); err != nil {
 		err = &SplitError{
-			Line:      str,
-			Delimiter: d,
-			err:       err,
+			Line: str,
+			err:  err,
 		}
 	}
 
@@ -36,10 +50,26 @@ func CheckLen(split []string, expected int) (err error) {
 }
 
 type WrongElementNumber struct {
+	Delimiter
 	Expected, Got int
 }
 
 func (w WrongElementNumber) Error() (s string) {
 	return fmt.Sprintf("expected '%d' elements, but got '%d' elements",
 		w.Expected, w.Got)
+}
+
+type Scanner struct {
+	template string
+}
+
+func (d Delimiter) AsScanner() (s Scanner) {
+	return Scanner{
+		template: fmt.Sprintf("%%s%s%%s", d),
+	}
+}
+
+func (s Scanner) SplitLine(str string) (key, value string, err error) {
+	_, err = fmt.Scanf(str, s.template, &key, &value)
+	return key, value, err
 }
