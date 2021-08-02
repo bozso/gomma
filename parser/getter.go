@@ -18,3 +18,12 @@ func (m Map) Get(key string) (val string, err error) {
 
 	return
 }
+
+func (m Map) Set(key, val string) (err error) {
+	m.data[key] = val
+	return nil
+}
+
+func NewMap(s Setup, r io.Reader) (m Map, err error) {
+	return
+}

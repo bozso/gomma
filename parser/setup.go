@@ -13,21 +13,21 @@ type Setter interface {
 	SetKeyVal(key, value string) error
 }
 
-type ParseSetup struct {
+type Setup struct {
 	Splitter Splitter
 	Wrapper  ReaderWrapper
 }
 
-func (p ParseSetup) ParseInto(r io.Reader, setter Setter) (err error) {
-	s, err := p.Wrapper.WrapReader(r)
+func (s Setup) ParseInto(r io.Reader, setter Setter) (err error) {
+	scan, err := s.Wrapper.WrapReader(r)
 	if err != nil {
 		return
 	}
 
-	for s.Scan() {
-		line := s.Text()
+	for scan.Scan() {
+		line := scan.Text()
 
-		key, val, err := p.Splitter.SplitLine(line)
+		key, val, err := s.Splitter.SplitLine(line)
 		if err != nil {
 			return err
 		}
@@ -37,7 +37,7 @@ func (p ParseSetup) ParseInto(r io.Reader, setter Setter) (err error) {
 		}
 	}
 
-	if err := s.Err(); err != nil && err != io.EOF {
+	if err := scan.Err(); err != nil && err != io.EOF {
 		return err
 	}
 
