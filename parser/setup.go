@@ -6,7 +6,17 @@ import (
 )
 
 type ReaderWrapper interface {
-	WrapReader(io.Reader) (bufio.Scanner, error)
+	WrapReader(io.Reader) (*bufio.Scanner, error)
+}
+
+type WrapScanner struct{}
+
+func (WrapScanner) WrapReader(r io.Reader) (b *bufio.Scanner, err error) {
+	return bufio.NewScanner(r), nil
+}
+
+func WrapIntoScanner() (w WrapScanner) {
+	return WrapScanner{}
 }
 
 type Setup struct {
