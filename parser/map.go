@@ -13,7 +13,7 @@ type Map struct {
 	data InMemoryStorage
 }
 
-func MapFromDict(in InMemoryStorage) (m Map) {
+func (in InMemoryStorage) ToMap() (m Map) {
 	m.keys = make([]string, len(in))
 
 	for key := range in {
