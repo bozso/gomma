@@ -22,6 +22,8 @@ func (s SplitWrapErr) SplitLine(str string) (key, value string, err error) {
 			err:  err,
 		}
 	}
+
+	return
 }
 
 type Delimiter string

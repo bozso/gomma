@@ -4,10 +4,22 @@ import (
 	"io"
 )
 
+type empty struct{}
+
 type InMemoryStorage map[string]string
 
 type Map struct {
+	keys []string
 	data InMemoryStorage
+}
+
+func (m Map) Keys() (keys []string) {
+	return m.keys
+}
+
+func (m Map) HasKey(key string) (hasKey bool) {
+	_, hasKey = m.data[key]
+	return
 }
 
 func (m Map) GetParsed(key string) (val string, err error) {
@@ -23,20 +35,17 @@ func (m Map) GetParsed(key string) (val string, err error) {
 
 func (m Map) AsMut() (mm *MutMap) {
 	return &MutMap{
-		wrap: m,
+		Map: m,
 	}
 }
 
 type MutMap struct {
-	wrap Map
-}
-
-func (m MutMap) GetParsed(key string) (val string, err error) {
-	return m.wrap.GetParsed(key)
+	Map
 }
 
 func (m *MutMap) SetParsed(key, val string) (err error) {
-	m.wrap.data[key] = val
+	m.keys = append(m.keys, key)
+	m.data[key] = val
 	return nil
 }
 

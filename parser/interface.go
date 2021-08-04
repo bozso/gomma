@@ -1,7 +1,9 @@
 package parser
 
 type Getter interface {
-	GetParsed(key string) (string, error)
+	Keys() (keys []string)
+	HasKey(key string) (hasKey bool)
+	GetParsed(key string) (value string, err error)
 }
 
 type Setter interface {

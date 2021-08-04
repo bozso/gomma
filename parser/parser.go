@@ -60,18 +60,18 @@ func NewTeeGetter(getters ...Getter) (t TeeGetter) {
 	return
 }
 
-var nf = NotFound{}
+var missing = &MissingKey{}
 
 func (t TeeGetter) Get(key string) (s string, err error) {
 	for _, r := range t.getters {
-		s, err = r.Get(key)
+		s, err = r.GetParsed(key)
 
 		if err == nil {
 			return
 		}
 
 		// try to retreive the parameter in the next retreiver
-		if errors.Is(err, nf) {
+		if errors.Is(err, missing) {
 			continue
 		} else {
 			return

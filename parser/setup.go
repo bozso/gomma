@@ -28,7 +28,7 @@ func (s Setup) ParseInto(r io.Reader, setter Setter) (err error) {
 			return err
 		}
 
-		if err = setter.SetKeyVal(key, val); err != nil {
+		if err = setter.SetParsed(key, val); err != nil {
 			return err
 		}
 	}
