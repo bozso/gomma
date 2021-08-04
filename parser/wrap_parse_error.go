@@ -20,10 +20,6 @@ func (m Mode) WrapError(ew ErrorWrapper, s string, e error) (err error) {
 	return e
 }
 
-type ErrorWrapper interface {
-	WrapParseError(string, Mode, error) error
-}
-
 type WrapError struct {
 	p       Parser
 	wrapper ErrorWrapper

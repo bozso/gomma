@@ -2,6 +2,8 @@ package parser
 
 import (
 	"strconv"
+
+	"github.com/bozso/gomma/bit"
 )
 
 type Default struct{}
