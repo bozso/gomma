@@ -18,7 +18,7 @@ func mapCreate(setup Setup, r io.Reader) (g Getter, err error) {
 func TestMapParsing(t *testing.T) {
 	cases := []TestCase{
 		{
-			"a:b\nc:d",
+			"a:b\nc:d\n",
 
 			InMemoryStorage{
 				"a": "b",

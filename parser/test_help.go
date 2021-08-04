@@ -32,7 +32,7 @@ func (tc TestCase) TestErr(s Setup, creator CreateGetter) (err error) {
 
 func (tc TestCase) Test(t *testing.T, s Setup, creator CreateGetter) {
 	if err := tc.TestErr(s, creator); err != nil {
-		t.Errorf("error while testing with input '%s'", tc.Input)
+		t.Errorf("error while testing with input '%s' %s", tc.Input, err)
 	}
 }
 

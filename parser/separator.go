@@ -11,7 +11,7 @@ type Splitter interface {
 
 type SplitWrapErr struct {
 	splitter Splitter
-	wrapper  SplitterWrapErr
+	wrapper  ErrorWrapper
 }
 
 func (s SplitWrapErr) SplitLine(str string) (key, value string, err error) {

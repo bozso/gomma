@@ -12,12 +12,21 @@ const (
 	ModeFloat
 )
 
-func (m Mode) WrapError(ew ErrorWrapper, s string, e error) (err error) {
-	if e != nil {
-		e = ew.WrapParseError(s, m, e)
+func (m Mode) String() (s string) {
+	switch m {
+	case ModeInt:
+		s = "int"
+	case ModeUint:
+		s = "uint"
+	case ModeFloat:
+		s = "float"
 	}
 
-	return e
+	return
+}
+
+func (m Mode) WrapError(ew ErrorWrapper, s string, e error) (err error) {
+	return ew.WrapParseError(s, m, e)
 }
 
 type WrapError struct {
