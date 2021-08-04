@@ -14,10 +14,6 @@ type Parser interface {
 	ParseBool(string) (bool, error)
 }
 
-type Getter interface {
-	Get(key string) (string, error)
-}
-
 /*
 func (p Parser) Splitter(key string) (sp splitted.Parser, err error) {
 	s, err := p.Param(key)

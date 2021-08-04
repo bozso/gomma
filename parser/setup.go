@@ -9,10 +9,6 @@ type ReaderWrapper interface {
 	WrapReader(io.Reader) (bufio.Scanner, error)
 }
 
-type Setter interface {
-	SetKeyVal(key, value string) error
-}
-
 type Setup struct {
 	Splitter Splitter
 	Wrapper  ReaderWrapper
