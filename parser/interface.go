@@ -14,3 +14,14 @@ type MutGetter interface {
 	Setter
 	Getter
 }
+
+func MustHave(get Getter, key string) (err error) {
+	err = nil
+	if !get.HasKey(key) {
+		err = &MissingKey{
+			Key: key,
+		}
+	}
+
+	return
+}

@@ -13,6 +13,18 @@ type Map struct {
 	data InMemoryStorage
 }
 
+func MapFromDict(in InMemoryStorage) (m Map) {
+	m.keys = make([]string, len(in))
+
+	for key := range in {
+		m.keys = append(m.keys, key)
+	}
+
+	m.data = in
+
+	return
+}
+
 func (m Map) Keys() (keys []string) {
 	return m.keys
 }
