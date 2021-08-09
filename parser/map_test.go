@@ -5,13 +5,11 @@ import (
 	"testing"
 )
 
-var errWrapper = DefaultErrorWrapper()
-
 var ColonSetup = Setup{
 	Wrapper: WrapIntoScanner(),
 	Splitter: SplitWrapErr{
 		Splitter: Delimiter(":").AsScanner(),
-		Wrapper:  errWrapper,
+		Wrapper:  ErrorWrapperLogging.New(),
 	},
 }
 

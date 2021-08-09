@@ -36,10 +36,6 @@ func (SimpleErrorWrapper) WrapParseError(line string, mode Mode, err error) (e e
 	return
 }
 
-func DefaultErrorWrapper() (s SimpleErrorWrapper) {
-	return SimpleErrorWrapper{}
-}
-
 type Error struct {
 	Line string
 	Mode Mode
@@ -59,7 +55,7 @@ func (e Error) Unwrap() (err error) {
 
 type LogErrorWrap struct {
 	Wrapper ErrorWrapper
-	Logger  log.Logger
+	Logger  *log.Logger
 }
 
 type WrapFunc func(error) error
@@ -73,7 +69,34 @@ func (l LogErrorWrap) LogContext(ctx string, e error, fn WrapFunc) (err error) {
 }
 
 func (l LogErrorWrap) WrapSplitError(line string, e error) (err error) {
-	return l.LogContext("split", func(e error) (err error) {
+	return l.LogContext("split", e, func(e error) (err error) {
 		return l.Wrapper.WrapSplitError(line, e)
 	})
+}
+
+func (l LogErrorWrap) WrapParseError(line string, mode Mode, e error) (err error) {
+	return l.LogContext("parse", e, func(e error) (err error) {
+		return l.Wrapper.WrapParseError(line, mode, e)
+	})
+}
+
+type ErrorWrapperKind int
+
+const (
+	ErrorWrapperSimple ErrorWrapperKind = iota
+	ErrorWrapperLogging
+)
+
+func (e ErrorWrapperKind) New() (ew ErrorWrapper) {
+	switch e {
+	case ErrorWrapperSimple:
+		ew = SimpleErrorWrapper{}
+	case ErrorWrapperLogging:
+		ew = LogErrorWrap{
+			Wrapper: SimpleErrorWrapper{},
+			Logger:  log.Default(),
+		}
+	}
+
+	return ew
 }
