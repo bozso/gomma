@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"io"
 )
 
@@ -14,15 +15,16 @@ type Map struct {
 }
 
 func (in InMemoryStorage) ToMap() (m Map) {
-	m.keys = make([]string, len(in))
+	fmt.Printf("%d\n", len(in))
+
+	m.keys = make([]string, 0, len(in))
 
 	for key := range in {
 		m.keys = append(m.keys, key)
 	}
 
 	m.data = in
-
-	return
+	return m
 }
 
 func (m Map) Keys() (keys []string) {
@@ -45,17 +47,7 @@ func (m Map) GetParsed(key string) (val string, err error) {
 	return
 }
 
-func (m Map) AsMut() (mm *MutMap) {
-	return &MutMap{
-		Map: m,
-	}
-}
-
-type MutMap struct {
-	Map
-}
-
-func (m *MutMap) SetParsed(key, val string) (err error) {
+func (m *Map) SetParsed(key, val string) (err error) {
 	m.keys = append(m.keys, key)
 	m.data[key] = val
 	return nil
@@ -63,7 +55,9 @@ func (m *MutMap) SetParsed(key, val string) (err error) {
 
 func NewMap(s Setup, r io.Reader) (m Map, err error) {
 	m.data = make(InMemoryStorage)
-	err = s.ParseInto(r, m.AsMut())
+	m.keys = make([]string, 0)
 
-	return
+	err = s.ParseInto(r, &m)
+
+	return m, err
 }

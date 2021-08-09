@@ -16,7 +16,7 @@ type SplitWrapErr struct {
 
 func (s SplitWrapErr) SplitLine(str string) (key, value string, err error) {
 	key, value, err = s.Splitter.SplitLine(str)
-	s.Wrapper.WrapSplitError(str, err)
+	err = s.Wrapper.WrapSplitError(str, err)
 
 	return
 }
@@ -67,6 +67,6 @@ func (d Delimiter) AsScanner() (s Scanner) {
 }
 
 func (s Scanner) SplitLine(str string) (key, value string, err error) {
-	_, err = fmt.Scanf(str, s.template, &key, &value)
+	_, err = fmt.Sscanf(str, s.template, &key, &value)
 	return key, value, err
 }

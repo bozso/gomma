@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"io"
 	"testing"
 )
@@ -8,8 +9,8 @@ import (
 var ColonSetup = Setup{
 	Wrapper: WrapIntoScanner(),
 	Splitter: SplitWrapErr{
-		Splitter: Delimiter(":").AsScanner(),
-		Wrapper:  ErrorWrapperLogging.New(),
+		Splitter: Delimiter(":"),
+		Wrapper:  ErrorWrapperSimple.New(),
 	},
 }
 
@@ -19,10 +20,12 @@ func mapCreate(setup Setup, r io.Reader) (g Getter, err error) {
 }
 
 func TestMapParsing(t *testing.T) {
+	const errTpl ErrorUnwrapper = "%s "
+	fmt.Printf("%#v\n", ColonSetup)
+
 	cases := []TestCase{
 		{
 			"a:b\nc:d\n",
-
 			InMemoryStorage{
 				"a": "b",
 				"c": "d",
@@ -33,5 +36,12 @@ func TestMapParsing(t *testing.T) {
 	TestWithSetup{
 		Cases: cases,
 		Setup: ColonSetup,
-	}.Test(t, mapCreate)
+	}.ForEach(func(err error) {
+		s, err := ErrorToString(errTpl, err)
+		PanicOnErr(err)
+
+		if err != nil {
+			t.Errorf("%s", s)
+		}
+	}, mapCreate)
 }

@@ -13,14 +13,13 @@ type ErrorWrapper interface {
 type SimpleErrorWrapper struct{}
 
 func (SimpleErrorWrapper) WrapSplitError(line string, err error) (e error) {
-	e = err
 	if err != nil {
-		e = &SplitError{
+		return &SplitError{
 			Line: line,
+			err:  err,
 		}
 	}
-
-	return
+	return err
 }
 
 func (SimpleErrorWrapper) WrapParseError(line string, mode Mode, err error) (e error) {
@@ -65,7 +64,7 @@ func (l LogErrorWrap) LogContext(ctx string, e error, fn WrapFunc) (err error) {
 	e = fn(e)
 	l.Logger.Printf("error after wrapping: '%s'", e)
 
-	return err
+	return e
 }
 
 func (l LogErrorWrap) WrapSplitError(line string, e error) (err error) {

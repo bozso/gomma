@@ -21,9 +21,9 @@ func (tc TestCase) TestErr(s Setup, creator CreateGetter) (err error) {
 	}
 
 	for _, key := range tc.Expected.Keys() {
-		const tpl = "expected resulting parsed Getter to have key '%s'"
-		if g.HasKey(key) {
-			return fmt.Errorf(tpl, key)
+		const tpl = "expected resulting parsed Getter (%#v) to have key '%s'"
+		if !g.HasKey(key) {
+			return fmt.Errorf(tpl, g, key)
 		}
 	}
 
@@ -49,6 +49,14 @@ func (ts TestWithSetup) TestErr(creator CreateGetter) (err error) {
 	}
 
 	return nil
+}
+
+type ErrorFn func(error)
+
+func (ts TestWithSetup) ForEach(fn ErrorFn, creator CreateGetter) {
+	for _, testCase := range ts.Cases {
+		fn(testCase.TestErr(ts.Setup, creator))
+	}
 }
 
 func (ts TestWithSetup) Test(t *testing.T, creator CreateGetter) {

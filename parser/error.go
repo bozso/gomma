@@ -38,3 +38,9 @@ func ErrorToString(ew ErrorWriter, e error) (s string, err error) {
 
 	return sb.String(), nil
 }
+
+func PanicOnErr(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
