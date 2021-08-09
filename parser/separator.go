@@ -10,18 +10,13 @@ type Splitter interface {
 }
 
 type SplitWrapErr struct {
-	splitter Splitter
-	wrapper  ErrorWrapper
+	Splitter Splitter
+	Wrapper  ErrorWrapper
 }
 
 func (s SplitWrapErr) SplitLine(str string) (key, value string, err error) {
-	key, value, err = s.splitter.SplitLine(str)
-	if err != nil {
-		err = &SplitError{
-			Line: str,
-			err:  err,
-		}
-	}
+	key, value, err = s.Splitter.SplitLine(str)
+	s.Wrapper.WrapSplitError(str, err)
 
 	return
 }

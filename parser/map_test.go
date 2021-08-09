@@ -5,9 +5,14 @@ import (
 	"testing"
 )
 
+var errWrapper = DefaultErrorWrapper()
+
 var ColonSetup = Setup{
-	Wrapper:  WrapIntoScanner(),
-	Splitter: Delimiter(":").AsScanner(),
+	Wrapper: WrapIntoScanner(),
+	Splitter: SplitWrapErr{
+		Splitter: Delimiter(":").AsScanner(),
+		Wrapper:  errWrapper,
+	},
 }
 
 func mapCreate(setup Setup, r io.Reader) (g Getter, err error) {

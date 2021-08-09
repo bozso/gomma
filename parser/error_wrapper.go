@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"log"
 )
 
 type ErrorWrapper interface {
@@ -54,4 +55,25 @@ func (e Error) Error() (s string) {
 
 func (e Error) Unwrap() (err error) {
 	return e.err
+}
+
+type LogErrorWrap struct {
+	Wrapper ErrorWrapper
+	Logger  log.Logger
+}
+
+type WrapFunc func(error) error
+
+func (l LogErrorWrap) LogContext(ctx string, e error, fn WrapFunc) (err error) {
+	l.Logger.Printf("wrapping %s error: '%s'", ctx, e)
+	e = fn(e)
+	l.Logger.Printf("error after wrapping: '%s'", e)
+
+	return err
+}
+
+func (l LogErrorWrap) WrapSplitError(line string, e error) (err error) {
+	return l.LogContext("split", func(e error) (err error) {
+		return l.Wrapper.WrapSplitError(line, e)
+	})
 }
