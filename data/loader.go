@@ -2,6 +2,7 @@ package data
 
 import (
 	"io"
+	"io/fs"
 
 	"git.sr.ht/~istvan_bozso/sedet/parser"
 )
@@ -12,21 +13,47 @@ type GetterMaker interface {
 }
 
 type Loader struct {
-	Maker  GetterMaker
-	Parser parser.Parser
-	Setup  parser.Setup
+	fsys   fs.FS
+	maker  GetterMaker
+	parser parser.Parser
+	setup  parser.Setup
 }
 
-func (l Loader) LoadMeta(r io.Reader, pk ParamKeys) (m Meta, err error) {
-	g := l.Maker.MakeGetter()
-	defer l.Maker.PutGetter(g)
+func (l Loader) ParseMeta(r io.Reader, pk ParamKeys) (m Meta, err error) {
+	i
+	g := l.maker.MakeGetter()
+	defer l.maker.PutGetter(g)
 
-	err = l.Setup.ParseInto(r, g)
+	err = l.setup.ParseInto(r, g)
 	if err != nil {
 		return
 	}
 
-	m, err = pk.ParseMeta(g, l.Parser)
+	m, err = pk.ParseMeta(g, l.parser)
 
 	return
+}
+
+func (l Loader) MetaFromFile(path string, pk ParamKeys) (m Meta, err error) {
+	f, err := l.fsys.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	m, err = l.ParseMeta(f, pk)
+
+	return
+}
+
+func (l Loader) LoadFile(p PathWithPar, pk ParamKeys) (f File, err error) {
+	meta, err := l.MetaFromFile(p.ParFile, pk)
+	if err != nil {
+		return
+	}
+
+	return File{
+		Meta:     meta,
+		DataFile: p.Path,
+	}, nil
 }

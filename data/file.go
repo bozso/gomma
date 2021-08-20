@@ -7,11 +7,11 @@ type File struct {
 	Meta     Meta `json:"meta"`
 }
 
-func (f File) Rng() (rng uint) {
+func (f File) Rng() (rng uint64) {
 	return f.Meta.RngAzi.Rng
 }
 
-func (f File) Azi() (azi uint) {
+func (f File) Azi() (azi uint64) {
 	return f.Meta.RngAzi.Azi
 }
 
