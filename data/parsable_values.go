@@ -10,6 +10,28 @@ type IntMeta struct {
 	Base bit.Base
 }
 
+func (im IntMeta) ParseUint(s string, p parser.Parser, ui *uint64) (err error) {
+	v := im.UintVar(p)
+	if err = v.Set(s); err != nil {
+		return
+	}
+
+	*ui = v.value
+
+	return
+}
+
+func (im IntMeta) ParseInt(s string, p parser.Parser, ii *int64) (err error) {
+	v := im.IntVar(p)
+	if err = v.Set(s); err != nil {
+		return
+	}
+
+	*ii = v.value
+
+	return
+}
+
 func (im IntMeta) UintVar(p parser.Parser) (pu parsableUint) {
 	return parsableUint{
 		value:  0,

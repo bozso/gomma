@@ -5,13 +5,13 @@ import (
 )
 
 type RngAzi struct {
-	Rng uint
-	Azi uint
+	Rng uint64 `json:"range"`
+	Azi uint64 `json:"azimuth"`
 }
 
 type ShapeMismatchError struct {
 	Along    string
-	One, Two uint
+	One, Two uint64
 }
 
 func (s ShapeMismatchError) Error() string {
