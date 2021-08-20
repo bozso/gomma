@@ -11,15 +11,15 @@ type IntMeta struct {
 }
 
 func (im IntMeta) UintVar(p parser.Parser) (pu parsableUint) {
-	return parsebleUint{
+	return parsableUint{
 		value:  0,
 		parser: p,
 		Meta:   im,
 	}
 }
 
-func (im IntMeta) IntVar(p parser.Parser) (pi parsableUint) {
-	return parsebleInt{
+func (im IntMeta) IntVar(p parser.Parser) (pi parsableInt) {
+	return parsableInt{
 		value:  0,
 		parser: p,
 		Meta:   im,
@@ -39,6 +39,8 @@ func (pu *parsableUint) Set(s string) (err error) {
 	}
 
 	pu.value = ui
+
+	return
 }
 
 type parsableInt struct {
@@ -48,12 +50,14 @@ type parsableInt struct {
 }
 
 func (pi *parsableInt) Set(s string) (err error) {
-	ii, err := pu.parser.ParseInt(s, pi.Meta.Base, pi.Meta.Size)
+	ii, err := pi.parser.ParseInt(s, pi.Meta.Base, pi.Meta.Size)
 	if err != nil {
 		return
 	}
 
 	pi.value = ii
+
+	return
 }
 
 type parsableFloat struct {
@@ -63,10 +67,12 @@ type parsableFloat struct {
 }
 
 func (pf *parsableFloat) Set(s string) (err error) {
-	fl, err := pu.parser.ParseFloat(s, pf.Meta.Size)
+	fl, err := pf.parser.ParseFloat(s, pf.Size)
 	if err != nil {
 		return
 	}
 
 	pf.value = fl
+
+	return
 }

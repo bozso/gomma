@@ -56,14 +56,14 @@ func (p ParserWithGetter) ParseInt(key string, base bit.Base, size bit.Size) (ii
 	return
 }
 
-func (p ParserWithGetter) ParseInt(key string, base bit.Base, size bit.Size) (ii int64, err error) {
-	v := &IntMeta{base, size}.IntVar(p.parser)
+func (p ParserWithGetter) ParseFloat(key string, size bit.Size) (fl float64, err error) {
+	v := ParseFloat{parser: p.parser, Size: size}
 	err = p.ParseVar(key, &v)
 	if err != nil {
 		return
 	}
 
-	ii = v.value
+	fl = v.value
 
 	return
 }
