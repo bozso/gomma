@@ -43,4 +43,17 @@ func (pk ParamKeys) ParseMeta(g parser.Getter, p parser.Parser) (m Meta, err err
 		*uints[ii] = ui
 	}
 
+	err = pg.ParseVar(pk.Type, &m.DataType)
+	if err != nil {
+		return
+	}
+
+	s, err := g.GetParsed(pk.Date)
+	if err != nil {
+		return
+	}
+
+	m.Date, err = DateFmt.Parse(s)
+
+	return
 }
