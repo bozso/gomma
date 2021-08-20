@@ -1,6 +1,7 @@
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
-git.sr.ht/~istvan_bozso/sedet v0.0.2 h1:f39IPEDSRF2/xBZvhd2SmgM6mWv0ghUqnISWFj2RM0I=
 git.sr.ht/~istvan_bozso/sedet v0.0.2/go.mod h1:cUaelxqU5McE9VUky6QaHaJR1TbJ6ojoT2tU8N9zM+Q=
+git.sr.ht/~istvan_bozso/sedet v0.2.0 h1:gXdY9WwWF6DAo1SdBGJTc07W3zcace5soKjEgvunB84=
+git.sr.ht/~istvan_bozso/sedet v0.2.0/go.mod h1:cUaelxqU5McE9VUky6QaHaJR1TbJ6ojoT2tU8N9zM+Q=
 git.sr.ht/~istvan_bozso/shutil v0.0.0-20210625095928-7d6e2a67bf01 h1:1Y0ckc667eyPi1bitg3YSFVA2pzEHYWQgrLTqblhBaU=
 git.sr.ht/~istvan_bozso/shutil v0.0.0-20210625095928-7d6e2a67bf01/go.mod h1:B52lvCrHhZcHkQnhuM6uzpitS2+MpWpNfuRq6pKjeCM=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
