@@ -27,20 +27,20 @@ var DefaultKeys = ParamKeys{
 }
 
 func (pk ParamKeys) ParseMeta(g parser.Getter, p parser.Parser) (m Meta, err error) {
+	pg := WithGetter(p, g)
+
 	var (
-		names = [2]string{pk.Range, pk.Azimuth}
+		keys  = [2]string{pk.Range, pk.Azimuth}
 		uints = [2]*uint64{&m.RngAzi.Rng, &m.RngAzi.Azi}
 	)
 
 	for ii := 0; ii < 2; ii++ {
-		s, err := g.GetParsed(names[ii])
+		ui, err := pg.ParseUint(keys[ii], im.Base, im.Size)
 		if err != nil {
 			return m, err
 		}
 
-		err = im.ParseUint(s, p, uints[ii])
-		if err != nil {
-			return m, err
-		}
+		*uints[ii] = ui
 	}
+
 }
