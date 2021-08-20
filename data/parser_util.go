@@ -33,7 +33,7 @@ func (p ParserWithGetter) ParseVar(key string, v Var) (err error) {
 }
 
 func (p ParserWithGetter) ParseUint(key string, base bit.Base, size bit.Size) (ui uint64, err error) {
-	v := &IntMeta{base, size}.UintVar(p.parser)
+	v := IntMeta{size, base}.UintVar(p.parser)
 	err = p.ParseVar(key, &v)
 	if err != nil {
 		return
@@ -45,7 +45,7 @@ func (p ParserWithGetter) ParseUint(key string, base bit.Base, size bit.Size) (u
 }
 
 func (p ParserWithGetter) ParseInt(key string, base bit.Base, size bit.Size) (ii int64, err error) {
-	v := &IntMeta{base, size}.IntVar(p.parser)
+	v := IntMeta{size, base}.IntVar(p.parser)
 	err = p.ParseVar(key, &v)
 	if err != nil {
 		return
@@ -57,7 +57,7 @@ func (p ParserWithGetter) ParseInt(key string, base bit.Base, size bit.Size) (ii
 }
 
 func (p ParserWithGetter) ParseFloat(key string, size bit.Size) (fl float64, err error) {
-	v := ParseFloat{parser: p.parser, Size: size}
+	v := parsableFloat{parser: p.parser, Size: size}
 	err = p.ParseVar(key, &v)
 	if err != nil {
 		return

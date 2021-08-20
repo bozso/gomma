@@ -1,5 +1,7 @@
 package data
 
+/*
+
 import (
 	"github.com/bozso/gomma/utils/params"
 	"github.com/bozso/gotoolbox/path"
@@ -99,3 +101,4 @@ func (pp WithParser) Load(l Loadable) (err error) {
 	err = l.Validate()
 	return
 }
+*/
