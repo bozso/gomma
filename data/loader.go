@@ -1,22 +1,42 @@
 package data
 
+import (
+	"io"
+
+	"git.sr.ht/~istvan_bozso/sedet/parser"
+)
+
+type GetterMaker interface {
+	MakeGetter() parser.MutGetter
+	PutGetter(parser.MutGetter)
+}
+
+type Loader struct {
+	Maker  GetterMaker
+	Parser parser.Parser
+	Setup  parser.Setup
+}
+
+func (l Loader) LoadMeta(r io.Reader, pk ParamKeys) (m Meta, err error) {
+	g := l.Maker.MakeGetter()
+	defer l.Maker.PutGetter(g)
+
+	err = l.Setup.ParseInto(r, g)
+	if err != nil {
+		return
+	}
+
+	m, err = pk.ParseMeta(g, l.Parser)
+
+	return
+}
+
 /*
 
 import (
 	"github.com/bozso/gomma/utils/params"
 	"github.com/bozso/gotoolbox/path"
 )
-
-type ParamKeys struct {
-	Rng, Azi, Type, Date string
-}
-
-var DefaultKeys = &ParamKeys{
-	Rng:  "range_samples",
-	Azi:  "azimuth_lines",
-	Type: "image_format",
-	Date: "date",
-}
 
 type PathWithPar struct {
 	Path
