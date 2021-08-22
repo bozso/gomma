@@ -33,20 +33,20 @@ func (l Loader) ParseMeta(r io.Reader, mp MetaParser) (m Meta, err error) {
 	return
 }
 
-func (l Loader) MetaFromFile(path string, pk ParamKeys) (m Meta, err error) {
+func (l Loader) MetaFromFile(path string, mp MetaParser) (m Meta, err error) {
 	f, err := l.fsys.Open(path)
 	if err != nil {
 		return
 	}
 	defer f.Close()
 
-	m, err = l.ParseMeta(f, pk)
+	m, err = l.ParseMeta(f, mp)
 
 	return
 }
 
-func (l Loader) LoadFile(p PathWithPar, pk ParamKeys) (f File, err error) {
-	meta, err := l.MetaFromFile(p.ParFile, pk)
+func (l Loader) LoadFile(p PathWithPar, mp MetaParser) (f File, err error) {
+	meta, err := l.MetaFromFile(p.ParFile, mp)
 	if err != nil {
 		return
 	}
