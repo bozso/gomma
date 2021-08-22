@@ -20,7 +20,6 @@ type Loader struct {
 }
 
 func (l Loader) ParseMeta(r io.Reader, pk ParamKeys) (m Meta, err error) {
-	i
 	g := l.maker.MakeGetter()
 	defer l.maker.PutGetter(g)
 
