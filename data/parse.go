@@ -5,6 +5,10 @@ import (
 	"git.sr.ht/~istvan_bozso/sedet/parser"
 )
 
+type MetaParser interface {
+	ParseMeta(parser.Getter, parser.Parser) (Meta, error)
+}
+
 // Default metadate for parsing ints
 var im = IntMeta{
 	Base: bit.Base(10),

@@ -19,7 +19,7 @@ type Loader struct {
 	setup  parser.Setup
 }
 
-func (l Loader) ParseMeta(r io.Reader, pk ParamKeys) (m Meta, err error) {
+func (l Loader) ParseMeta(r io.Reader, mp MetaParser) (m Meta, err error) {
 	g := l.maker.MakeGetter()
 	defer l.maker.PutGetter(g)
 
@@ -28,7 +28,7 @@ func (l Loader) ParseMeta(r io.Reader, pk ParamKeys) (m Meta, err error) {
 		return
 	}
 
-	m, err = pk.ParseMeta(g, l.parser)
+	m, err = mp.ParseMeta(g, l.parser)
 
 	return
 }
