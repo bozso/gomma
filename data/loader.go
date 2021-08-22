@@ -19,7 +19,19 @@ type Loader struct {
 	setup  parser.Setup
 }
 
-func (l Loader) ParseMeta(r io.Reader, mp MetaParser) (m Meta, err error) {
+type UseParamFunc func(parser.Getter) error
+
+func (l Loader) OpenParamGetter(path string, fn UseParamFunc) (err error) {
+	f, err := l.fsys.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	return l.WithParamGetter(f, fn)
+}
+
+func (l Loader) WithParamGetter(r io.Reader, fn UseParamFunc) (err error) {
 	g := l.maker.MakeGetter()
 	defer l.maker.PutGetter(g)
 
@@ -28,7 +40,14 @@ func (l Loader) ParseMeta(r io.Reader, mp MetaParser) (m Meta, err error) {
 		return
 	}
 
-	m, err = mp.ParseMeta(g, l.parser)
+	return fn(g)
+}
+
+func (l Loader) ParseMeta(r io.Reader, mp MetaParser) (m Meta, err error) {
+	l.WithParamGetter(r, func(g parser.Getter) (err error) {
+		m, err = mp.ParseMeta(g, l.parser)
+		return
+	})
 
 	return
 }
