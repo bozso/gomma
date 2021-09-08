@@ -2,23 +2,20 @@ package batch
 
 import (
 	"github.com/bozso/gotoolbox/cli"
-	"github.com/bozso/gotoolbox/path"
 )
 
 type Operation interface {
-	Call(infile path.ValidFile) (outfile path.ValidFile, err error)
+	Call(ctx Context, infile string) (outfile string, err error)
 }
 
-type Creator interface {
-	CreateOp(Context) (Operation, error)
-}
-
-type CreatorMap map[string]Creator
+type OperationMap map[string]Operation
 
 type Controller struct {
-	creators CreatorMap
-	ctx      Context
-	data     []byte
+	operations OperationMap
+	ctx        Context
+	op         string
+	infile     string
+	outfile    string
 }
 
 func (c *Controller) SetCli(cl *cli.Cli) {
@@ -27,4 +24,18 @@ func (c *Controller) SetCli(cl *cli.Cli) {
 		Usage("profile file that contains settings").
 		Var(&c.ctx)
 
+	cl.NewFlag().
+		Name("operation").
+		Usage("operation to carry out").
+		String(&c.op)
+
+	cl.NewFlag().
+		Name("in").
+		Usage("inputfile for batch operation").
+		String(&c.infile)
+
+	cl.NewFlag().
+		Name("out").
+		Usage("outputfile of batch operation").
+		String(&c.infile)
 }

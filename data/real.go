@@ -3,7 +3,7 @@ package data
 import ()
 
 type Real struct {
-	File `json:"file"`
+	File
 }
 
 func (r Real) Validate() (err error) {
