@@ -32,10 +32,10 @@ func (c *Controller) SetCli(cl *cli.Cli) {
 	cl.NewFlag().
 		Name("in").
 		Usage("inputfile for batch operation").
-		String(&c.infile)
+		String(&c.infile, "-")
 
 	cl.NewFlag().
 		Name("out").
 		Usage("outputfile of batch operation").
-		String(&c.infile)
+		StringVar(&c.infile, "-")
 }
