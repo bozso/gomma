@@ -5,7 +5,7 @@ import (
 )
 
 type Operation interface {
-	Call(ctx Context, infile string) (outfile string, err error)
+	BatchOp(ctx Context, infile string) (outfile string, err error)
 }
 
 type OperationMap map[string]Operation
@@ -16,6 +16,7 @@ type Controller struct {
 	op         string
 	infile     string
 	outfile    string
+	config     Config
 }
 
 func (c *Controller) SetCli(cl *cli.Cli) {
