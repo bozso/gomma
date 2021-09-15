@@ -1,11 +1,12 @@
 package batch
 
 import (
+	"fmt"
 	"github.com/bozso/gotoolbox/cli"
 )
 
 type Operation interface {
-	BatchOp(ctx Context, infile string) (outfile string, err error)
+	BatchOp(ctx Context, outfile, infile string) (err error)
 }
 
 type OperationMap map[string]Operation
@@ -18,6 +19,18 @@ type Controller struct {
 	outfile    string
 }
 
+func (c Controller) Run() (err error) {
+	return WrapErr(c.op, func() (err error) {
+		op, ok := c.operations[c.op]
+		if !ok {
+			return fmt.Errorf("operation '%s' not found", c.op)
+		}
+
+		err = op.BatchOp(c.ctx, c.infile, c.outfile)
+		return
+	})
+}
+
 func (c *Controller) SetCli(cl *cli.Cli) {
 	cl.NewFlag().
 		Name("profile").
@@ -27,7 +40,7 @@ func (c *Controller) SetCli(cl *cli.Cli) {
 	cl.NewFlag().
 		Name("operation").
 		Usage("operation to carry out").
-		StringVar(&c.op)
+		StringVar(&c.op, "")
 
 	cl.NewFlag().
 		Name("in").

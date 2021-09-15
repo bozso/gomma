@@ -1,7 +1,7 @@
 .PHONY: build deploy
 
 test:
-	go test ./meta ./parser ./data
+	go test ./meta ./parser ./data ./batch
 
 /tmp/gomma:
 	go build -o /tmp/gomma

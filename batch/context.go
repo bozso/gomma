@@ -1,8 +1,6 @@
-package cli
+package batch
 
 import (
-	"bufio"
-	"encoding/json"
 	"log"
 
 	"github.com/bozso/gomma/cli"
