@@ -16,7 +16,6 @@ type Controller struct {
 	op         string
 	infile     string
 	outfile    string
-	config     Config
 }
 
 func (c *Controller) SetCli(cl *cli.Cli) {
@@ -28,12 +27,12 @@ func (c *Controller) SetCli(cl *cli.Cli) {
 	cl.NewFlag().
 		Name("operation").
 		Usage("operation to carry out").
-		String(&c.op)
+		StringVar(&c.op)
 
 	cl.NewFlag().
 		Name("in").
 		Usage("inputfile for batch operation").
-		String(&c.infile, "-")
+		StringVar(&c.infile, "-")
 
 	cl.NewFlag().
 		Name("out").

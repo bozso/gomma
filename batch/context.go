@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/bozso/gomma/cli"
 	"github.com/bozso/gomma/settings"
 	"github.com/bozso/gotoolbox/path"
 )
@@ -14,19 +15,23 @@ type ExecutorPayload struct {
 	Data []byte `json:"data"`
 }
 
-type ContextConfig struct {
-	Logfile   path.File       `json:"logfile"`
-	GammaPath path.Dir        `json:"gamma_dir"`
-	Executor  ExecutorPayload `json:"executor"`
+type ContextPayload struct {
+	Logfile   path.File         `json:"logfile"`
+	GammaPath path.Dir          `json:"gamma_dir"`
+	Executor  ExecutorPayload   `json:"executor"`
+	Config    cli.PathOrPayload `json:"config"`
 }
 
 type Context struct {
 	Logger        *log.Logger
 	GammaCommands settings.Commands
+	config        cli.PathOrPayload
 	/// TODO: add executor after merge
 }
 
 func (c *Context) Set(s string) (err error) {
+	decoder := cli.CoderJSON.GetDecoder()
+
 	f, err := path.New(s).ToValidFile()
 	if err != nil {
 		return
@@ -39,10 +44,12 @@ func (c *Context) Set(s string) (err error) {
 	defer reader.Close()
 
 	var payload ContextPayload
-	err = json.NewDecoder(bufio.NewReader(reader)).Decode(&payload)
+	err = decoder.Decode(&payload)
 	if err != nil {
 		return
 	}
+
+	c.config = payload.Config
 
 	return nil
 }
