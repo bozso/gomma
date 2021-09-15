@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"encoding/json"
+	"log"
 
 	"github.com/bozso/gomma/settings"
 	"github.com/bozso/gotoolbox/path"
@@ -20,7 +21,7 @@ type ContextConfig struct {
 }
 
 type Context struct {
-	Logger        io.Writer
+	Logger        *log.Logger
 	GammaCommands settings.Commands
 	/// TODO: add executor after merge
 }
