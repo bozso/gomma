@@ -33,15 +33,12 @@ type ParseConfig struct {
 func (p ParseConfig) ParseStringPayload(s string, v interface{}) (err error) {
 	var r io.Reader
 
-	stat, err := fs.Stat(p.fsys, s)
-	if err == nil {
-		if stat.IsDir() {
-			err = fmt.Errorf(
-				"expected path '%s' to be a file not a directory", s)
+	isFile, err := IsFile(p.fsys, s)
+	if err != nil {
+		return
+	}
 
-			return err
-		}
-
+	if isFile {
 		file, err := p.fsys.Open(s)
 		if err != nil {
 			return err

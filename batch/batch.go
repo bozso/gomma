@@ -2,11 +2,13 @@ package batch
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/bozso/gotoolbox/cli"
 )
 
 type Operation interface {
-	BatchOp(ctx Context, outfile, infile string) (err error)
+	BatchOp(ctx Context, in io.Reader, out io.Writer) (err error)
 }
 
 type OperationMap map[string]Operation
@@ -26,7 +28,9 @@ func (c Controller) Run() (err error) {
 			return fmt.Errorf("operation '%s' not found", c.op)
 		}
 
-		err = op.BatchOp(c.ctx, c.infile, c.outfile)
+
+
+		err = op.BatchOp(c.ctx, )
 		return
 	})
 }
