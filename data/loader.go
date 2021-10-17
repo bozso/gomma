@@ -3,13 +3,44 @@ package data
 import (
 	"io"
 	"io/fs"
+	"sync"
 
 	"git.sr.ht/~istvan_bozso/sedet/parser"
+	sfs "git.sr.ht/~istvan_bozso/shutil/fs"
 )
 
 type GetterMaker interface {
 	MakeGetter() parser.MutGetter
 	PutGetter(parser.MutGetter)
+}
+
+type GetterPool struct {
+	pool sync.Pool
+}
+
+func NewGetterPool() (gp GetterPool) {
+	return GetterPool{
+		pool: sync.Pool{
+			New: func() (v interface{}) {
+				return parser.NewMap()
+			},
+		},
+	}
+}
+
+func (m *GetterPool) MakeGetter() (m parser.MutGetter) {
+	return pool.Get().(parser.MutGetter)
+}
+
+func (m *GetterPool) PutGetter(m parser.MutGetter) {
+	return pool.Put(m)
+}
+
+func DefaultLoader() (l Loader) {
+	return Loader{
+		fsys:  sfs.OS(),
+		maker: NewGetterPool(),
+	}
 }
 
 type Loader struct {

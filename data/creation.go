@@ -9,12 +9,12 @@ import (
 type CreationMode int
 
 const (
-	None CreationMode = iota
-	Command
+	CreationNone CreationMode = iota
+	CreationCommand
 )
 
 func (c CreationMode) Some() (b bool) {
-	return c != None
+	return c != CreationNone
 }
 
 type CreatedBy struct {
@@ -45,4 +45,23 @@ func (c CreatedBy) Command() (cmd string, b bool) {
 	}
 
 	return c.Cmd, b
+}
+
+func (c *CreatedBy) UnmarshalJSON(b []byte) (err error) {
+	if len(b) == 0 {
+		c.Mode = CreationNone
+	} else {
+		c.Mode = CreationCommand
+		c.Cmd = string(b)
+	}
+
+	return nil
+}
+
+func (c *CreatedBy) MarshalJSON() (b []byte, err error) {
+	if c.Mode.Some() {
+		b = []byte(c.Cmd)
+	}
+
+	return
 }
