@@ -18,22 +18,22 @@ type GetterPool struct {
 	pool sync.Pool
 }
 
-func NewGetterPool() (gp GetterPool) {
-	return GetterPool{
+func NewGetterPool() (gp *GetterPool) {
+	return &GetterPool{
 		pool: sync.Pool{
 			New: func() (v interface{}) {
-				return parser.NewMap()
+				return parser.EmptyMap()
 			},
 		},
 	}
 }
 
-func (m *GetterPool) MakeGetter() (m parser.MutGetter) {
-	return pool.Get().(parser.MutGetter)
+func (m *GetterPool) MakeGetter() (mg parser.MutGetter) {
+	return m.pool.Get().(parser.MutGetter)
 }
 
-func (m *GetterPool) PutGetter(m parser.MutGetter) {
-	return pool.Put(m)
+func (m *GetterPool) PutGetter(mg parser.MutGetter) {
+	m.pool.Put(mg)
 }
 
 func DefaultLoader() (l Loader) {

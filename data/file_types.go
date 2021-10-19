@@ -1,22 +1,22 @@
 package data
 
 type TypeEnsurer struct {
-	dataTypes []Type
+	dataTypes []Kind
 }
 
 func (t TypeEnsurer) ValidateMeta(m Meta) (err error) {
 	return m.MustBeOfType(t.dataTypes...)
 }
 
-func NewTypeEnsurer(dtypes ...Type) (t TypeEnsurer) {
+func NewTypeEnsurer(dtypes ...Kind) (t TypeEnsurer) {
 	return TypeEnsurer{
 		dataTypes: dtypes,
 	}
 }
 
 var (
-	EnsureComplex = NewTypeEnsurer(ShortCpx, FloatCpx)
-	EnsureReal    = NewTypeEnsurer(Float, Double)
+	EnsureComplex = NewTypeEnsurer(KindShortCpx, KindFloatCpx)
+	EnsureReal    = NewTypeEnsurer(KindFloat, KindDouble)
 )
 
 func LoadAndValidate(l Loader, p PathWithPar, pk ParamKeys, v MetaValidator) (f File, err error) {

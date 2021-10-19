@@ -1,7 +1,16 @@
 package data
 
 type Path struct {
-	DataFile string `json:"data_file"`
+	DataFile string
+}
+
+func (p Path) UnmarshalJSON(b []byte) (err error) {
+	p.DataFile = string(b)
+	return nil
+}
+
+func (p Path) MarshalJSON() (b []byte, err error) {
+	return []byte(p.DataFile), nil
 }
 
 func New(file string) (p Path) {

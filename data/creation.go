@@ -22,6 +22,10 @@ type CreatedBy struct {
 	Cmd  string       `json:"command"`
 }
 
+func CreationUnknown() (c CreatedBy) {
+	return CreatedBy{Mode: CreationNone, Cmd: ""}
+}
+
 func (c CreatedBy) DescribeTo(w io.Writer) (n int, err error) {
 	if !c.Mode.Some() {
 		return fmt.Fprintf(w, "no information available on creation")

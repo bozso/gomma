@@ -7,70 +7,70 @@ import (
 	"github.com/bozso/gotoolbox/cli"
 )
 
-type Type int
+type Kind int
 
 const (
-	Float Type = iota
-	Double
-	ShortCpx
-	FloatCpx
-	Raster
-	UChar
-	Short
-	Unknown
-	Any
+	KindFloat Kind = iota
+	KindDouble
+	KindShortCpx
+	KindFloatCpx
+	KindRaster
+	KindUChar
+	KindShort
+	KindUnknown
+	KindAny
 )
 
-func (t *Type) SetCli(c *cli.Cli) {
-	c.Var(t, "dtype", "Datatype of datafile.")
+func (k *Kind) SetCli(c *cli.Cli) {
+	c.Var(k, "dtype", "Datatype of datafile.")
 }
 
-func (t *Type) Set(s string) error {
+func (t *Kind) Set(s string) error {
 	in := strings.ToUpper(s)
 
 	switch in {
 	case "FLOAT":
-		*t = Float
+		*t = KindFloat
 	case "DOUBLE":
-		*t = Double
+		*t = KindDouble
 	case "SCOMPLEX":
-		*t = ShortCpx
+		*t = KindShortCpx
 	case "FCOMPLEX":
-		*t = FloatCpx
+		*t = KindFloatCpx
 	case "SUN", "RASTER", "BMP":
-		*t = Raster
+		*t = KindRaster
 	case "UNSIGNED CHAR":
-		*t = UChar
+		*t = KindUChar
 	case "SHORT":
-		*t = Short
+		*t = KindShort
 	case "ANY":
-		*t = Any
+		*t = KindAny
 	default:
-		*t = Unknown
+		*t = KindUnknown
 	}
 
 	return nil
 }
 
-func (t Type) String() string {
-	switch t {
-	case Float:
+func (k Kind) String() string {
+	switch k {
+	case KindFloat:
 		return "FLOAT"
-	case Double:
+	case KindDouble:
 		return "DOUBLE"
-	case ShortCpx:
+	case KindShortCpx:
 		return "SCOMPLEX"
-	case FloatCpx:
+	case KindFloatCpx:
 		return "FCOMPLEX"
-	case Raster:
+	case KindRaster:
 		return "RASTER"
-	case UChar:
+	case KindUChar:
 		return "UNSIGNED CHAR"
-	case Short:
+	case KindShort:
 		return "SHORT"
-	case Any:
+	case KindAny:
 		return "ANY"
-	case Unknown:
+	case KindUnknown:
 		return "UNKNOWN"
 	default:
 		return "UNKNOWN"
@@ -79,7 +79,7 @@ func (t Type) String() string {
 
 type TypeMismatchError struct {
 	Expected string
-	Got      Type
+	Got      Kind
 	err      error
 }
 
@@ -93,36 +93,36 @@ func (e TypeMismatchError) Unwrap() error {
 }
 
 type UnknownTypeError struct {
-	Type
+	Kind
 	Err error
 }
 
 func (e UnknownTypeError) Error() string {
 	return fmt.Sprintf("unrecognised type '%s', expected a valid datatype",
-		e.Type.String())
+		e.Kind.String())
 }
 
 func (e UnknownTypeError) Unwrap() error {
 	return e.Err
 }
 
-func (t Type) WrongType(purpose string) error {
-	return WrongTypeError{t, purpose, nil}
+func (k Kind) WrongType(purpose string) error {
+	return WrongTypeError{Kind: k, data: purpose, err: nil}
 }
 
-func WrongType(dtype Type, kind string) error {
-	return WrongTypeError{dtype, kind, nil}
+func WrongType(dtype Kind, data string) error {
+	return WrongTypeError{Kind: dtype, data: data, err: nil}
 }
 
 type WrongTypeError struct {
-	Type
-	Kind string
+	Kind
+	data string
 	err  error
 }
 
 func (e WrongTypeError) Error() string {
-	return fmt.Sprintf("wrong datatype '%s' for %s", e.Type.String(),
-		e.Kind)
+	return fmt.Sprintf("wrong datatype '%s' for %s", e.Kind.String(),
+		e.data)
 }
 
 func (e WrongTypeError) Unwrap() error {
