@@ -32,10 +32,36 @@ func LoadDefault(l Loader, p PathWithPar, v MetaValidator) (f File, err error) {
 	return LoadAndValidate(l, p, DefaultKeys, v)
 }
 
-func LoadComplex(l Loader, p PathWithPar) (f File, err error) {
-	return LoadDefault(l, p, EnsureComplex)
+type Real struct {
+	File
 }
 
-func LoadReal(l Loader, p PathWithPar) (f File, err error) {
-	return LoadDefault(l, p, EnsureReal)
+func (r Real) Validate() (err error) {
+	return r.File.Meta.MustBeReal()
+}
+
+func LoadReal(l Loader, p PathWithPar) (r Real, err error) {
+	f, err := LoadDefault(l, p, EnsureReal)
+	if err != nil {
+		return
+	}
+
+	return Real{f}, nil
+}
+
+type Complex struct {
+	File
+}
+
+func (c Complex) Validate() (err error) {
+	return c.File.Meta.MustBeComplex()
+}
+
+func LoadComplex(l Loader, p PathWithPar) (c Complex, err error) {
+	f, err := LoadDefault(l, p, EnsureComplex)
+	if err != nil {
+		return
+	}
+
+	return Complex{f}, nil
 }

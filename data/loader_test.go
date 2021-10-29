@@ -33,7 +33,7 @@ func TestLoadMeta(t *testing.T) {
 }`,
 	}
 
-	date, err := time.Parse("2016.01.01", "2018.08.09")
+	date, err := time.Parse("2016.01.31", "2018.08.09")
 	if err != nil {
 		t.Fatalf("date parsing failed: %s", err)
 	}
