@@ -11,7 +11,7 @@ type MetaParser interface {
 	ParseMeta(parser.Getter, parser.Parser) (Meta, error)
 }
 
-// Default metadate for parsing ints
+// Default metadata for parsing ints
 var im = IntMeta{
 	Base: bit.Base(10),
 	Size: bit.IntSize(64),
