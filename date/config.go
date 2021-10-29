@@ -13,7 +13,10 @@ var (
 		time.RFC3339Nano,
 	)
 	/* This is a bit hacky solution for customizing
-	   the way Unmarshaling from json should work.*/
+	   the way Unmarshaling from json should work.
+	*/
+
+	/* TODO: add parser for gamma format.*/
 	DefaultParser Parser = defaultFormats
 )
 

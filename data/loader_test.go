@@ -2,11 +2,14 @@ package data
 
 import (
 	"encoding/json"
+	"log"
 	"reflect"
 	"testing"
 
 	"github.com/bozso/gomma/date"
 )
+
+var logger = log.Default()
 
 type TestPayload struct {
 	path string
@@ -21,19 +24,6 @@ func (t TestPayload) MarshalJSON() (b []byte, err error) {
 }
 
 func TestLoadMeta(t *testing.T) {
-	payload := TestPayload{
-		path: "data.mli",
-		meta: `
-{
-    "data_type": "FLOAT",
-    "range_azimuth": {
-        "range": 456,
-        "azimuth": 128,
-    },
-    "date": 2018.08.09
-}`,
-	}
-
 	date_, err := date.DefaultParser.ParseDate("2018-08-09")
 	if err != nil {
 		t.Fatalf("date parsing failed: %s", err)
@@ -52,13 +42,21 @@ func TestLoadMeta(t *testing.T) {
 		},
 	}
 
-	marshaled, err := payload.MarshalJSON()
+	marshaled := []byte(`
+    {
+        "path": "data.mli",
+        "meta": {
+            "data_type": "FLOAT",
+            "range_azimuth": {
+                "range": 456,
+                "azimuth": 128
+            },
+            "date": "2018-08-09"
+        }
+    }`)
+	logger.Printf("payload: '%s'\n", string(marshaled))
 
 	var parsed File
-	if err := json.Unmarshal(marshaled, &parsed); err != nil {
-		t.Fatalf("json marshaling failed: %s", err)
-	}
-
 	if err := json.Unmarshal(marshaled, &parsed); err != nil {
 		t.Fatalf("json unmarshaling failed: %s", err)
 	}
