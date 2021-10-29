@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+func New(t time.Time) (d Date) {
+	return Date{t}
+}
+
 type ToTime interface {
 	AsTime() time.Time
 }

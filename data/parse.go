@@ -1,6 +1,8 @@
 package data
 
 import (
+	"github.com/bozso/gomma/date"
+
 	"git.sr.ht/~istvan_bozso/sedet/bit"
 	"git.sr.ht/~istvan_bozso/sedet/parser"
 )
@@ -30,6 +32,8 @@ var DefaultKeys = ParamKeys{
 	Date:    "date",
 }
 
+const DateParse = date.Format("2016 12 05")
+
 func (pk ParamKeys) ParseMeta(g parser.Getter, p parser.Parser) (m Meta, err error) {
 	pg := WithGetter(p, g)
 
@@ -57,7 +61,11 @@ func (pk ParamKeys) ParseMeta(g parser.Getter, p parser.Parser) (m Meta, err err
 		return
 	}
 
-	m.Date, err = DateFmt.Parse(s)
+	time, err := DateParse.ParseDate(s)
+	if err != nil {
+		return
+	}
+	m.Date = date.New(time)
 
 	return
 }

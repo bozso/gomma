@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
-	"time"
+
+	"github.com/bozso/gomma/date"
 )
 
 type TestPayload struct {
@@ -33,7 +34,7 @@ func TestLoadMeta(t *testing.T) {
 }`,
 	}
 
-	date, err := time.Parse("2016.01.31", "2018.08.09")
+	date_, err := date.DefaultParser.ParseDate("2018-08-09")
 	if err != nil {
 		t.Fatalf("date parsing failed: %s", err)
 	}
@@ -46,7 +47,7 @@ func TestLoadMeta(t *testing.T) {
 				Rng: 456,
 				Azi: 128,
 			},
-			Date:      date,
+			Date:      date.New(date_),
 			CreatedBy: CreationUnknown(),
 		},
 	}

@@ -3,7 +3,6 @@ package data
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/bozso/gomma/date"
 )
@@ -13,7 +12,7 @@ const DateFmt date.ParseFmt = "2016 12 05"
 type Meta struct {
 	DataType  Kind      `json:"data_type"`
 	RngAzi    RngAzi    `json:"range_azimuth"`
-	Date      time.Time `json:"date"`
+	Date      date.Date `json:"date"`
 	CreatedBy CreatedBy `json:"created_by"`
 }
 

@@ -51,6 +51,15 @@ type Formats struct {
 	formats []Format
 }
 
+func FormatsFromStrings(strings ...string) (f Formats) {
+	l := len(strings)
+	f.formats = make([]Format, l)
+	for ii, s := range strings {
+		f.formats[ii] = Format(s)
+	}
+	return
+}
+
 func (f Formats) ParseDate(s string) (t time.Time, err error) {
 	for _, format := range f.formats {
 		t, err = format.ParseDate(s)
