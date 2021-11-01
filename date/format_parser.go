@@ -35,5 +35,8 @@ func NewLogFormatParser(parser FormatParser, logger *log.Logger) (l LogFormatPar
 func (l LogFormatParser) ParseWithFormat(fmt Format, s string) (t time.Time, err error) {
 	l.logger.Debugf("Parsing with format: %s", fmt)
 	t, err = l.parser.ParseWithFormat(fmt, s)
+	if err != nil {
+		l.logger.Debugf("failed with: %s", err)
+	}
 	return
 }

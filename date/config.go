@@ -15,10 +15,15 @@ var (
 		time.RFC3339Nano,
 	)
 
-	StdParser = NewStdParser()
-	logger    = log.StandardLogger()
+	StdParser   = NewStdParser()
+	Logger      = log.StandardLogger()
+	DebugLogger = func() (l *log.Logger) {
+		l = log.StandardLogger()
+		l.SetLevel(log.DebugLevel)
+		return
+	}()
 
-	debugParser         = NewLogFormatParser(StdParser, logger)
+	debugParser         = NewLogFormatParser(StdParser, DebugLogger)
 	DefaultFormatParser = StdParser
 
 	/* This is a bit hacky solution for customizing
@@ -26,10 +31,17 @@ var (
 	*/
 
 	/* TODO: add parser for gamma format.*/
-	DefaultParser = NewLogger(
+	DebugParser = NewLogger(
 		defaultFormats.Ref(debugParser),
-		logger,
+		Logger,
 	)
+
+	DefaultParser = NewLogger(
+		defaultFormats.Ref(StdParser),
+		Logger,
+	)
+	// parser = DebugParser
+	parser = DefaultParser
 )
 
 type Date struct {
@@ -37,6 +49,6 @@ type Date struct {
 }
 
 func (d Date) UnmarshalJSON(b []byte) (err error) {
-	d.Time, err = DefaultParser.ParseDate(string(b))
+	d.Time, err = parser.ParseDate(string(b))
 	return
 }
