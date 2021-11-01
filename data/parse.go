@@ -32,7 +32,7 @@ var DefaultKeys = ParamKeys{
 	Date:    "date",
 }
 
-const DateParse = date.Format("2016 12 05")
+var DateParse = date.Format("2016 12 05").Ref(date.DefaultFormatParser)
 
 func (pk ParamKeys) ParseMeta(g parser.Getter, p parser.Parser) (m Meta, err error) {
 	pg := WithGetter(p, g)

@@ -40,36 +40,3 @@ func (m MultiParser) ParseDate(s string) (t time.Time, err error) {
 		LastError: err,
 	}
 }
-
-type Format string
-
-func (f Format) ParseDate(s string) (t time.Time, err error) {
-	return time.Parse(string(f), s)
-}
-
-type Formats struct {
-	formats []Format
-}
-
-func FormatsFromStrings(strings ...string) (f Formats) {
-	l := len(strings)
-	f.formats = make([]Format, l)
-	for ii, s := range strings {
-		f.formats[ii] = Format(s)
-	}
-	return
-}
-
-func (f Formats) ParseDate(s string) (t time.Time, err error) {
-	for _, format := range f.formats {
-		t, err = format.ParseDate(s)
-		if err == nil {
-			return t, err
-		}
-	}
-
-	return t, MultiParseError{
-		Input:     s,
-		LastError: err,
-	}
-}
