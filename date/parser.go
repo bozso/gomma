@@ -16,7 +16,7 @@ type MultiParseError struct {
 
 func (m MultiParseError) Error() (s string) {
 	return fmt.Sprintf(
-		"failed to parse string '%s' using multiple parsers, last error was: %s", m.Input, m.LastError)
+		"failed to parse string %s using multiple parsers, last error was: %s", m.Input, m.LastError)
 }
 
 func (m MultiParseError) Unwrap() (err error) {
