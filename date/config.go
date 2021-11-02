@@ -8,6 +8,7 @@ import (
 
 var (
 	defaultFormats = FormatsFromStrings(
+		"2006 01 02",
 		"2006-01-02",
 		time.RFC1123,
 		time.RFC1123Z,
@@ -41,11 +42,15 @@ var (
 		Logger,
 	)
 	// parser = DebugParser
-	parser = DefaultParser
+	parser Parser = DefaultParser
 )
 
 type Date struct {
 	time.Time
+}
+
+func (Date) SetParser(dateParser Parser) {
+    parser = dateParser
 }
 
 func (d Date) UnmarshalJSON(b []byte) (err error) {
