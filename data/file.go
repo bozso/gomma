@@ -3,7 +3,7 @@ package data
 import ()
 
 type File struct {
-	DataFile Path
+	DataFile Path `json:"data_path"`
 	Meta     Meta `json:"meta"`
 }
 

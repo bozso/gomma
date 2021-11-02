@@ -1,6 +1,8 @@
 package data
 
 import (
+	"github.com/bozso/gomma/date"
+
 	"git.sr.ht/~istvan_bozso/sedet/bit"
 	"git.sr.ht/~istvan_bozso/sedet/parser"
 )
@@ -9,7 +11,7 @@ type MetaParser interface {
 	ParseMeta(parser.Getter, parser.Parser) (Meta, error)
 }
 
-// Default metadate for parsing ints
+// Default metadata for parsing ints
 var im = IntMeta{
 	Base: bit.Base(10),
 	Size: bit.IntSize(64),
@@ -29,6 +31,8 @@ var DefaultKeys = ParamKeys{
 	Type:    "image_format",
 	Date:    "date",
 }
+
+var DateParse = date.Format("2016 12 05").Ref(date.DefaultFormatParser)
 
 func (pk ParamKeys) ParseMeta(g parser.Getter, p parser.Parser) (m Meta, err error) {
 	pg := WithGetter(p, g)
@@ -57,7 +61,11 @@ func (pk ParamKeys) ParseMeta(g parser.Getter, p parser.Parser) (m Meta, err err
 		return
 	}
 
-	m.Date, err = DateFmt.Parse(s)
+	time, err := DateParse.ParseDate(s)
+	if err != nil {
+		return
+	}
+	m.Date = date.New(time)
 
 	return
 }

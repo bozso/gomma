@@ -8,4 +8,5 @@ require (
 	github.com/bozso/emath v0.3.0
 	github.com/bozso/gotoolbox v0.0.2
 	github.com/paulmach/orb v0.2.2
+	github.com/sirupsen/logrus v1.8.1
 )
