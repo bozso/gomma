@@ -4,7 +4,7 @@ type Path struct {
 	DataFile string
 }
 
-func (p Path) UnmarshalJSON(b []byte) (err error) {
+func (p *Path) UnmarshalJSON(b []byte) (err error) {
 	p.DataFile = string(b)
 	return nil
 }
