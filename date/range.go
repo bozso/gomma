@@ -85,8 +85,8 @@ type Checkers struct {
 	checkers []Checker
 }
 
-func NewCheckersWithCap(cap int) (c Checkers) {
-	c.checkers = make([]Checker, 0, cap)
+func NewCheckersWithCap(capacity int) (c Checkers) {
+	c.checkers = make([]Checker, 0, capacity)
 	return
 }
 
@@ -103,8 +103,8 @@ func (c Checkers) In(t time.Time) (b bool) {
 		return true
 	}
 
-	for ii, _ := range c.checkers {
-		b = c.checkers[ii].In(t)
+	for _, checker := range c.checkers {
+		b = checker.In(t)
 		if b {
 			break
 		}
@@ -132,8 +132,8 @@ func (_ NoChecker) Add(ch Checker) (c Checkers) {
 
 func (_ NoChecker) Extend(ch ...Checker) (c Checkers) {
 	c = NewCheckersWithCap(len(ch))
-	for ii, _ := range ch {
-		c.Append(ch[ii])
+	for _, checker := range ch {
+		c.Append(checker)
 	}
 	return
 }

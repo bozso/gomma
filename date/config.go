@@ -50,7 +50,7 @@ type Date struct {
 }
 
 func (Date) SetParser(dateParser Parser) {
-    parser = dateParser
+	parser = dateParser
 }
 
 func (d Date) UnmarshalJSON(b []byte) (err error) {
