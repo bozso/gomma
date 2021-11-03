@@ -75,7 +75,7 @@ func (l Loader) WithParamGetter(r io.Reader, fn UseParamFunc) (err error) {
 }
 
 func (l Loader) ParseMeta(r io.Reader, mp MetaParser) (m Meta, err error) {
-	l.WithParamGetter(r, func(g parser.Getter) (err error) {
+	err = l.WithParamGetter(r, func(g parser.Getter) (err error) {
 		m, err = mp.ParseMeta(g, l.parser)
 		return
 	})
