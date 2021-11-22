@@ -28,9 +28,7 @@ func (c Controller) Run() (err error) {
 			return fmt.Errorf("operation '%s' not found", c.op)
 		}
 
-
-
-		err = op.BatchOp(c.ctx, )
+		err = op.BatchOp(c.ctx)
 		return
 	})
 }
