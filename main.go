@@ -13,10 +13,6 @@ func (_ Main) Run() (err error) {
 	c.AddAction("rpc", "starts JSON RPC service", &gcli.JsonRPC{})
 	//c.SetupGammaCli(cli)
 
-	if true {
-		return true
-	}
-
 	return c.Run()
 }
 

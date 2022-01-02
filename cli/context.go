@@ -9,14 +9,14 @@ import (
 )
 
 type ExecutorPayload struct {
-	Tag  string `json:"type"`
-	Data []byte `json:"data"`
+	Tag  string `json:"type" toml:"type"`
+	Data []byte `json:"data" toml:"data"`
 }
 
 type ContextConfig struct {
-	Logfile   path.File       `json:"logfile"`
-	GammaPath path.Dir        `json:"gamma_dir"`
-	Executor  ExecutorPayload `json:"executor"`
+	Logfile   string          `json:"logfile" toml:"logfile"`
+	GammaPath string          `json:"gamma_dir" toml:"gamma_dir"`
+	Executor  ExecutorPayload `json:"executor" toml:"executor"`
 }
 
 type Context struct {
@@ -26,19 +26,14 @@ type Context struct {
 }
 
 func (c *Context) Set(s string) (err error) {
-	f, err := path.New(s).ToValidFile()
+	f, err := OsFS.Open(s)
 	if err != nil {
 		return
 	}
-
-	reader, err := f.Open()
-	if err != nil {
-		return
-	}
-	defer reader.Close()
+	defer f.Close()
 
 	var payload ContextPayload
-	err = json.NewDecoder(bufio.NewReader(reader)).Decode(&payload)
+	err = json.NewDecoder(bufio.NewReader(f)).Decode(&payload)
 	if err != nil {
 		return
 	}
