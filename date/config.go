@@ -1,6 +1,7 @@
 package date
 
 import (
+	"bytes"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -41,7 +42,7 @@ var (
 		defaultFormats.Ref(StdParser),
 		Logger,
 	)
-	// parser = DebugParser
+	// parser Parser = DebugParser
 	parser Parser = DefaultParser
 )
 
@@ -54,6 +55,6 @@ func (Date) SetParser(dateParser Parser) {
 }
 
 func (d *Date) UnmarshalJSON(b []byte) (err error) {
-	d.Time, err = parser.ParseDate(string(b))
+	d.Time, err = parser.ParseDate(string(bytes.Trim(b, "\"")))
 	return
 }

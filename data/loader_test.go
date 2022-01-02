@@ -25,6 +25,7 @@ func (t TestPayload) MarshalJSON() (b []byte, err error) {
 
 func TestLoadMeta(t *testing.T) {
 	date_, err := date.DefaultParser.ParseDate("2018-08-09")
+	logger.Printf("%s\n", date_)
 	if err != nil {
 		t.Fatalf("date parsing failed: %s", err)
 	}
